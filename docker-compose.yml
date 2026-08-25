@@ -1,0 +1,9 @@
+services:
+  portunus:
+    build: .
+    ports:
+      - '3060:3060'
+    volumes:
+      - './data:/app/data'
+    container_name: portunus
+    restart: unless-stopped
