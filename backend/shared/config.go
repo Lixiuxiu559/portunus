@@ -24,7 +24,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	c := &Config{}
 	c.Server.Host = "0.0.0.0"
-	c.Server.Port = 8080
+	c.Server.Port = 3060
 	c.Database.Type = "sqlite"
 	c.Database.Path = "data/portunus.db"
 	return c

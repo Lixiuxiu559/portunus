@@ -54,7 +54,7 @@ GOPROXY=https://goproxy.cn,direct go mod tidy   # 网络直连 proxy.golang.org 
 go run .
 ```
 
-服务默认监听 `0.0.0.0:8080`，SQLite 数据库位于 `data/portunus.db`。
+服务默认监听 `0.0.0.0:3060`，SQLite 数据库位于 `data/portunus.db`。
 
 ### 配置
 
@@ -62,7 +62,7 @@ go run .
 
 ```json
 {
-  "server": { "host": "0.0.0.0", "port": 8080 },
+  "server": { "host": "0.0.0.0", "port": 3060 },
   "database": { "type": "sqlite", "path": "data/portunus.db" }
 }
 ```
