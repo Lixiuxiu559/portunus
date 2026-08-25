@@ -73,12 +73,3 @@ func TestRewriteModel(t *testing.T) {
 		t.Errorf("group-name 不应残留: %s", out)
 	}
 }
-
-func TestNextRoundRobin(t *testing.T) {
-	const groupID = 99999
-	for i := 0; i < 5; i++ {
-		if got := nextRoundRobin(groupID, 3); got != i%3 {
-			t.Errorf("第 %d 次轮询 = %d, want %d", i, got, i%3)
-		}
-	}
-}

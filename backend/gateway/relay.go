@@ -11,6 +11,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/router"
 )
 
 // relayMeta 是三种客户端协议请求体的最小公共字段。
@@ -45,7 +46,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			return
 		}
 
-		targets, err := selectTargets(g)
+		targets, err := router.Resolve(g)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -79,7 +80,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端，一旦提交（写入 200 头）不再返回错误触发 failover。
-func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t target, originalBody []byte, apiKeyID int64) (out []byte, status int, err error) {
+func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -87,17 +88,17 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds())
 	}()
 
-	reqBody, err := rewriteModel(originalBody, t.model.Name)
+	reqBody, err := rewriteModel(originalBody, t.Model.Name)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	upBody, err := protocol.ConvertRequest(clientProto, t.channel.Type, reqBody)
+	upBody, err := protocol.ConvertRequest(clientProto, t.Channel.Type, reqBody)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	resp, err := doRequest(buildURL(t.channel, t.model.Name, stream), buildHeaders(t.channel), upBody)
+	resp, err := doRequest(buildURL(t.Channel, t.Model.Name, stream), buildHeaders(t.Channel), upBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -110,7 +111,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	}
 
 	if stream {
-		conv, convErr := protocol.NewStreamConverter(t.channel.Type, clientProto)
+		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto)
 		if convErr != nil {
 			return nil, status, convErr
 		}
@@ -124,8 +125,8 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if readErr != nil {
 			return nil, status, readErr
 		}
-		usage = protocol.UsageFromResponse(t.channel.Type, upRespBody)
-		out, err = protocol.ConvertResponse(t.channel.Type, clientProto, upRespBody)
+		usage = protocol.UsageFromResponse(t.Channel.Type, upRespBody)
+		out, err = protocol.ConvertResponse(t.Channel.Type, clientProto, upRespBody)
 		if err != nil {
 			return nil, status, err
 		}

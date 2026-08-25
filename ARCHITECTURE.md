@@ -16,13 +16,14 @@ LLM API 聚合服务：多渠道接入、按渠道模型定价、模型分组对
 | `channel` | 渠道：上游连接配置（type / base_url / key），自动从 `/models` 拉模型 |
 | `model` | 模型：管理渠道中的模型，**每个模型带价格**（内置价格表填默认 + 手动覆盖） |
 | `group` | 分组：跨渠道聚合模型，**每个分组必配一个路由策略** |
+| `router` | 路由解析：按分组策略决定调用哪个/哪些上游，返回「模型 + 渠道」 |
 | `protocol` | 协议转换：OpenAI Chat / Responses ↔ Anthropic ↔ Gemini |
 | `api` | 管理 API：供前端调用（渠道 / 模型 / 分组的 CRUD） |
 | `gateway` | 对外 `/v1` LLM 接口：供 claude code / codex 等客户端调用，按分组策略路由 |
 | `cron` | 定时任务：定时同步模型、日志落库 |
 | `shared` | 跨模块公共：配置、数据库初始化、APIKey / 日志实体 |
 
-依赖方向：`api` / `gateway` / `cron` → `channel` / `model` / `group` / `protocol` → `shared`。模块之间用外键 ID 关联，避免包级循环依赖。
+依赖方向：`api` / `gateway` / `cron` → `router` / `channel` / `model` / `group` / `protocol` → `shared`。模块之间用外键 ID 关联，避免包级循环依赖。
 
 ## 核心概念
 
