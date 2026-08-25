@@ -26,6 +26,7 @@ func Register(r *gin.RouterGroup) {
 	registerGroupRoutes(r)   // 分组 CRUD
 	registerSettingRoutes(r) // 全局设置
 	registerAPIKeyRoutes(r)  // API Key CRUD
+	registerLogRoutes(r)     // 日志查询与统计
 }
 
 // parseID 解析路径参数中的 id。
