@@ -1,0 +1,7 @@
+# 将 web/ 声明为独立的 pnpm workspace，
+# 避免 pnpm 向上查找命中 ~/pnpm-workspace.yaml 而把本目录误并入 home 的 workspace
+packages:
+  - '.'
+onlyBuiltDependencies:
+  - electron
+  - '@electron/get'
