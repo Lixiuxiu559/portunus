@@ -15,6 +15,7 @@ func registerLogRoutes(r *gin.RouterGroup) {
 	g := r.Group("/logs")
 	g.GET("", listLogs)
 	g.GET("/stat", getLogStats)
+	g.DELETE("", deleteOldLogs)
 }
 
 // parseLogFilter 从 query string 解析筛选条件。
@@ -64,4 +65,20 @@ func getLogStats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, s)
+}
+
+// deleteOldLogs 删除 created_at 早于 target_timestamp（Unix 秒）的历史日志。
+func deleteOldLogs(c *gin.Context) {
+	ts, err := strconv.ParseInt(c.Query("target_timestamp"), 10, 64)
+	if err != nil || ts <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 target_timestamp 参数（Unix 秒）"})
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	count, err := shared.DeleteOldLogs(time.Unix(ts, 0), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": count})
 }

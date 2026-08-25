@@ -367,9 +367,10 @@ func geminiResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 	}
 	if resp.UsageMetadata != nil {
 		out.Usage = &Usage{
-			PromptTokens:     resp.UsageMetadata.PromptTokenCount,
+			PromptTokens:     resp.UsageMetadata.PromptTokenCount - resp.UsageMetadata.CachedContentTokenCount,
 			CompletionTokens: resp.UsageMetadata.CandidatesTokenCount,
 			TotalTokens:      resp.UsageMetadata.TotalTokenCount,
+			CacheReadTokens:  resp.UsageMetadata.CachedContentTokenCount,
 		}
 	}
 	return out, nil

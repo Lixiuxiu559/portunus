@@ -30,10 +30,12 @@ func main() {
 		&group.Group{},
 		&group.GroupItem{},
 		&shared.APIKey{},
-		&shared.Log{},
 		&shared.Setting{},
 	); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
+	}
+	if err := shared.InitLogDB(cfg); err != nil {
+		log.Fatalf("初始化日志库失败: %v", err)
 	}
 	if err := shared.EnsureDefaultSettings(); err != nil {
 		log.Fatalf("初始化默认设置失败: %v", err)

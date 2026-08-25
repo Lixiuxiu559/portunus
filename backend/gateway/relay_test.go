@@ -39,9 +39,12 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 	t.Cleanup(closeDB) // 先于 TempDir 清理关闭 DB，避免目录删除失败
 	if err := shared.AutoMigrate(
 		&channel.Channel{}, &model.Model{}, &group.Group{}, &group.GroupItem{},
-		&shared.APIKey{}, &shared.Log{},
+		&shared.APIKey{},
 	); err != nil {
 		t.Fatalf("迁移失败: %v", err)
+	}
+	if err := shared.InitLogDB(cfg); err != nil {
+		t.Fatalf("初始化日志库失败: %v", err)
 	}
 
 	srv := httptest.NewServer(upstream)

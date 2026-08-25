@@ -33,6 +33,8 @@ var defaultPrice = map[string]Price{
 	"claude-sonnet":    {Input: 3, Output: 15, CacheRead: 0.3, CacheWrite: 3.75},
 	"claude-haiku":     {Input: 0.8, Output: 4, CacheRead: 0.08, CacheWrite: 1},
 	"gemini-2.5-flash": {Input: 0.3, Output: 2.5, CacheRead: 0.03, CacheWrite: 0.3},
+	"deepseek-v4-pro":  {Input: 1.0, Output: 4.0, CacheRead: 0.1, CacheWrite: 1.0},
+	"deepseek-v4-flash": {Input: 0.3, Output: 1.2, CacheRead: 0.03, CacheWrite: 0.3},
 }
 
 // ApplyDefaultPrice 为拉回的模型套用内置默认价；未匹配到的模型价格保持 0，由用户手填。

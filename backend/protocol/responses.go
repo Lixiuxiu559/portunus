@@ -75,6 +75,9 @@ type ResponsesUsage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
 	TotalTokens  int `json:"total_tokens"`
+	InputTokensDetails struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"input_tokens_details"`
 }
 
 // ResponsesStreamEvent 是 Responses 流式事件。
@@ -290,9 +293,10 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 
 	if resp.Usage != nil {
 		out.Usage = &Usage{
-			PromptTokens:     resp.Usage.InputTokens,
+			PromptTokens:     resp.Usage.InputTokens - resp.Usage.InputTokensDetails.CachedTokens,
 			CompletionTokens: resp.Usage.OutputTokens,
 			TotalTokens:      resp.Usage.TotalTokens,
+			CacheReadTokens:  resp.Usage.InputTokensDetails.CachedTokens,
 		}
 	}
 	return out, nil
@@ -369,9 +373,10 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			r.st.setMeta(ev.Response.ID, ev.Response.Model)
 			if ev.Response.Usage != nil {
 				r.st.usage = &Usage{
-					PromptTokens:     ev.Response.Usage.InputTokens,
+					PromptTokens:     ev.Response.Usage.InputTokens - ev.Response.Usage.InputTokensDetails.CachedTokens,
 					CompletionTokens: ev.Response.Usage.OutputTokens,
 					TotalTokens:      ev.Response.Usage.TotalTokens,
+					CacheReadTokens:  ev.Response.Usage.InputTokensDetails.CachedTokens,
 				}
 			}
 			r.st.finish = "stop"

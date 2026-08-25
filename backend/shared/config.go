@@ -14,8 +14,9 @@ type Config struct {
 		Port int    `json:"port"`
 	} `json:"server"`
 	Database struct {
-		Type string `json:"type"` // sqlite / mysql / postgres
-		Path string `json:"path"`
+		Type    string `json:"type"` // sqlite / mysql / postgres
+		Path    string `json:"path"`
+		LogPath string `json:"log_path"` // 可选：日志库独立路径，空则复用主库
 	} `json:"database"`
 }
 
@@ -60,5 +61,8 @@ func applyEnv(c *Config) {
 	}
 	if v := os.Getenv("PORTUNUS_DATABASE_PATH"); v != "" {
 		c.Database.Path = v
+	}
+	if v := os.Getenv("PORTUNUS_DATABASE_LOG_PATH"); v != "" {
+		c.Database.LogPath = v
 	}
 }

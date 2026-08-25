@@ -418,9 +418,11 @@ func anthropicResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 	}
 	if resp.Usage != nil {
 		out.Usage = &Usage{
-			PromptTokens:     resp.Usage.InputTokens,
+			PromptTokens:     resp.Usage.InputTokens - resp.Usage.CacheCreationInputTokens - resp.Usage.CacheReadInputTokens,
 			CompletionTokens: resp.Usage.OutputTokens,
 			TotalTokens:      resp.Usage.InputTokens + resp.Usage.OutputTokens,
+			CacheReadTokens:  resp.Usage.CacheReadInputTokens,
+			CacheWriteTokens: resp.Usage.CacheCreationInputTokens,
 		}
 	}
 	return out, nil
@@ -521,7 +523,11 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		if ev.Message != nil {
 			a.st.setMeta(ev.Message.ID, ev.Message.Model)
 			if ev.Message.Usage != nil {
-				a.st.usage = &Usage{PromptTokens: ev.Message.Usage.InputTokens}
+				a.st.usage = &Usage{
+					PromptTokens:     ev.Message.Usage.InputTokens - ev.Message.Usage.CacheCreationInputTokens - ev.Message.Usage.CacheReadInputTokens,
+					CacheReadTokens:  ev.Message.Usage.CacheReadInputTokens,
+					CacheWriteTokens: ev.Message.Usage.CacheCreationInputTokens,
+				}
 			}
 			if b := a.st.emitRole("assistant"); b != nil {
 				out = append(out, b)
@@ -561,7 +567,7 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 				a.st.usage = &Usage{}
 			}
 			a.st.usage.CompletionTokens = ev.Usage.OutputTokens
-			a.st.usage.TotalTokens = a.st.usage.PromptTokens + a.st.usage.CompletionTokens
+			a.st.usage.TotalTokens = a.st.usage.PromptTokens + a.st.usage.CompletionTokens + a.st.usage.CacheReadTokens + a.st.usage.CacheWriteTokens
 		}
 	case "message_stop":
 		// no-op，收尾由 Finish 统一处理
