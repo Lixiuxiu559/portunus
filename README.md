@@ -24,16 +24,13 @@ Portunus is a lightweight LLM API aggregation service: connect multiple upstream
 ### Docker
 
 ```bash
-git clone https://github.com/Lixiuxiu559/portunus.git && cd portunus
-docker compose up -d
+docker run -d --name portunus -v /path/to/data:/app/data -p 3060:3060 lixiuxiu559/portunus
 ```
 
-Or build and run the image manually:
+Or use Docker Compose:
 
 ```bash
-git clone https://github.com/Lixiuxiu559/portunus.git && cd portunus
-docker build -t portunus .
-docker run -d --name portunus -v ./data:/app/data -p 3060:3060 portunus
+docker compose up -d
 ```
 
 ### Run from Source

@@ -1,6 +1,6 @@
 services:
   portunus:
-    build: .
+    image: lixiuxiu559/portunus
     ports:
       - '3060:3060'
     volumes:

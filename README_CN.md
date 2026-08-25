@@ -24,16 +24,13 @@ Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，�
 ### Docker
 
 ```bash
-git clone https://github.com/Lixiuxiu559/portunus.git && cd portunus
-docker compose up -d
+docker run -d --name portunus -v /path/to/data:/app/data -p 3060:3060 lixiuxiu559/portunus
 ```
 
-或手动构建并运行：
+或使用 Docker Compose：
 
 ```bash
-git clone https://github.com/Lixiuxiu559/portunus.git && cd portunus
-docker build -t portunus .
-docker run -d --name portunus -v ./data:/app/data -p 3060:3060 portunus
+docker compose up -d
 ```
 
 ### 从源码运行
