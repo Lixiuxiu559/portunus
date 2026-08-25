@@ -86,6 +86,13 @@ func Get(id int64) (*Channel, error) {
 	return &c, nil
 }
 
+// Exists 校验渠道是否存在。
+func Exists(id int64) (bool, error) {
+	var count int64
+	err := shared.DB.Model(&Channel{}).Where("id = ?", id).Count(&count).Error
+	return count > 0, err
+}
+
 // Create 创建渠道。
 func Create(req CreateRequest) (*Channel, error) {
 	c := Channel{

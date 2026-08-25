@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Lixiuxiu559/portunus/backend/channel"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -90,7 +91,7 @@ func Create(req CreateRequest) (*Model, error) {
 	if req.Name == "" {
 		return nil, ErrInvalid
 	}
-	ok, err := channelExists(req.ChannelID)
+	ok, err := channel.Exists(req.ChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +131,7 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 		m.Name = *req.Name
 	}
 	if req.ChannelID != nil {
-		ok, err := channelExists(*req.ChannelID)
+		ok, err := channel.Exists(*req.ChannelID)
 		if err != nil {
 			return nil, err
 		}
@@ -173,9 +174,9 @@ func resolvePrice(req *float64, def float64) float64 {
 	return def
 }
 
-// channelExists 校验渠道是否存在。
-func channelExists(id int64) (bool, error) {
+// Exists 校验模型是否存在。
+func Exists(id int64) (bool, error) {
 	var count int64
-	err := shared.DB.Table("channels").Where("id = ?", id).Count(&count).Error
+	err := shared.DB.Model(&Model{}).Where("id = ?", id).Count(&count).Error
 	return count > 0, err
 }

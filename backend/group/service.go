@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -111,19 +112,22 @@ func Create(req CreateRequest) (*Group, error) {
 	if req.Name == "" || !req.Strategy.Valid() {
 		return nil, ErrInvalid
 	}
+	// 预校验所有模型存在（只读，无需进事务）
+	for _, it := range req.Items {
+		ok, err := model.Exists(it.ModelID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrModelNotFound
+		}
+	}
 	g := Group{Name: req.Name, Strategy: req.Strategy}
 	err := shared.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&g).Error; err != nil {
 			return err
 		}
 		for _, it := range req.Items {
-			ok, err := modelExists(tx, it.ModelID)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return ErrModelNotFound
-			}
 			item := GroupItem{GroupID: g.ID, ModelID: it.ModelID, Priority: it.Priority}
 			if err := tx.Create(&item).Error; err != nil {
 				return err
@@ -183,7 +187,7 @@ func AddItem(groupID int64, req ItemAddRequest) (*GroupItem, error) {
 	if err := shared.DB.First(&g, groupID).Error; err != nil {
 		return nil, err
 	}
-	ok, err := modelExists(shared.DB, req.ModelID)
+	ok, err := model.Exists(req.ModelID)
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +233,4 @@ func itemInGroup(itemID, groupID int64) bool {
 		return false
 	}
 	return count > 0
-}
-
-// modelExists 校验模型是否存在（直接用表名，避免跨包依赖）。
-func modelExists(db *gorm.DB, id int64) (bool, error) {
-	var count int64
-	err := db.Table("models").Where("id = ?", id).Count(&count).Error
-	return count > 0, err
 }
