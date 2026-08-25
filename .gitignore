@@ -1,0 +1,10 @@
+# AI agent / 本地工具配置（不随项目公开）
+.codegraph/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+.mcp.json
+
+# 运行时数据（本地数据库、配置）
+data/
+config.json
