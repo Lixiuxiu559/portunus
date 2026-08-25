@@ -66,7 +66,7 @@ func GetCurrency() Currency {
 // SetCurrency 更新货币设置。
 func SetCurrency(c Currency) error {
 	if !c.Valid() {
-		return fmt.Errorf("不支持的货币: %s", c)
+		return &StatusError{Status: 400, Message: fmt.Sprintf("不支持的货币: %s", c)}
 	}
 	if DB == nil {
 		return fmt.Errorf("数据库未初始化")

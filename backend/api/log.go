@@ -51,7 +51,7 @@ func parseLogFilter(c *gin.Context) shared.LogFilter {
 func listLogs(c *gin.Context) {
 	logs, total, err := shared.ListLogs(parseLogFilter(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"total": total, "data": logs})
@@ -60,7 +60,7 @@ func listLogs(c *gin.Context) {
 func getLogStats(c *gin.Context) {
 	s, err := shared.LogStatsBy(parseLogFilter(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, s)

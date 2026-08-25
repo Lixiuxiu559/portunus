@@ -39,7 +39,7 @@ func toAPIKeyResponse(k *shared.APIKey, full bool) apiKeyResponse {
 func listAPIKeys(c *gin.Context) {
 	ks, err := shared.ListAPIKeys()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	resp := make([]apiKeyResponse, 0, len(ks))
@@ -59,7 +59,7 @@ func createAPIKey(c *gin.Context) {
 	}
 	k, err := shared.CreateAPIKey(req.Name)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, toAPIKeyResponse(k, true))
@@ -81,7 +81,7 @@ func updateAPIKey(c *gin.Context) {
 	}
 	k, err := shared.UpdateAPIKey(id, req.Name, req.Enabled)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, toAPIKeyResponse(k, false))
@@ -94,7 +94,7 @@ func deleteAPIKey(c *gin.Context) {
 		return
 	}
 	if err := shared.DeleteAPIKey(id); err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})

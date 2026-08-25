@@ -3,7 +3,6 @@ package shared
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"time"
 )
 
@@ -17,7 +16,7 @@ type APIKey struct {
 }
 
 // ErrAPIKeyInvalid 表示 API Key 字段校验不通过。
-var ErrAPIKeyInvalid = errors.New("API Key 名称不能为空")
+var ErrAPIKeyInvalid = &StatusError{Status: 400, Message: "API Key 名称不能为空"}
 
 // GenerateAPIKey 生成一个随机 API Key（sk- 前缀）。
 func GenerateAPIKey() (string, error) {

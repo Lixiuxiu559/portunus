@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"errors"
 	"time"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
@@ -9,7 +8,7 @@ import (
 )
 
 // ErrInvalid 表示渠道字段校验不通过。
-var ErrInvalid = errors.New("渠道字段不合法")
+var ErrInvalid = &shared.StatusError{Status: 400, Message: "渠道字段不合法"}
 
 // CreateRequest 创建渠道请求。
 type CreateRequest struct {

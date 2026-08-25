@@ -25,7 +25,7 @@ func registerGroupRoutes(r *gin.RouterGroup) {
 func listGroups(c *gin.Context) {
 	gs, err := group.List()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	resp := make([]group.Response, 0, len(gs))
@@ -43,7 +43,7 @@ func getGroup(c *gin.Context) {
 	}
 	g, err := group.Get(id)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, g.ToResponse())
@@ -57,7 +57,7 @@ func createGroup(c *gin.Context) {
 	}
 	g, err := group.Create(req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, g.ToResponse())
@@ -76,7 +76,7 @@ func updateGroup(c *gin.Context) {
 	}
 	g, err := group.Update(id, req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, g.ToResponse())
@@ -89,7 +89,7 @@ func deleteGroup(c *gin.Context) {
 		return
 	}
 	if err := group.Delete(id); err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
@@ -108,7 +108,7 @@ func addGroupItem(c *gin.Context) {
 	}
 	item, err := group.AddItem(groupID, req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, item)
@@ -132,7 +132,7 @@ func updateGroupItem(c *gin.Context) {
 	}
 	item, err := group.UpdateItem(groupID, itemID, req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, item)
@@ -150,7 +150,7 @@ func deleteGroupItem(c *gin.Context) {
 		return
 	}
 	if err := group.DeleteItem(groupID, itemID); err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})

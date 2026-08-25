@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"time"
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
@@ -9,10 +8,10 @@ import (
 )
 
 // ErrInvalid 表示模型字段校验不通过。
-var ErrInvalid = errors.New("模型字段不合法")
+var ErrInvalid = &shared.StatusError{Status: 400, Message: "模型字段不合法"}
 
 // ErrChannelNotFound 表示指定的渠道不存在。
-var ErrChannelNotFound = errors.New("渠道不存在")
+var ErrChannelNotFound = &shared.StatusError{Status: 400, Message: "渠道不存在"}
 
 // CreateRequest 创建模型请求。
 type CreateRequest struct {

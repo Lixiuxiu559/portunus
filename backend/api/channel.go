@@ -21,7 +21,7 @@ func registerChannelRoutes(r *gin.RouterGroup) {
 func listChannels(c *gin.Context) {
 	cs, err := channel.List()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	resp := make([]channel.Response, 0, len(cs))
@@ -39,7 +39,7 @@ func getChannel(c *gin.Context) {
 	}
 	ch, err := channel.Get(id)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, ch.ToResponse())
@@ -53,7 +53,7 @@ func createChannel(c *gin.Context) {
 	}
 	ch, err := channel.Create(req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, ch.ToResponse())
@@ -72,7 +72,7 @@ func updateChannel(c *gin.Context) {
 	}
 	ch, err := channel.Update(id, req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, ch.ToResponse())
@@ -85,7 +85,7 @@ func deleteChannel(c *gin.Context) {
 		return
 	}
 	if err := channel.Delete(id); err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})

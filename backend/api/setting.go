@@ -28,7 +28,7 @@ func setCurrency(c *gin.Context) {
 		return
 	}
 	if err := shared.SetCurrency(req.Currency); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"currency": shared.GetCurrency()})

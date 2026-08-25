@@ -28,7 +28,7 @@ func listModels(c *gin.Context) {
 	}
 	ms, err := model.List(channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	resp := make([]model.Response, 0, len(ms))
@@ -46,7 +46,7 @@ func getModel(c *gin.Context) {
 	}
 	m, err := model.Get(id)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, m.ToResponse())
@@ -60,7 +60,7 @@ func createModel(c *gin.Context) {
 	}
 	m, err := model.Create(req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, m.ToResponse())
@@ -79,7 +79,7 @@ func updateModel(c *gin.Context) {
 	}
 	m, err := model.Update(id, req)
 	if err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, m.ToResponse())
@@ -92,7 +92,7 @@ func deleteModel(c *gin.Context) {
 		return
 	}
 	if err := model.Delete(id); err != nil {
-		c.JSON(statusForErr(err), gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})

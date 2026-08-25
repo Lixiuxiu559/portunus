@@ -1,7 +1,6 @@
 package group
 
 import (
-	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,10 +10,10 @@ import (
 )
 
 // ErrInvalid 表示分组字段校验不通过。
-var ErrInvalid = errors.New("分组字段不合法")
+var ErrInvalid = &shared.StatusError{Status: 400, Message: "分组字段不合法"}
 
 // ErrModelNotFound 表示分组项引用的模型不存在。
-var ErrModelNotFound = errors.New("模型不存在")
+var ErrModelNotFound = &shared.StatusError{Status: 400, Message: "模型不存在"}
 
 // CreateRequest 创建分组请求。
 type CreateRequest struct {

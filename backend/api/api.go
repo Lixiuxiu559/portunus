@@ -9,9 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/Lixiuxiu559/portunus/backend/channel"
-	"github.com/Lixiuxiu559/portunus/backend/group"
-	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -35,23 +32,25 @@ func parseID(c *gin.Context) (int64, bool) {
 	return id, err == nil
 }
 
-// statusForErr 根据错误类型映射 HTTP 状态码。
-func statusForErr(err error) int {
-	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		return http.StatusNotFound
-	case errors.Is(err, channel.ErrInvalid),
-		errors.Is(err, model.ErrInvalid),
-		errors.Is(err, model.ErrChannelNotFound),
-		errors.Is(err, group.ErrInvalid),
-		errors.Is(err, group.ErrModelNotFound),
-		errors.Is(err, shared.ErrAPIKeyInvalid):
-		return http.StatusBadRequest
-	case isUniqueViolation(err):
-		return http.StatusConflict
-	default:
-		return http.StatusInternalServerError
+// classifyError 把错误归类为状态码 + 对用户安全的消息，避免把 DB 报错暴露给客户端。
+func classifyError(err error) (int, string) {
+	var se *shared.StatusError
+	if errors.As(err, &se) {
+		return se.Status, se.Message
 	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return http.StatusNotFound, "记录不存在"
+	}
+	if isUniqueViolation(err) {
+		return http.StatusConflict, "记录已存在"
+	}
+	return http.StatusInternalServerError, "内部错误"
+}
+
+// respondError 统一写出错误响应。
+func respondError(c *gin.Context, err error) {
+	status, msg := classifyError(err)
+	c.JSON(status, gin.H{"error": msg})
 }
 
 // isUniqueViolation 判断是否为唯一约束冲突（如渠道名 / 模型名重复）。
