@@ -13,6 +13,12 @@
       "src/main/**/*",
       "dist/renderer/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "../portunus${ext}",
+        "to": "./portunus${ext}"
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
@@ -30,13 +36,19 @@
         "AppImage",
         "deb"
       ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Lixiuxiu559",
+      "repo": "portunus"
     }
   },
   "scripts": {
     "dev": "concurrently \"pnpm run dev:web\" \"wait-on tcp:localhost:5173 && pnpm run dev:main\"",
     "dev:web": "vite --open",
     "dev:main": "cross-env NODE_ENV=development electron .",
-    "build": "vite build && electron-builder",
+    "build:go": "cd .. && go build -o portunus .",
+    "build": "pnpm run build:go && vite build && electron-builder",
     "build:renderer": "vite build",
     "start": "electron ."
   },

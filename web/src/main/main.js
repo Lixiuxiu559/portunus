@@ -1,5 +1,7 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
+const { startServer, stopServer, SERVER_PORT, isDev: sidecarIsDev } = require('./sidecar');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -28,11 +30,35 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
   }
+
+  // 启动自动更新检查（仅生产模式）
+  if (!isDev) {
+    forwardEvents(mainWindow);
+    checkForUpdates().catch(() => {
+      // 静默失败
+    });
+  }
 }
 
-app.whenReady().then(createWindow);
+// ─── IPC：更新操作 ───
+ipcMain.handle('update:check', () => checkForUpdates());
+ipcMain.handle('update:download', () => downloadUpdate());
+ipcMain.handle('update:install', () => quitAndInstall());
+
+app.whenReady().then(async () => {
+  // 先启动 Go 后端，再创建窗口
+  try {
+    await startServer();
+    console.log('[main] 后端服务已就绪');
+  } catch (err) {
+    console.error('[main] 后端服务启动失败:', err.message);
+    // 即使后端没起来也创建窗口，让用户看到 UI
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
+  stopServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -42,4 +68,8 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('before-quit', () => {
+  stopServer();
 });

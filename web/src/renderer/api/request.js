@@ -3,15 +3,19 @@ import { toast } from '@heroui/react';
 
 /**
  * 全局 axios 实例
- * - baseURL: /api（Vite 代理到后端 localhost:8080）
+ * - 开发模式：baseURL /api（Vite 代理到后端 localhost:3060）
+ * - 生产模式：baseURL http://localhost:3060/api（直连 Go sidecar）
  * - timeout: 30s
  *
  * 后端响应约定（管理 API，Gin）：
  * - 成功：直接返回业务数据（数组 / 对象 / { total, data } 等）
  * - 失败：HTTP 状态码 + { error: "消息" }
  */
+const isProd = typeof window !== 'undefined' && window.location.protocol === 'file:';
+const BASE_URL = isProd ? 'http://localhost:3060/api' : '/api';
+
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: BASE_URL,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
 });
