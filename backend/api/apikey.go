@@ -44,7 +44,8 @@ func listAPIKeys(c *gin.Context) {
 	}
 	resp := make([]apiKeyResponse, 0, len(ks))
 	for i := range ks {
-		resp = append(resp, toAPIKeyResponse(&ks[i], false))
+		// 本地个人使用场景：列表直接返回完整 key，便于随时复制。
+		resp = append(resp, toAPIKeyResponse(&ks[i], true))
 	}
 	c.JSON(http.StatusOK, resp)
 }

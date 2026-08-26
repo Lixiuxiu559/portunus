@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Typography, Button, Card, Spinner, Input, TextField, toast } from '@heroui/react';
-import { Download, RotateCw, CheckCircle, RefreshCw } from 'lucide-react';
+import { Download, RotateCw, CheckCircle, RefreshCw, Copy, Check, Trash2, Plus } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
+import { listAPIKeys, createAPIKey, updateAPIKey, deleteAPIKey } from '../api/apikey';
 
 const APP_VERSION = '0.1.0';
 
@@ -14,6 +15,86 @@ export default function Settings() {
   const [lastSyncAt, setLastSyncAt] = useState(0);
   const [savingInterval, setSavingInterval] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  const [apiKeys, setApiKeys] = useState([]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [busyKeyId, setBusyKeyId] = useState(null);
+
+  const loadAPIKeys = async () => {
+    try {
+      const ks = await listAPIKeys();
+      setApiKeys(Array.isArray(ks) ? ks : []);
+    } catch {
+      // toast 由 request 拦截器统一提示
+    }
+  };
+
+  useEffect(() => {
+    loadAPIKeys();
+  }, []);
+
+  const handleCreateKey = async () => {
+    const name = newKeyName.trim();
+    if (!name) {
+      toast.error('请输入令牌名称');
+      return;
+    }
+    setCreatingKey(true);
+    try {
+      await createAPIKey(name);
+      setNewKeyName('');
+      toast.success('令牌创建成功');
+      loadAPIKeys();
+    } catch {
+      // toast 由 request 拦截器统一提示
+    } finally {
+      setCreatingKey(false);
+    }
+  };
+
+  const handleCopyKey = async (key, id) => {
+    try {
+      await navigator.clipboard.writeText(key);
+    } catch {
+      // 降级方案
+      const input = document.createElement('input');
+      input.value = key;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const handleToggleKey = async (k) => {
+    setBusyKeyId(k.id);
+    try {
+      await updateAPIKey(k.id, { enabled: !k.enabled });
+      toast.success(k.enabled ? '令牌已禁用' : '令牌已启用');
+      loadAPIKeys();
+    } catch {
+      // toast 由 request 拦截器统一提示
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
+
+  const handleDeleteKey = async (k) => {
+    setBusyKeyId(k.id);
+    try {
+      await deleteAPIKey(k.id);
+      toast.success('令牌已删除');
+      loadAPIKeys();
+    } catch {
+      // toast 由 request 拦截器统一提示
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
 
   const loadSyncSettings = async () => {
     try {
@@ -115,6 +196,88 @@ export default function Settings() {
                 立即同步
               </Button>
             </div>
+          </div>
+        </Card.Content>
+      </Card>
+
+      {/* 令牌管理 */}
+      <Card className="gap-4 p-5">
+        <Card.Header className="p-0">
+          <Typography type="body-sm" className="text-muted">
+            令牌管理
+          </Typography>
+        </Card.Header>
+        <Card.Content className="p-0">
+          <div className="flex flex-col gap-4">
+            {/* 新建令牌 */}
+            <div className="flex items-center gap-2">
+              <TextField
+                size="sm"
+                value={newKeyName}
+                onChange={setNewKeyName}
+                className="flex-1"
+                placeholder="令牌名称，例如：claude-code"
+                aria-label="令牌名称"
+              >
+                <Input />
+              </TextField>
+              <Button variant="secondary" size="sm" onPress={handleCreateKey} isPending={creatingKey}>
+                <Plus className="size-4" />
+                创建
+              </Button>
+            </div>
+
+            {/* 令牌列表 */}
+            {apiKeys.length === 0 ? (
+              <Typography type="body-sm" className="text-muted">
+                暂无令牌
+              </Typography>
+            ) : (
+              <div className="flex flex-col divide-y divide-default-200">
+                {apiKeys.map((k) => (
+                  <div key={k.id} className="flex items-center justify-between py-2">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <Typography className="font-medium truncate">{k.name}</Typography>
+                      <Typography type="body-xs" className="text-muted">
+                        {k.enabled ? '已启用' : '已禁用'} · 创建于{' '}
+                        {new Date(k.created_at).toLocaleDateString()}
+                      </Typography>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyKey(k.key, k.id)}
+                        className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
+                        aria-label={`复制令牌 ${k.name}`}
+                      >
+                        {copiedId === k.id ? (
+                          <Check className="size-4 text-success" />
+                        ) : (
+                          <Copy className="size-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleKey(k)}
+                        disabled={busyKeyId === k.id}
+                        className="px-2 h-7 text-xs rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
+                      >
+                        {k.enabled ? '禁用' : '启用'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteKey(k)}
+                        disabled={busyKeyId === k.id}
+                        className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer disabled:opacity-50"
+                        aria-label={`删除令牌 ${k.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Card.Content>
       </Card>
