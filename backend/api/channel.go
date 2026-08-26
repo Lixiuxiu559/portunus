@@ -8,6 +8,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
 	"github.com/Lixiuxiu559/portunus/backend/model"
+	"github.com/Lixiuxiu559/portunus/backend/protocol"
 )
 
 // registerChannelRoutes 注册渠道 CRUD 路由。
@@ -16,6 +17,7 @@ func registerChannelRoutes(r *gin.RouterGroup) {
 	g.GET("", listChannels)
 	g.GET("/:id", getChannel)
 	g.POST("", createChannel)
+	g.POST("/preview-models", previewChannelModels)
 	g.PUT("/:id", updateChannel)
 	g.DELETE("/:id", deleteChannel)
 	g.POST("/:id/sync", syncChannelModels)
@@ -94,6 +96,29 @@ func deleteChannel(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+// previewChannelModels 只读预览某协议下的上游模型列表，不落库、不要求渠道已存在。
+func previewChannelModels(c *gin.Context) {
+	var req struct {
+		Type    protocol.Provider `json:"type" binding:"required"`
+		BaseURL string            `json:"base_url" binding:"required"`
+		Key     string            `json:"key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
+		return
+	}
+	if !req.Type.Valid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的协议类型"})
+		return
+	}
+	names, err := model.FetchModelNames(req.Type, req.BaseURL, req.Key)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"models": names})
 }
 
 // syncChannelModels 一键拉取指定渠道的上游模型并同步到模型表。

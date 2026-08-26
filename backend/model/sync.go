@@ -20,7 +20,7 @@ var syncClient = &http.Client{Timeout: 15 * time.Second}
 // 已存在（channel_id + name）的模型不覆盖，保留用户手动设置的价格与启停状态。
 // 返回新增的模型数量。
 func SyncFromChannel(ch *channel.Channel) (int, error) {
-	names, err := fetchModelNames(ch)
+	names, err := FetchModelNames(ch.Type, ch.BaseURL, ch.Key)
 	if err != nil {
 		return 0, err
 	}
@@ -43,26 +43,26 @@ func SyncFromChannel(ch *channel.Channel) (int, error) {
 	return added, nil
 }
 
-// fetchModelNames 按渠道协议拉取上游模型名列表。
-func fetchModelNames(ch *channel.Channel) ([]string, error) {
-	base := strings.TrimRight(ch.BaseURL, "/")
+// FetchModelNames 按协议拉取上游模型名列表，只读不落库。
+func FetchModelNames(provider protocol.Provider, baseURL, key string) ([]string, error) {
+	base := strings.TrimRight(baseURL, "/")
 	url := base + "/models"
-	if ch.Type == protocol.ProviderGemini {
-		url += "?key=" + ch.Key
+	if provider == protocol.ProviderGemini {
+		url += "?key=" + key
 	}
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	switch ch.Type {
+	switch provider {
 	case protocol.ProviderAnthropic:
-		req.Header.Set("x-api-key", ch.Key)
+		req.Header.Set("x-api-key", key)
 		req.Header.Set("anthropic-version", "2023-06-01")
 	case protocol.ProviderGemini:
 		// key 已作为 query 参数，无需额外请求头
 	default: // openai / openai_responses
-		req.Header.Set("Authorization", "Bearer "+ch.Key)
+		req.Header.Set("Authorization", "Bearer "+key)
 	}
 
 	resp, err := syncClient.Do(req)
@@ -78,7 +78,7 @@ func fetchModelNames(ch *channel.Channel) ([]string, error) {
 		return nil, fmt.Errorf("拉取模型列表失败: %s", resp.Status)
 	}
 
-	if ch.Type == protocol.ProviderGemini {
+	if provider == protocol.ProviderGemini {
 		return parseGeminiModels(body)
 	}
 	return parseOpenAIModels(body)
