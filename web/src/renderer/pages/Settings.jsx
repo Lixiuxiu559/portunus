@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Typography, Button, Card, Spinner, Input, TextField, toast } from '@heroui/react';
+import { Typography, Button, Card, Spinner, Input, TextField, Switch, toast } from '@heroui/react';
 import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check, Trash2, Plus } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
@@ -250,8 +250,7 @@ export default function Settings() {
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <Typography className="font-medium truncate">{k.name}</Typography>
                       <Typography type="body-xs" className="text-muted">
-                        {k.enabled ? '已启用' : '已禁用'} · 创建于{' '}
-                        {new Date(k.created_at).toLocaleDateString()}
+                        创建于 {new Date(k.created_at).toLocaleDateString()}
                       </Typography>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -267,14 +266,19 @@ export default function Settings() {
                           <Copy className="size-4" />
                         )}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleKey(k)}
-                        disabled={busyKeyId === k.id}
-                        className="px-2 h-7 text-xs rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
+                      <Switch
+                        size="sm"
+                        isSelected={k.enabled}
+                        isDisabled={busyKeyId === k.id}
+                        onChange={() => handleToggleKey(k)}
+                        aria-label={`切换令牌 ${k.name}`}
                       >
-                        {k.enabled ? '禁用' : '启用'}
-                      </button>
+                        <Switch.Content>
+                          <Switch.Control>
+                            <Switch.Thumb />
+                          </Switch.Control>
+                        </Switch.Content>
+                      </Switch>
                       <button
                         type="button"
                         onClick={() => handleDeleteKey(k)}
