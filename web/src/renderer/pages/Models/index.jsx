@@ -139,6 +139,24 @@ export default function Models() {
       ),
     },
     {
+      title: '缓存读取',
+      dataIndex: 'cache_read_price',
+      key: 'cache_read_price',
+      width: '110px',
+      render: (val) => (
+        <span className="font-mono">${val ?? '—'}</span>
+      ),
+    },
+    {
+      title: '缓存写入',
+      dataIndex: 'cache_write_price',
+      key: 'cache_write_price',
+      width: '110px',
+      render: (val) => (
+        <span className="font-mono">${val ?? '—'}</span>
+      ),
+    },
+    {
       title: '操作',
       dataIndex: 'id',
       key: 'action',

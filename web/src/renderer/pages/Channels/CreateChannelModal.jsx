@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
+import { useState, useEffect, useRef } from 'react';
+import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
 import { Plus, X, RefreshCw } from 'lucide-react';
 import { createChannel, previewModels } from '../../api';
 
@@ -31,9 +31,9 @@ const emptyForm = {
 export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [error, setError] = useState('');
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const formRef = useRef(null);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -42,7 +42,6 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
     if (isOpen) {
       setForm(emptyForm);
       setModels([]);
-      setError('');
       setSyncing(false);
       setSaving(false);
     }
@@ -70,12 +69,9 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
     setModels((prev) => prev.filter((m) => m !== name));
   };
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!form.name.trim() || !form.base_url.trim() || !form.key.trim()) {
-      setError('请填写名称、Base URL 与 Key');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       await createChannel({
@@ -91,7 +87,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
       onCreated?.();
       toast.success('渠道创建成功');
     } catch (e) {
-      setError(e.message || '创建失败');
+      toast.error(e.message || '创建失败');
     } finally {
       setSaving(false);
     }
@@ -107,7 +103,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
           </Modal.Header>
 
           <Modal.Body>
-            <div className="flex flex-col gap-4">
+            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <TextField
                   isRequired
@@ -116,9 +112,11 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                   onChange={set('name')}
                   autoFocus
                   autoComplete="off"
+                  validate={(v) => (!v || !v.trim()) ? '请填写渠道名称' : null}
                 >
                   <Label>渠道名称</Label>
                   <Input placeholder="例如：OpenAI 官方" />
+                  <FieldError />
                 </TextField>
 
                 <Select
@@ -150,22 +148,27 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                   value={form.base_url}
                   onChange={set('base_url')}
                   autoComplete="off"
+                  validate={(v) => (!v || !v.trim()) ? '请填写 Base URL' : null}
                 >
                   <Label>Base URL</Label>
                   <Input placeholder="https://api.openai.com" />
+                  <FieldError />
                 </TextField>
 
-                <TextField isRequired name="key" type="password" value={form.key} onChange={set('key')} autoComplete="new-password">
+                <TextField
+                  isRequired
+                  name="key"
+                  type="password"
+                  value={form.key}
+                  onChange={set('key')}
+                  autoComplete="new-password"
+                  validate={(v) => (!v || !v.trim()) ? '请填写 API Key' : null}
+                >
                   <Label>API Key</Label>
                   <Input placeholder="sk-..." />
+                  <FieldError />
                 </TextField>
               </div>
-
-              {error && (
-                <Typography color="danger" type="body-sm">
-                  {error}
-                </Typography>
-              )}
 
               {/* 模型列表 */}
               <div className="border-t border-default-200 pt-4">
@@ -216,14 +219,14 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                   </ScrollShadow>
                 )}
               </div>
-            </div>
+            </Form>
           </Modal.Body>
 
           <Modal.Footer>
             <Button slot="close" variant="secondary">
               取消
             </Button>
-            <Button variant="primary" isPending={saving} onPress={handleSubmit}>
+            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
               {saving ? '保存中…' : '保存'}
             </Button>
           </Modal.Footer>

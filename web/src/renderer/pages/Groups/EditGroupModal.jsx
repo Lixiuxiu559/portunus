@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, toast } from '@heroui/react';
+import { useState, useEffect, useRef } from 'react';
+import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 import { updateGroup } from '../../api';
 
 const strategyOptions = [
@@ -11,23 +11,19 @@ const strategyOptions = [
 export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', strategy: 'manual' });
-  const [error, setError] = useState('');
+  const formRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && group) {
       setForm({ name: group.name || '', strategy: group.strategy || 'manual' });
-      setError('');
     }
   }, [isOpen, group]);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!form.name.trim()) {
-      setError('请填写分组名称');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       await updateGroup(group.id, { name: form.name.trim(), strategy: form.strategy });
@@ -35,7 +31,7 @@ export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated 
       onUpdated?.();
       toast.success('分组更新成功');
     } catch (e) {
-      setError(e.message || '更新失败');
+      toast.error(e.message || '更新失败');
     } finally {
       setSaving(false);
     }
@@ -51,7 +47,7 @@ export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated 
           </Modal.Header>
 
           <Modal.Body>
-            <div className="flex flex-col gap-4">
+            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
               <TextField
                 isRequired
                 name="name"
@@ -59,9 +55,11 @@ export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated 
                 onChange={set('name')}
                 autoFocus
                 autoComplete="off"
+                validate={(v) => (!v || !v.trim()) ? '请填写分组名称' : null}
               >
                 <Label>分组名称</Label>
                 <Input placeholder="例如：GPT-4 负载均衡" />
+                <FieldError />
               </TextField>
 
               <Select
@@ -86,20 +84,14 @@ export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated 
                   </ListBox>
                 </Select.Popover>
               </Select>
-
-              {error && (
-                <Typography color="danger" type="body-sm">
-                  {error}
-                </Typography>
-              )}
-            </div>
+            </Form>
           </Modal.Body>
 
           <Modal.Footer>
             <Button slot="close" variant="secondary">
               取消
             </Button>
-            <Button variant="primary" isPending={saving} onPress={handleSubmit}>
+            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
               {saving ? '保存中…' : '保存'}
             </Button>
           </Modal.Footer>

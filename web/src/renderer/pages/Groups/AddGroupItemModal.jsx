@@ -1,23 +1,21 @@
-import { useState } from 'react';
-import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, toast } from '@heroui/react';
+import { useState, useRef } from 'react';
+import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 import { addGroupItem } from '../../api';
 
 export default function AddGroupItemModal({ group, models, isOpen, onOpenChange, onAdded }) {
   const [saving, setSaving] = useState(false);
   const [modelId, setModelId] = useState('');
   const [priority, setPriority] = useState('0');
-  const [error, setError] = useState('');
+  const formRef = useRef(null);
 
   // 过滤掉分组中已有的模型
   const existingIds = new Set((group?.items || []).map((i) => i.model_id));
   const available = models.filter((m) => !existingIds.has(m.id));
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!modelId) {
-      setError('请选择模型');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formRef.current?.checkValidity()) return;
+    if (!modelId) return;
     setSaving(true);
     try {
       await addGroupItem(group.id, {
@@ -28,7 +26,7 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
       onAdded?.();
       toast.success('模型已添加到分组');
     } catch (e) {
-      setError(e.message || '添加失败');
+      toast.error(e.message || '添加失败');
     } finally {
       setSaving(false);
     }
@@ -44,13 +42,14 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
           </Modal.Header>
 
           <Modal.Body>
-            <div className="flex flex-col gap-4">
+            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
               <Select
                 isRequired
                 name="model_id"
                 placeholder="请选择模型"
                 selectedKey={modelId}
                 onSelectionChange={setModelId}
+                validate={(v) => (!v) ? '请选择模型' : null}
               >
                 <Label>选择模型</Label>
                 <Select.Trigger>
@@ -67,6 +66,7 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
                     ))}
                   </ListBox>
                 </Select.Popover>
+                <FieldError />
               </Select>
 
               <TextField
@@ -78,20 +78,14 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
                 <Label>优先级</Label>
                 <Input placeholder="0" />
               </TextField>
-
-              {error && (
-                <Typography color="danger" type="body-sm">
-                  {error}
-                </Typography>
-              )}
-            </div>
+            </Form>
           </Modal.Body>
 
           <Modal.Footer>
             <Button slot="close" variant="secondary">
               取消
             </Button>
-            <Button variant="primary" isPending={saving} onPress={handleSubmit}>
+            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
               {saving ? '添加中…' : '添加'}
             </Button>
           </Modal.Footer>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
+import { useState, useEffect, useRef } from 'react';
+import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
 import { X, RefreshCw } from 'lucide-react';
 import { updateChannel, listModels, deleteModel, syncChannel } from '../../api';
 
@@ -14,9 +14,9 @@ const providerOptions = [
 export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'openai', base_url: '', key: '' });
-  const [error, setError] = useState('');
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const formRef = useRef(null);
 
   // 打开弹窗时用渠道数据填充表单，并加载已有模型
   useEffect(() => {
@@ -65,12 +65,9 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
     }
   };
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!form.name.trim() || !form.base_url.trim()) {
-      setError('请填写名称与 Base URL');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       const payload = {
@@ -103,7 +100,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
           </Modal.Header>
 
           <Modal.Body>
-            <div className="flex flex-col gap-4">
+            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <TextField
                   isRequired
@@ -112,9 +109,11 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                   onChange={set('name')}
                   autoFocus
                   autoComplete="off"
+                  validate={(v) => (!v || !v.trim()) ? '请填写渠道名称' : null}
                 >
                   <Label>渠道名称</Label>
                   <Input placeholder="例如：OpenAI 官方" />
+                  <FieldError />
                 </TextField>
 
                 <Select
@@ -146,9 +145,11 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                   value={form.base_url}
                   onChange={set('base_url')}
                   autoComplete="off"
+                  validate={(v) => (!v || !v.trim()) ? '请填写 Base URL' : null}
                 >
                   <Label>Base URL</Label>
                   <Input placeholder="https://api.openai.com" />
+                  <FieldError />
                 </TextField>
 
                 <TextField
@@ -162,12 +163,6 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                   <Input placeholder="留空则不更新" />
                 </TextField>
               </div>
-
-              {error && (
-                <Typography color="danger" type="body-sm">
-                  {error}
-                </Typography>
-              )}
 
               {/* 模型列表 */}
               <div className="border-t border-default-200 pt-4">
@@ -214,14 +209,14 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                   </ScrollShadow>
                 )}
               </div>
-            </div>
+            </Form>
           </Modal.Body>
 
           <Modal.Footer>
             <Button slot="close" variant="secondary">
               取消
             </Button>
-            <Button variant="primary" isPending={saving} onPress={handleSubmit}>
+            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
               {saving ? '保存中…' : '保存'}
             </Button>
           </Modal.Footer>

@@ -23,4 +23,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Go 服务端状态（sidecar 占位）
   getServerPort: () => 3060,
+
+  // 打开外部链接（默认浏览器）
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });

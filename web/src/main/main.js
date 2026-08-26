@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
 const { startServer, stopServer, SERVER_PORT, isDev: sidecarIsDev } = require('./sidecar');
@@ -44,6 +44,15 @@ function createWindow() {
 ipcMain.handle('update:check', () => checkForUpdates());
 ipcMain.handle('update:download', () => downloadUpdate());
 ipcMain.handle('update:install', () => quitAndInstall());
+
+// ─── IPC：打开外部链接 ───
+ipcMain.handle('open-external', (_event, url) => {
+  // 仅允许 http/https，防止被渲染进程滥用打开任意协议
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    return shell.openExternal(url);
+  }
+  return Promise.reject(new Error('不支持的链接'));
+});
 
 app.whenReady().then(async () => {
   // 先启动 Go 后端，再创建窗口

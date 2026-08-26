@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Card, toast } from '@heroui/react';
+import { Button, Typography, Chip, Card, ScrollShadow, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck } from 'lucide-react';
-import { listGroups, updateGroup, deleteGroup, updateGroupItem, deleteGroupItem, listModels } from '../../api';
+import { listGroups, updateGroup, deleteGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import CreateGroupModal from './CreateGroupModal';
 import EditGroupModal from './EditGroupModal';
 import DeleteGroupModal from './DeleteGroupModal';
@@ -17,6 +17,7 @@ const STRATEGIES = [
 export default function Groups() {
   const [groups, setGroups] = useState([]);
   const [models, setModels] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -26,9 +27,10 @@ export default function Groups() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [g, m] = await Promise.all([listGroups(), listModels()]);
+      const [g, m, c] = await Promise.all([listGroups(), listModels(), listChannels()]);
       setGroups(Array.isArray(g) ? g : []);
       setModels(Array.isArray(m) ? m : []);
+      setChannels(Array.isArray(c) ? c : []);
     } catch {
       setGroups([]);
     } finally {
@@ -118,8 +120,8 @@ export default function Groups() {
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (
-            <Card key={g.id} className="gap-4 p-5">
-              <Card.Header className="flex-row items-center justify-between gap-3">
+            <Card key={g.id} className="gap-4 p-5 h-[22rem]">
+              <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   <Typography className="font-medium text-lg">{g.name}</Typography>
                   <Chip size="sm" variant="soft">
@@ -144,7 +146,8 @@ export default function Groups() {
                 </div>
               </Card.Header>
 
-              <Card.Content>
+              <Card.Content className="flex-1 min-h-0 p-0">
+                <ScrollShadow orientation="vertical" className="h-full thin-scrollbar">
                 {/* 分组项列表（可拖拽排序） */}
                 {g.items && g.items.length > 0 ? (
                   <Droppable droppableId={String(g.id)}>
@@ -175,7 +178,7 @@ export default function Groups() {
                                   <span className="font-medium">{modelMap[item.model_id] || `#${item.model_id}`}</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  {g.active_item_id === item.id && (
+                                  {g.strategy === 'manual' && g.active_item_id === item.id && (
                                     <CircleCheck className="size-4 text-success" />
                                   )}
                                   <button
@@ -197,9 +200,10 @@ export default function Groups() {
                 ) : (
                   <Typography type="body-sm" className="text-muted">暂无模型</Typography>
                 )}
+                </ScrollShadow>
               </Card.Content>
 
-              <Card.Footer>
+              <Card.Footer className="shrink-0">
                 <Button
                   size="sm" variant="tertiary"
                   onPress={() => setAddItemTarget(g)}
@@ -217,6 +221,8 @@ export default function Groups() {
         isOpen={showCreate}
         onOpenChange={setShowCreate}
         onCreated={fetchAll}
+        channels={channels}
+        models={models}
       />
       <EditGroupModal
         group={editTarget}

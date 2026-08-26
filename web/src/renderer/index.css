@@ -188,3 +188,26 @@ html.dark .bg-decor .mask {
 .model-filters .select__trigger {
   padding-inline: calc(var(--spacing) * 2) !important;
 }
+
+/*
+ * 细滚动条：分组卡片等内容区的滚动条过粗时使用。
+ * Firefox 用 scrollbar-width，Chromium/Electron 用 ::-webkit-scrollbar 兜底。
+ */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}

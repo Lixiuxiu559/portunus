@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, toast } from '@heroui/react';
+import { useState, useRef } from 'react';
+import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 
 const emptyForm = {
   channel_id: '',
@@ -13,16 +13,13 @@ const emptyForm = {
 export default function CreateModelModal({ isOpen, onOpenChange, channels, onSubmit }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const formRef = useRef(null);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!form.channel_id || !form.name.trim()) {
-      setError('请选择渠道并填写模型名称');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       const data = {
@@ -37,7 +34,7 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
       setForm(emptyForm);
       onOpenChange(false);
     } catch (e) {
-      setError(e.message || '创建失败');
+      toast.error(e.message || '创建失败');
     } finally {
       setSaving(false);
     }
@@ -53,12 +50,13 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
           </Modal.Header>
 
           <Modal.Body>
-            <div className="flex flex-col gap-4">
+            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
               <Select
                 isRequired
                 name="channel_id"
                 selectedKey={form.channel_id}
                 onSelectionChange={set('channel_id')}
+                validate={(v) => (!v) ? '请选择渠道' : null}
               >
                 <Label>所属渠道</Label>
                 <Select.Trigger>
@@ -75,6 +73,7 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
                     ))}
                   </ListBox>
                 </Select.Popover>
+                <FieldError />
               </Select>
 
               <TextField
@@ -84,9 +83,11 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
                 onChange={set('name')}
                 autoFocus
                 autoComplete="off"
+                validate={(v) => (!v || !v.trim()) ? '请填写模型名称' : null}
               >
                 <Label>模型名称</Label>
                 <Input placeholder="例如：gpt-4o / claude-sonnet-4-20250514" />
+                <FieldError />
               </TextField>
 
               <div className="grid grid-cols-2 gap-3">
@@ -107,20 +108,14 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
                   <Input type="number" placeholder="0" />
                 </TextField>
               </div>
-
-              {error && (
-                <Typography color="danger" type="body-sm">
-                  {error}
-                </Typography>
-              )}
-            </div>
+            </Form>
           </Modal.Body>
 
           <Modal.Footer>
             <Button slot="close" variant="secondary">
               取消
             </Button>
-            <Button variant="primary" isPending={saving} onPress={handleSubmit}>
+            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
               {saving ? '保存中…' : '保存'}
             </Button>
           </Modal.Footer>
