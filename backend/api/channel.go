@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -61,7 +60,6 @@ func createChannel(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	syncChannelAfterSave(ch)
 	c.JSON(http.StatusCreated, ch.ToResponse())
 }
 
@@ -81,7 +79,6 @@ func updateChannel(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	syncChannelAfterSave(ch)
 	c.JSON(http.StatusOK, ch.ToResponse())
 }
 
@@ -139,14 +136,4 @@ func syncChannelModels(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"added": added})
-}
-
-// syncChannelAfterSave 渠道保存后自动同步上游模型；失败仅记录，不阻断渠道保存。
-func syncChannelAfterSave(ch *channel.Channel) {
-	if !ch.AutoSync {
-		return
-	}
-	if _, err := model.SyncFromChannel(ch); err != nil {
-		log.Printf("同步渠道 %s 模型失败: %v", ch.Name, err)
-	}
 }

@@ -1,6 +1,10 @@
 package shared
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
 
 // Currency 是费用计价的货币单位，仅支持人民币与美元。
 type Currency string
@@ -19,7 +23,9 @@ func (c Currency) Valid() bool {
 type SettingKey string
 
 const (
-	SettingKeyCurrency SettingKey = "currency" // 费用计价货币
+	SettingKeyCurrency     SettingKey = "currency"      // 费用计价货币
+	SettingKeySyncInterval SettingKey = "sync_interval" // 自动同步间隔（分钟，0 = 关闭）
+	SettingKeyLastSyncAt   SettingKey = "last_sync_at"  // 上次同步时间（Unix 秒，0 = 从未）
 )
 
 // Setting 是全局设置项，key-value 存储。
@@ -32,6 +38,8 @@ type Setting struct {
 func DefaultSettings() []Setting {
 	return []Setting{
 		{Key: SettingKeyCurrency, Value: string(CurrencyUSD)},
+		{Key: SettingKeySyncInterval, Value: "360"},
+		{Key: SettingKeyLastSyncAt, Value: "0"},
 	}
 }
 
@@ -68,8 +76,61 @@ func SetCurrency(c Currency) error {
 	if !c.Valid() {
 		return &StatusError{Status: 400, Message: fmt.Sprintf("不支持的货币: %s", c)}
 	}
+	return saveSetting(SettingKeyCurrency, string(c))
+}
+
+// SyncIntervalDefault 是自动同步间隔的默认值（分钟）。
+const SyncIntervalDefault = 360
+
+// GetSyncInterval 返回自动同步间隔（分钟）；未初始化或解析失败回退默认值。
+func GetSyncInterval() int {
+	if DB == nil {
+		return SyncIntervalDefault
+	}
+	var s Setting
+	if err := DB.First(&s, SettingKeySyncInterval).Error; err != nil {
+		return SyncIntervalDefault
+	}
+	n, err := strconv.Atoi(s.Value)
+	if err != nil {
+		return SyncIntervalDefault
+	}
+	return n
+}
+
+// SetSyncInterval 更新自动同步间隔；minutes 为 0 表示关闭自动同步，负数不合法。
+func SetSyncInterval(minutes int) error {
+	if minutes < 0 {
+		return &StatusError{Status: 400, Message: "同步间隔不能为负"}
+	}
+	return saveSetting(SettingKeySyncInterval, strconv.Itoa(minutes))
+}
+
+// GetLastSyncAt 返回上次同步时间（Unix 秒）；缺失或失败返回 0（从未）。
+func GetLastSyncAt() int64 {
+	if DB == nil {
+		return 0
+	}
+	var s Setting
+	if err := DB.First(&s, SettingKeyLastSyncAt).Error; err != nil {
+		return 0
+	}
+	n, err := strconv.ParseInt(s.Value, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// SetLastSyncAt 记录上次同步时间。
+func SetLastSyncAt(t time.Time) error {
+	return saveSetting(SettingKeyLastSyncAt, strconv.FormatInt(t.Unix(), 10))
+}
+
+// saveSetting 以 key 为主键 upsert 一条设置。
+func saveSetting(key SettingKey, value string) error {
 	if DB == nil {
 		return fmt.Errorf("数据库未初始化")
 	}
-	return DB.Save(&Setting{Key: SettingKeyCurrency, Value: string(c)}).Error
+	return DB.Save(&Setting{Key: key, Value: value}).Error
 }

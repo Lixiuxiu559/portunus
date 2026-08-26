@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -41,6 +42,30 @@ func SyncFromChannel(ch *channel.Channel) (int, error) {
 		added++
 	}
 	return added, nil
+}
+
+// SyncAutoChannels 同步所有开启自动同步的渠道，返回成功同步的渠道数与新增模型总数。
+// 单个渠道失败仅记录，不中断整体，保证一个慢渠道不拖垮其余渠道。
+func SyncAutoChannels() (synced, added int) {
+	cs, err := channel.List()
+	if err != nil {
+		log.Printf("加载渠道列表失败: %v", err)
+		return 0, 0
+	}
+	for i := range cs {
+		c := cs[i]
+		if !c.AutoSync {
+			continue
+		}
+		n, err := SyncFromChannel(&c)
+		if err != nil {
+			log.Printf("同步渠道 %s 模型失败: %v", c.Name, err)
+			continue
+		}
+		synced++
+		added += n
+	}
+	return synced, added
 }
 
 // FetchModelNames 按协议拉取上游模型名列表，只读不落库。

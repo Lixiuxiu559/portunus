@@ -8,6 +8,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/api"
 	"github.com/Lixiuxiu559/portunus/backend/channel"
+	"github.com/Lixiuxiu559/portunus/backend/cron"
 	"github.com/Lixiuxiu559/portunus/backend/gateway"
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
@@ -45,6 +46,8 @@ func main() {
 
 	gateway.Register(r)          // 对外 /v1 LLM 接口
 	api.Register(r.Group("/api")) // 管理 API
+
+	cron.Start() // 定时自动同步渠道模型
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("portunus 启动于 %s", addr)
