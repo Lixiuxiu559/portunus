@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button, Typography, Spinner } from '@heroui/react';
-import { Plus, X } from 'lucide-react';
+import { Button, Switch, Typography, toast } from '@heroui/react';
+import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import DataTable from '../../components/DataTable.tsx';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
-import { listChannels, updateChannel } from '../../api';
+import EditChannelModal from './EditChannelModal';
+import { listChannels, updateChannel, syncChannel } from '../../api';
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,6 +13,8 @@ export default function Channels() {
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -41,6 +45,102 @@ export default function Channels() {
     }
   };
 
+  const handleSync = async (ch) => {
+    setSyncingId(ch.id);
+    try {
+      const res = await syncChannel(ch.id);
+      toast.success(`同步完成，新增 ${res.added ?? 0} 个模型`);
+    } catch {
+      // toast 由 request 拦截器统一提示
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const columns = [
+    {
+      title: '渠道名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (_, record) => (
+        <span className="font-medium">{record.name}</span>
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      render: (val) => (
+        <span className="inline-block rounded-full bg-default px-2 py-0.5 text-xs text-default-foreground">
+          {val}
+        </span>
+      ),
+    },
+    {
+      title: 'Base URL',
+      dataIndex: 'base_url',
+      key: 'base_url',
+      copy: true,
+      render: (val) => (
+        <span className="text-muted truncate max-w-[300px] inline-block" title={val}>
+          {val}
+        </span>
+      ),
+    },
+    {
+      title: '操作',
+      dataIndex: 'id',
+      key: 'action',
+      width: '140px',
+      render: (_, record) => (
+        <div className="flex items-center gap-1">
+          <button
+            aria-label={`同步渠道 ${record.name} 模型`}
+            onClick={() => handleSync(record)}
+            disabled={syncingId === record.id}
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`size-4 ${syncingId === record.id ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            aria-label={`编辑渠道 ${record.name}`}
+            onClick={() => setEditTarget(record)}
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            aria-label={`删除渠道 ${record.name}`}
+            onClick={() => setDeleteTarget(record)}
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      ),
+    },
+    {
+      title: '启用',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      width: '80px',
+      render: (val, record) => (
+        <Switch
+          size="sm"
+          isSelected={val}
+          isDisabled={togglingId === record.id}
+          onChange={() => handleToggle(record)}
+        >
+          <Switch.Content>
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Content>
+        </Switch>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -51,54 +151,12 @@ export default function Channels() {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner />
-        </div>
-      ) : channels.length === 0 ? (
-        <div className="flex justify-center py-16 text-muted">
-          <Typography>暂无渠道，点击右上角「新增渠道」创建</Typography>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {channels.map((ch) => (
-            <div
-              key={ch.id}
-              className="group relative flex flex-col gap-3 rounded-xl bg-accent/10 shadow-md shadow-accent/5 p-4"
-            >
-              <button
-                aria-label={`删除渠道 ${ch.name}`}
-                onClick={() => setDeleteTarget(ch)}
-                className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full text-muted transition-colors hover:bg-default hover:text-foreground cursor-pointer"
-              >
-                <X className="size-3.5" />
-              </button>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Typography className="font-medium truncate">{ch.name}</Typography>
-                  <span className="shrink-0 rounded-full bg-default px-2 py-0.5 text-xs text-default-foreground">
-                    {ch.type}
-                  </span>
-                </div>
-              </div>
-              <Typography color="muted" type="body-sm" className="truncate">
-                {ch.base_url}
-              </Typography>
-              <div className="mt-auto flex justify-end">
-                <Button
-                  size="sm"
-                  variant={ch.enabled ? 'primary' : 'ghost'}
-                  isPending={togglingId === ch.id}
-                  onPress={() => handleToggle(ch)}
-                  className="w-fit"
-                >
-                  {ch.enabled ? '启用' : '停用'}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <DataTable
+        dataSource={channels}
+        columns={columns}
+        loading={loading}
+        emptyText="暂无渠道，点击右上角「新增渠道」创建"
+      />
 
       <CreateChannelModal
         isOpen={isOpen}
@@ -112,6 +170,14 @@ export default function Channels() {
           if (!open) setDeleteTarget(null);
         }}
         onDeleted={fetchChannels}
+      />
+      <EditChannelModal
+        channel={editTarget}
+        isOpen={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        onUpdated={fetchChannels}
       />
     </div>
   );

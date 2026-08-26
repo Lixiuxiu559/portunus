@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Modal, Typography } from '@heroui/react';
+import { Button, Modal, Typography, toast } from '@heroui/react';
 import { deleteChannel } from '../../api';
 
 // 删除渠道确认弹窗：由渠道卡片右上角的 Close 图标触发
@@ -13,6 +13,7 @@ export default function DeleteChannelModal({ channel, isOpen, onOpenChange, onDe
       await deleteChannel(channel.id);
       onOpenChange(false);
       onDeleted?.();
+      toast.success('渠道已删除');
     } catch {
       // 错误提示由 request 拦截器统一处理
     } finally {

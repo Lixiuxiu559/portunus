@@ -31,3 +31,8 @@ export function updateChannel(id, data) {
 export function deleteChannel(id) {
   return request.delete(`/channels/${id}`);
 }
+
+/** 同步渠道模型 */
+export function syncChannel(id) {
+  return request.post(`/channels/${id}/sync`);
+}

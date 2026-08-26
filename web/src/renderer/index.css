@@ -15,11 +15,11 @@
 [data-theme="default"] {
   /* Theme Colors (Light Mode) */
   --accent: oklch(68% 0.18 55);
-  --accent-foreground: oklch(15% 0.02 55);
+  --accent-foreground: oklch(99% 0 0);
   --background: oklch(97.02% 0.0088 34.39);
   --border: oklch(90.00% 0.0088 34.39);
-  --danger: oklch(65.32% 0.2369 359.41);
-  --danger-foreground: oklch(99.11% 0 0);
+  --danger: oklch(55% 0.22 25);
+  --danger-foreground: oklch(99% 0 0);
   --default: oklch(94.00% 0.0088 34.39);
   --default-foreground: oklch(21.03% 0.0059 34.39);
   --field-background: oklch(100.00% 0.0044 34.39);
@@ -63,10 +63,10 @@ html[data-theme="dark"] [data-slot] {
   color-scheme: dark;
   /* Theme Colors (Dark Mode) */
   --accent: oklch(72% 0.18 55);
-  --accent-foreground: oklch(15% 0.02 55);
+  --accent-foreground: oklch(10% 0.02 55);
   --background: oklch(12.00% 0.0088 34.39);
   --border: oklch(28.00% 0.0088 34.39);
-  --danger: oklch(59.40% 0.2002 358.30);
+  --danger: oklch(55% 0.22 25);
   --danger-foreground: oklch(99.11% 0 0);
   --default: oklch(27.40% 0.0088 34.39);
   --default-foreground: oklch(99.11% 0 0);

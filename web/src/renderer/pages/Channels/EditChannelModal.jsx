@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, toast } from '@heroui/react';
-import { Plus } from 'lucide-react';
-import { createChannel } from '../../api';
+import { updateChannel } from '../../api';
 
 // 协议类型与后端 protocol.Provider 保持一致
 const providerOptions = [
@@ -11,52 +10,49 @@ const providerOptions = [
   { id: 'gemini', label: 'Gemini' },
 ];
 
-// 各协议的默认 Base URL，选中后自动填充
-const defaultBaseURLs = {
-  openai: 'https://api.openai.com',
-  openai_responses: 'https://api.openai.com',
-  anthropic: 'https://api.anthropic.com',
-  gemini: 'https://generativelanguage.googleapis.com',
-};
-
-const emptyForm = {
-  name: '',
-  type: 'openai',
-  base_url: '',
-  key: '',
-  enabled: true,
-  auto_sync: true,
-};
-
-export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) {
+export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpdated }) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({ name: '', type: 'openai', base_url: '', key: '' });
   const [error, setError] = useState('');
+
+  // 打开弹窗时用渠道数据填充表单
+  useEffect(() => {
+    if (isOpen && channel) {
+      setForm({
+        name: channel.name || '',
+        type: channel.type || 'openai',
+        base_url: channel.base_url || '',
+        key: '', // key 脱敏，编辑时留空则不更新
+      });
+      setError('');
+    }
+  }, [isOpen, channel]);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = async () => {
     setError('');
-    if (!form.name.trim() || !form.base_url.trim() || !form.key.trim()) {
-      setError('请填写名称、Base URL 与 Key');
+    if (!form.name.trim() || !form.base_url.trim()) {
+      setError('请填写名称与 Base URL');
       return;
     }
     setSaving(true);
     try {
-      await createChannel({
+      const payload = {
         name: form.name.trim(),
         type: form.type,
         base_url: form.base_url.trim(),
-        key: form.key.trim(),
-        enabled: form.enabled,
-        auto_sync: form.auto_sync,
-      });
-      setForm(emptyForm);
+      };
+      // key 仅在用户填写时更新
+      if (form.key.trim()) {
+        payload.key = form.key.trim();
+      }
+      await updateChannel(channel.id, payload);
       onOpenChange(false);
-      onCreated?.();
-      toast.success('渠道创建成功');
+      onUpdated?.();
+      toast.success('渠道更新成功');
     } catch (e) {
-      setError(e.message || '创建失败');
+      setError(e.message || '更新失败');
     } finally {
       setSaving(false);
     }
@@ -68,7 +64,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
         <Modal.Dialog>
           <Modal.CloseTrigger />
           <Modal.Header>
-            <Modal.Heading>新增渠道</Modal.Heading>
+            <Modal.Heading>编辑渠道</Modal.Heading>
           </Modal.Header>
 
           <Modal.Body>
@@ -119,9 +115,15 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                 <Input placeholder="https://api.openai.com" />
               </TextField>
 
-              <TextField isRequired name="key" type="password" value={form.key} onChange={set('key')} autoComplete="new-password">
+              <TextField
+                name="key"
+                type="password"
+                value={form.key}
+                onChange={set('key')}
+                autoComplete="new-password"
+              >
                 <Label>API Key</Label>
-                <Input placeholder="sk-..." />
+                <Input placeholder="留空则不更新" />
               </TextField>
 
               {error && (

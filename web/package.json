@@ -64,10 +64,13 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "tailwindcss": "^4.3.0",
+    "typescript": "^7.0.2",
     "vite": "^8.0.16",
     "wait-on": "^9.0.10"
   }
