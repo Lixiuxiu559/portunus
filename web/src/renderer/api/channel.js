@@ -36,3 +36,8 @@ export function deleteChannel(id) {
 export function syncChannel(id) {
   return request.post(`/channels/${id}/sync`);
 }
+
+/** 预览上游模型列表（不创建渠道） */
+export function previewModels(data) {
+  return request.post('/channels/preview-models', data);
+}

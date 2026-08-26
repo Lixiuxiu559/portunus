@@ -26,7 +26,7 @@ func listModels(c *gin.Context) {
 			channelID = id
 		}
 	}
-	ms, err := model.List(channelID)
+	ms, err := model.List(channelID, c.Query("name"))
 	if err != nil {
 		respondError(c, err)
 		return

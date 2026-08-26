@@ -7,7 +7,7 @@
  *
  * copy 字段：设置为 true 时，单元格内容旁会显示复制图标，hover 时可见，点击可复制文本到剪贴板。
  */
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, memo, type ReactNode } from 'react';
 import { Table, Spinner } from '@heroui/react';
 import { Copy, Check } from 'lucide-react';
 
@@ -88,7 +88,7 @@ function CopyButton({ text }: { text: string }) {
 
 /* ──────────── DataTable 主组件 ──────────── */
 
-export default function DataTable<T extends Record<string, unknown>>({
+export default memo(function DataTable<T extends Record<string, unknown>>({
   dataSource = [],
   columns = [],
   loading = false,
@@ -101,7 +101,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   // 首次加载（无数据）：居中显示 Spinner
   if (loading && !hasData) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex items-center justify-center flex-1">
         <Spinner />
       </div>
     );
@@ -110,14 +110,14 @@ export default function DataTable<T extends Record<string, unknown>>({
   // 空态
   if (!hasData) {
     return (
-      <div className="flex justify-center py-16 text-muted">
+      <div className="flex items-center justify-center flex-1 text-muted">
         {emptyText}
       </div>
     );
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative flex min-h-0 flex-col ${className}`}>
       {/* 刷新遮罩：有数据时 loading 叠加在表格上方 */}
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px] rounded-xl">
@@ -125,8 +125,8 @@ export default function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
-      <Table>
-        <Table.ScrollContainer className="max-h-[calc(100vh-10rem)] overflow-auto">
+      <Table className="h-full grid-rows-[minmax(0,1fr)]">
+        <Table.ScrollContainer className="h-full min-h-0 overflow-auto">
           <Table.Content
             aria-label={ariaLabel}
             className="min-w-[600px] px-0"
@@ -173,4 +173,4 @@ export default function DataTable<T extends Record<string, unknown>>({
       </Table>
     </div>
   );
-}
+});

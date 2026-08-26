@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Modal, Label, Input, TextField, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
 import { Plus, X, RefreshCw } from 'lucide-react';
-import { createChannel, listModels, deleteModel, syncChannel } from '../../api';
+import { createChannel, previewModels } from '../../api';
 
 // 协议类型与后端 protocol.Provider 保持一致
 const providerOptions = [
@@ -37,38 +37,37 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
 
-  // 同步模型：先保存渠道，再调用同步接口拉取上游模型
+  // 每次打开弹窗重置表单
+  useEffect(() => {
+    if (isOpen) {
+      setForm(emptyForm);
+      setModels([]);
+      setError('');
+      setSyncing(false);
+      setSaving(false);
+    }
+  }, [isOpen]);
+
+  // 预览上游模型：不创建渠道，只获取模型列表
   const handleSyncModels = async () => {
     setSyncing(true);
     try {
-      const ch = await createChannel({
-        name: form.name.trim(),
+      const res = await previewModels({
         type: form.type,
         base_url: form.base_url.trim(),
         key: form.key.trim(),
-        enabled: form.enabled,
-        auto_sync: form.auto_sync,
       });
-      const res = await syncChannel(ch.id);
-      toast.success(`同步完成，新增 ${res.added ?? 0} 个模型`);
-      const ms = await listModels();
-      setModels(Array.isArray(ms) ? ms : []);
-      onCreated?.();
+      setModels(Array.isArray(res.models) ? res.models : []);
+      toast.success(`获取到 ${(res.models || []).length} 个模型`);
     } catch (e) {
-      toast.error(e.message || '同步失败');
+      toast.error(e.message || '获取模型失败');
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleDeleteModel = async (m) => {
-    try {
-      await deleteModel(m.id);
-      setModels((prev) => prev.filter((x) => x.id !== m.id));
-      toast.success('模型已删除');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    }
+  const handleRemoveModel = (name) => {
+    setModels((prev) => prev.filter((m) => m !== name));
   };
 
   const handleSubmit = async () => {
@@ -196,18 +195,18 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                     orientation="vertical"
                     hideScrollBar
                   >
-                    {models.map((m) => (
+                    {models.map((name) => (
                       <Chip
-                        key={m.id}
+                        key={name}
                         variant="soft"
                         size="sm"
                       >
                         <span className="flex items-center gap-1">
-                          {m.name}
+                          {name}
                           <button
-                            onClick={() => handleDeleteModel(m)}
+                            onClick={() => handleRemoveModel(name)}
                             className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
-                            aria-label={`删除模型 ${m.name}`}
+                            aria-label={`移除模型 ${name}`}
                           >
                             <X className="size-3" />
                           </button>

@@ -22,12 +22,15 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // 管理 API 代理：转发到 portunus 后端
-      // 前端源码模块请求（/api/*.js，Accept: */*）不能被代理，需 bypass 回 Vite
+      // 前端源码模块请求（/api/*.js，含 ?t= 时间戳）不能被代理，需 bypass 回 Vite
       '/api': {
         target: 'http://localhost:3060',
         changeOrigin: true,
         bypass: (req) => {
-          if (req.url.endsWith('.js') || req.url.endsWith('.mjs') || req.url.includes('?')) {
+          // 只看路径（去掉查询串）：只有 .js/.mjs 源码模块才 bypass，
+          // 带查询串的 API 请求（如 /api/models?name=xxx）必须代理到后端
+          const pathname = req.url.split('?')[0];
+          if (pathname.endsWith('.js') || pathname.endsWith('.mjs')) {
             return req.url;
           }
         },

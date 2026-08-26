@@ -5,7 +5,16 @@ import DataTable from '../../components/DataTable.tsx';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
 import EditChannelModal from './EditChannelModal';
+import ProviderIcon from '../../components/ProviderIcon';
 import { listChannels, updateChannel, syncChannel } from '../../api';
+
+// 协议类型标签颜色
+const providerBadge = {
+  openai: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+  openai_responses: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+  anthropic: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
+  gemini: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+};
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,8 +80,9 @@ export default function Channels() {
       dataIndex: 'type',
       key: 'type',
       render: (val) => (
-        <span className="inline-block rounded-full bg-default px-2 py-0.5 text-xs text-default-foreground">
-          {val}
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${providerBadge[val] || 'bg-default text-default-foreground'}`}>
+          <ProviderIcon type={val} className="size-3.5" />
+          {val.replace(/_/g, ' ')}
         </span>
       ),
     },
@@ -142,7 +152,7 @@ export default function Channels() {
   ];
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">渠道管理</Typography>
         <div className="flex items-center gap-2">

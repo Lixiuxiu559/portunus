@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Typography, Button, TextField, Input, Select, ListBox, Label, DateRangePicker } from '@heroui/react';
+import {
+  Typography, Button, Card, TextField, Input, Select, ListBox, Label,
+  DateRangePicker, DateField, RangeCalendar,
+} from '@heroui/react';
 import { Search, RotateCw } from 'lucide-react';
 import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/date';
 import DataTable from '../components/DataTable';
@@ -114,7 +117,7 @@ export default function Logs() {
   ];
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">调用日志</Typography>
         <Button variant="secondary" size="md" onPress={fetchLogs} isPending={loading}>
@@ -170,16 +173,53 @@ export default function Logs() {
 
         <DateRangePicker
           granularity="minute"
+          startName="start"
+          endName="end"
           value={filters.range}
           onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
           placeholderValue={defaultDate}
           className="w-fit"
         >
           <Label>时间范围</Label>
-          <DateRangePicker.Trigger>
-            <DateRangePicker.TriggerIndicator />
-          </DateRangePicker.Trigger>
-          <DateRangePicker.Popover />
+          <DateField.Group fullWidth>
+            <DateField.Input slot="start">
+              {(segment) => <DateField.Segment segment={segment} />}
+            </DateField.Input>
+            <DateRangePicker.RangeSeparator />
+            <DateField.Input slot="end">
+              {(segment) => <DateField.Segment segment={segment} />}
+            </DateField.Input>
+            <DateField.Suffix>
+              <DateRangePicker.Trigger>
+                <DateRangePicker.TriggerIndicator />
+              </DateRangePicker.Trigger>
+            </DateField.Suffix>
+          </DateField.Group>
+          <DateRangePicker.Popover>
+            <RangeCalendar aria-label="时间范围">
+              <RangeCalendar.Header>
+                <RangeCalendar.YearPickerTrigger>
+                  <RangeCalendar.YearPickerTriggerHeading />
+                  <RangeCalendar.YearPickerTriggerIndicator />
+                </RangeCalendar.YearPickerTrigger>
+                <RangeCalendar.NavButton slot="previous" />
+                <RangeCalendar.NavButton slot="next" />
+              </RangeCalendar.Header>
+              <RangeCalendar.Grid>
+                <RangeCalendar.GridHeader>
+                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
+                </RangeCalendar.GridHeader>
+                <RangeCalendar.GridBody>
+                  {(date) => <RangeCalendar.Cell date={date} />}
+                </RangeCalendar.GridBody>
+              </RangeCalendar.Grid>
+              <RangeCalendar.YearPickerGrid>
+                <RangeCalendar.YearPickerGridBody>
+                  {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
+                </RangeCalendar.YearPickerGridBody>
+              </RangeCalendar.YearPickerGrid>
+            </RangeCalendar>
+          </DateRangePicker.Popover>
         </DateRangePicker>
 
         <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(); }}>
@@ -211,10 +251,14 @@ export default function Logs() {
 
 function StatCard({ label, value }) {
   return (
-    <div className="rounded-xl border border-separator p-4">
-      <Typography type="body-sm" className="text-muted">{label}</Typography>
-      <Typography type="body" className="font-semibold mt-1">{value}</Typography>
-    </div>
+    <Card className="gap-1 px-4 py-2 rounded-2xl">
+      <Card.Header className="p-0">
+        <Typography type="body-sm" className="text-muted">{label}</Typography>
+      </Card.Header>
+      <Card.Content className="p-0">
+        <Typography type="body" className="font-semibold">{value}</Typography>
+      </Card.Content>
+    </Card>
   );
 }
 

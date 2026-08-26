@@ -53,6 +53,7 @@
     "start": "electron ."
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@heroui/react": "3.2.4",
     "@heroui/styles": "3.2.4",
     "@internationalized/date": "^3.12.3",

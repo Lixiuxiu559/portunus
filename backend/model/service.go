@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
@@ -65,11 +66,15 @@ func (m *Model) ToResponse() Response {
 	}
 }
 
-// List 返回模型列表；channelID > 0 时仅返回该渠道下的模型。
-func List(channelID int64) ([]Model, error) {
+// List 返回模型列表；支持按渠道与名称关键词过滤（均可选）。
+func List(channelID int64, name string) ([]Model, error) {
 	q := shared.DB
 	if channelID > 0 {
 		q = q.Where("channel_id = ?", channelID)
+	}
+	// 名称不区分大小写的模糊匹配
+	if name != "" {
+		q = q.Where("lower(name) LIKE ?", "%"+strings.ToLower(name)+"%")
 	}
 	var ms []Model
 	err := q.Order("id").Find(&ms).Error

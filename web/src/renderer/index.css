@@ -173,3 +173,18 @@ html.dark .bg-decor .mask {
     transform: translate(0, 0) scale(1);
   }
 }
+
+/*
+ * 模型页筛选区：把名称输入框、渠道下拉、查询按钮整体缩小一号。
+ * HeroUI 的 TextField/Select 无 size 变体，这里用作用域自定义覆盖其默认高度。
+ */
+.model-filters .input,
+.model-filters .select__trigger {
+  min-height: calc(var(--spacing) * 8) !important;
+  padding-block: calc(var(--spacing) * 1) !important;
+  font-size: var(--text-xs);
+}
+
+.model-filters .select__trigger {
+  padding-inline: calc(var(--spacing) * 2) !important;
+}

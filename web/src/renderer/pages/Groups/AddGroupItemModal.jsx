@@ -48,12 +48,13 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
               <Select
                 isRequired
                 name="model_id"
+                placeholder="请选择模型"
                 selectedKey={modelId}
                 onSelectionChange={setModelId}
               >
                 <Label>选择模型</Label>
                 <Select.Trigger>
-                  <Select.Value placeholder="请选择模型" />
+                  <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
                 <Select.Popover>

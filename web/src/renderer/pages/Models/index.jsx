@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Button, Switch, Typography, Chip, toast } from '@heroui/react';
-import { Plus, Trash2, Pencil, RotateCw } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Switch, Typography, Chip, toast, Select, ListBox, TextField, Input } from '@heroui/react';
+import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
 import DataTable from '../../components/DataTable';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
@@ -13,6 +13,12 @@ export default function Models() {
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  // 查询条件（点击查询按钮后才生效）
+  const [queryChannel, setQueryChannel] = useState('all');
+  const [queryName, setQueryName] = useState('');
+  // 输入框的临时值，未点击查询前不触发请求
+  const [draftName, setDraftName] = useState('');
+  const [draftChannel, setDraftChannel] = useState('all');
 
   const fetchAll = async () => {
     setLoading(true);
@@ -33,7 +39,41 @@ export default function Models() {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
+  const channelMap = useMemo(
+    () => Object.fromEntries(channels.map((c) => [c.id, c.name])),
+    [channels],
+  );
+
+  // 实际执行查询：channel + name 组合
+  const performSearch = useCallback(async (channel, name) => {
+    setQueryChannel(channel);
+    setQueryName(name.trim());
+    const params = {};
+    if (channel !== 'all') params.channel_id = channel;
+    if (name.trim()) params.name = name.trim();
+    setLoading(true);
+    try {
+      setModels(await listModels(params));
+    } catch {
+      setModels([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 点查询按钮 / 回车：按当前草稿值查询
+  const handleSearch = useCallback(() => {
+    performSearch(draftChannel, draftName);
+  }, [performSearch, draftChannel, draftName]);
+
+  // 切换渠道：立即请求（名称取当前输入框的草稿值）
+  const handleChannelChange = useCallback(
+    (channel) => {
+      setDraftChannel(channel);
+      performSearch(channel, draftName);
+    },
+    [performSearch, draftName],
+  );
 
   const handleToggle = async (m) => {
     setTogglingId(m.id);
@@ -60,7 +100,7 @@ export default function Models() {
     toast.success('模型已删除');
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '名称',
       dataIndex: 'name',
@@ -133,10 +173,10 @@ export default function Models() {
         </Switch>
       ),
     },
-  ];
+  ], [channelMap, togglingId]);
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">模型管理</Typography>
         <div className="flex items-center gap-2">
@@ -150,11 +190,68 @@ export default function Models() {
         </div>
       </div>
 
+      {/* 筛选区：名称 + 渠道，点击查询按钮后按条件请求后端 */}
+      <div className="model-filters flex items-center gap-2 mb-3">
+        <TextField
+          size="sm"
+          value={draftName}
+          onChange={setDraftName}
+          placeholder="按名称筛选"
+          className="w-56"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSearch();
+          }}
+        >
+          <Input />
+        </TextField>
+        {draftName && (
+          <button
+            onClick={() => { setDraftName(''); setQueryName(''); }}
+            className="flex size-6 items-center justify-center rounded text-muted hover:text-foreground cursor-pointer"
+            aria-label="清除名称筛选"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+
+        <Select
+          size="sm"
+          selectedKey={draftChannel}
+          onSelectionChange={handleChannelChange}
+          className="w-52"
+        >
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              <ListBox.Item id="all" textValue="全部渠道">
+                全部渠道
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+              {channels.map((c) => (
+                <ListBox.Item key={c.id} id={String(c.id)} textValue={c.name}>
+                  {c.name}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+        <Button variant="primary" size="sm" onPress={handleSearch} isPending={loading}>
+          <Search className="size-4" />
+          查询
+        </Button>
+      </div>
+
       <DataTable
         dataSource={models}
         columns={columns}
         loading={loading}
-        emptyText="暂无模型，点击右上角「新增模型」创建"
+        emptyText={queryName || queryChannel !== 'all'
+          ? '没有符合条件的模型'
+          : '暂无模型，点击右上角「新增模型」创建'}
       />
 
       <CreateModelModal

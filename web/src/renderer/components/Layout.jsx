@@ -43,8 +43,8 @@ export default function Layout() {
           <ThemeToggle />
         </div>
       </header>
-      <main className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-5xl">
+      <main className="flex-1 min-h-0 p-6">
+        <div className="mx-auto max-w-5xl h-full flex flex-col">
           <Outlet />
         </div>
       </main>

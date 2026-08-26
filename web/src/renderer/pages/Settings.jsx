@@ -1,4 +1,4 @@
-import { Typography, Button, Spinner } from '@heroui/react';
+import { Typography, Button, Card, Spinner } from '@heroui/react';
 import { Download, RotateCw, CheckCircle } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 
@@ -13,51 +13,55 @@ export default function Settings() {
       <Typography type="h2">系统设置</Typography>
 
       {/* 版本信息 */}
-      <div className="rounded-xl border border-separator p-5">
-        <Typography type="body-sm" className="text-muted mb-2">
-          关于 Portunus
-        </Typography>
-        <div className="flex items-center justify-between">
-          <div>
-            <Typography className="font-medium">版本 {APP_VERSION}</Typography>
-            {available && version && (
-              <Typography type="body-sm" className="text-primary mt-1">
-                新版本 {version} 可用
-              </Typography>
-            )}
-            {error && (
-              <Typography type="body-sm" className="text-red-500 mt-1">
-                更新出错: {error}
-              </Typography>
-            )}
+      <Card className="gap-4 p-5">
+        <Card.Header className="p-0">
+          <Typography type="body-sm" className="text-muted">
+            关于 Portunus
+          </Typography>
+        </Card.Header>
+        <Card.Content className="p-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <Typography className="font-medium">版本 {APP_VERSION}</Typography>
+              {available && version && (
+                <Typography type="body-sm" className="text-primary mt-1">
+                  新版本 {version} 可用
+                </Typography>
+              )}
+              {error && (
+                <Typography type="body-sm" className="text-red-500 mt-1">
+                  更新出错: {error}
+                </Typography>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {checking && (
+                <Spinner size="sm" />
+              )}
+              {!downloaded && !checking && (
+                <Button variant="tertiary" size="sm" onPress={check}>
+                  <RotateCw className="size-4" />
+                  检查更新
+                </Button>
+              )}
+              {available && !downloaded && !checking && (
+                <Button variant="primary" size="sm" onPress={download}>
+                  <Download className="size-4" />
+                  下载更新
+                </Button>
+              )}
+              {downloaded && (
+                <Button variant="primary" size="sm" onPress={install}>
+                  <CheckCircle className="size-4" />
+                  安装并重启
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {checking && (
-              <Spinner size="sm" />
-            )}
-            {!downloaded && !checking && (
-              <Button variant="ghost" size="sm" onPress={check}>
-                <RotateCw className="size-4" />
-                检查更新
-              </Button>
-            )}
-            {available && !downloaded && !checking && (
-              <Button variant="primary" size="sm" onPress={download}>
-                <Download className="size-4" />
-                下载更新
-              </Button>
-            )}
-            {downloaded && (
-              <Button variant="primary" size="sm" onPress={install}>
-                <CheckCircle className="size-4" />
-                安装并重启
-              </Button>
-            )}
-          </div>
-        </div>
+        </Card.Content>
 
         {progress.percent > 0 && progress.percent < 100 && (
-          <div className="mt-3">
+          <div className="mt-1">
             <div className="w-full h-2 rounded-full bg-accent/10 overflow-hidden">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300"
@@ -69,7 +73,7 @@ export default function Settings() {
             </Typography>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
