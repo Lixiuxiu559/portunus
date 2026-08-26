@@ -220,6 +220,25 @@ func DeleteItem(groupID, itemID int64) error {
 	return shared.DB.Where("id = ? AND group_id = ?", itemID, groupID).Delete(&GroupItem{}).Error
 }
 
+// DeleteItemsByModelIDsTx 在事务中删除引用指定模型的全部分组项，
+// 并把指向这些分组项的 ActiveItemID 清零。
+func DeleteItemsByModelIDsTx(tx *gorm.DB, modelIDs []int64) error {
+	if len(modelIDs) == 0 {
+		return nil
+	}
+	var itemIDs []int64
+	if err := tx.Model(&GroupItem{}).Where("model_id IN ?", modelIDs).Pluck("id", &itemIDs).Error; err != nil {
+		return err
+	}
+	if len(itemIDs) == 0 {
+		return nil
+	}
+	if err := tx.Model(&Group{}).Where("active_item_id IN ?", itemIDs).Update("active_item_id", 0).Error; err != nil {
+		return err
+	}
+	return tx.Where("id IN ?", itemIDs).Delete(&GroupItem{}).Error
+}
+
 // orderByPriority 让分组项按 priority 升序加载。
 func orderByPriority(db *gorm.DB) *gorm.DB {
 	return db.Order("priority")

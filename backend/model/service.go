@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/Lixiuxiu559/portunus/backend/channel"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
@@ -168,6 +170,11 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 // Delete 删除模型。
 func Delete(id int64) error {
 	return shared.DB.Delete(&Model{}, id).Error
+}
+
+// DeleteByChannelTx 在事务中删除指定渠道下的全部模型。
+func DeleteByChannelTx(tx *gorm.DB, channelID int64) error {
+	return tx.Where("channel_id = ?", channelID).Delete(&Model{}).Error
 }
 
 // resolvePrice 返回请求中显式指定的价格，否则返回内置默认价（无则 0）。

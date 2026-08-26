@@ -3,6 +3,8 @@ package channel
 import (
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
@@ -150,8 +152,7 @@ func Update(id int64, req UpdateRequest) (*Channel, error) {
 	return &c, nil
 }
 
-// Delete 删除渠道。
-// TODO: 级联删除该渠道下的模型，避免产生孤儿记录。
-func Delete(id int64) error {
-	return shared.DB.Delete(&Channel{}, id).Error
+// DeleteTx 在事务中删除渠道。级联清理由调用方（api 层）在同一个事务内完成。
+func DeleteTx(tx *gorm.DB, id int64) error {
+	return tx.Delete(&Channel{}, id).Error
 }

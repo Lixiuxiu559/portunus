@@ -4,10 +4,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
+	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // registerChannelRoutes 注册渠道 CRUD 路由。
@@ -88,7 +91,21 @@ func deleteChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
 		return
 	}
-	if err := channel.Delete(id); err != nil {
+	// 级联清理：先收集该渠道模型 ID，删引用它们的分组项，再删模型，最后删渠道。
+	err := shared.DB.Transaction(func(tx *gorm.DB) error {
+		var modelIDs []int64
+		if err := tx.Model(&model.Model{}).Where("channel_id = ?", id).Pluck("id", &modelIDs).Error; err != nil {
+			return err
+		}
+		if err := group.DeleteItemsByModelIDsTx(tx, modelIDs); err != nil {
+			return err
+		}
+		if err := model.DeleteByChannelTx(tx, id); err != nil {
+			return err
+		}
+		return channel.DeleteTx(tx, id)
+	})
+	if err != nil {
 		respondError(c, err)
 		return
 	}
