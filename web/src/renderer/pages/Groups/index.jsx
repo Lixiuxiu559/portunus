@@ -27,9 +27,9 @@ export default function Groups() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [g, m, c] = await Promise.all([listGroups(), listModels(), listChannels()]);
+      const [g, m, c] = await Promise.all([listGroups(), listModels({ page: 1, page_size: 1000 }), listChannels()]);
       setGroups(Array.isArray(g) ? g : []);
-      setModels(Array.isArray(m) ? m : []);
+      setModels(Array.isArray(m?.data) ? m.data : []);
       setChannels(Array.isArray(c) ? c : []);
     } catch {
       setGroups([]);

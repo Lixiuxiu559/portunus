@@ -29,10 +29,10 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
     });
     setError('');
     setModels([]);
-    listModels()
+    listModels({ page: 1, page_size: 1000, channel_id: channel.id })
       .then((res) => {
-        const all = Array.isArray(res) ? res : [];
-        setModels(all.filter((m) => m.channel_id === channel.id));
+        const all = Array.isArray(res?.data) ? res.data : [];
+        setModels(all);
       })
       .catch(() => setModels([]));
   }, [isOpen, channel]);
@@ -45,9 +45,9 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
     try {
       const res = await syncChannel(channel.id);
       toast.success(`同步完成，新增 ${res.added ?? 0} 个模型`);
-      const ms = await listModels();
-      const all = Array.isArray(ms) ? ms : [];
-      setModels(all.filter((m) => m.channel_id === channel.id));
+      const ms = await listModels({ page: 1, page_size: 1000, channel_id: channel.id });
+      const all = Array.isArray(ms?.data) ? ms.data : [];
+      setModels(all);
     } catch (e) {
       toast.error(e.message || '同步失败');
     } finally {

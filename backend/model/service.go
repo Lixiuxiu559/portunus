@@ -68,8 +68,8 @@ func (m *Model) ToResponse() Response {
 	}
 }
 
-// List 返回模型列表；支持按渠道与名称关键词过滤（均可选）。
-func List(channelID int64, name string) ([]Model, error) {
+// List 返回分页模型列表与总数；支持按渠道与名称关键词过滤（均可选）。
+func List(channelID int64, name string, page, pageSize int) ([]Model, int64, error) {
 	q := shared.DB
 	if channelID > 0 {
 		q = q.Where("channel_id = ?", channelID)
@@ -78,9 +78,19 @@ func List(channelID int64, name string) ([]Model, error) {
 	if name != "" {
 		q = q.Where("lower(name) LIKE ?", "%"+strings.ToLower(name)+"%")
 	}
+	var total int64
+	if err := q.Model(&Model{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
 	var ms []Model
-	err := q.Order("id").Find(&ms).Error
-	return ms, err
+	err := q.Order("id").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ms).Error
+	return ms, total, err
 }
 
 // Get 返回单个模型。

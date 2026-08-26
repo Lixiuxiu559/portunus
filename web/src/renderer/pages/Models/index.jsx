@@ -9,6 +9,8 @@ import { listModels, updateModel, createModel, deleteModel, listChannels } from 
 export default function Models() {
   const [models, setModels] = useState([]);
   const [channels, setChannels] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -19,13 +21,16 @@ export default function Models() {
   // 输入框的临时值，未点击查询前不触发请求
   const [draftName, setDraftName] = useState('');
   const [draftChannel, setDraftChannel] = useState('all');
+  const pageSize = 20;
 
   const fetchAll = async () => {
     setLoading(true);
     try {
       const start = Date.now();
-      const [m, c] = await Promise.all([listModels(), listChannels()]);
-      setModels(Array.isArray(m) ? m : []);
+      const [m, c] = await Promise.all([listModels({ page: 1, page_size: pageSize }), listChannels()]);
+      setModels(Array.isArray(m?.data) ? m.data : []);
+      setTotal(m?.total ?? 0);
+      setPage(1);
       setChannels(Array.isArray(c) ? c : []);
       // 确保加载状态至少显示 300ms，避免闪烁
       const elapsed = Date.now() - start;
@@ -45,34 +50,45 @@ export default function Models() {
   );
 
   // 实际执行查询：channel + name 组合
-  const performSearch = useCallback(async (channel, name) => {
+  const performSearch = useCallback(async (channel, name, targetPage = 1) => {
     setQueryChannel(channel);
     setQueryName(name.trim());
-    const params = {};
+    const params = { page: targetPage, page_size: pageSize };
     if (channel !== 'all') params.channel_id = channel;
     if (name.trim()) params.name = name.trim();
     setLoading(true);
     try {
-      setModels(await listModels(params));
+      const res = await listModels(params);
+      setModels(Array.isArray(res?.data) ? res.data : []);
+      setTotal(res?.total ?? 0);
+      setPage(targetPage);
     } catch {
       setModels([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pageSize]);
 
-  // 点查询按钮 / 回车：按当前草稿值查询
+  // 点查询按钮 / 回车：按当前草稿值查询（回到第 1 页）
   const handleSearch = useCallback(() => {
-    performSearch(draftChannel, draftName);
+    performSearch(draftChannel, draftName, 1);
   }, [performSearch, draftChannel, draftName]);
 
   // 切换渠道：立即请求（名称取当前输入框的草稿值）
   const handleChannelChange = useCallback(
     (channel) => {
       setDraftChannel(channel);
-      performSearch(channel, draftName);
+      performSearch(channel, draftName, 1);
     },
     [performSearch, draftName],
+  );
+
+  // 翻页：按已生效的查询条件请求
+  const handlePageChange = useCallback(
+    (nextPage) => {
+      performSearch(queryChannel, queryName, nextPage);
+    },
+    [performSearch, queryChannel, queryName],
   );
 
   const handleToggle = async (m) => {
@@ -96,8 +112,10 @@ export default function Models() {
 
   const handleDelete = async (m) => {
     await deleteModel(m.id);
-    setModels((prev) => prev.filter((x) => x.id !== m.id));
     toast.success('模型已删除');
+    // 刷新当前页：删掉当前页最后一条时自动回退到上一页
+    const nextPage = models.length === 1 && page > 1 ? page - 1 : page;
+    await performSearch(queryChannel, queryName, nextPage);
   };
 
   const columns = useMemo(() => [
@@ -271,6 +289,31 @@ export default function Models() {
           ? '没有符合条件的模型'
           : '暂无模型，点击右上角「新增模型」创建'}
       />
+
+      {/* 分页 */}
+      <div className="flex items-center justify-between mt-3">
+        <Typography type="body-sm" className="text-muted">
+          共 {total} 条，第 {page}/{Math.max(1, Math.ceil(total / pageSize))} 页
+        </Typography>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="secondary"
+            isDisabled={page <= 1}
+            onPress={() => handlePageChange(page - 1)}
+          >
+            上一页
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            isDisabled={page >= Math.max(1, Math.ceil(total / pageSize))}
+            onPress={() => handlePageChange(page + 1)}
+          >
+            下一页
+          </Button>
+        </div>
+      </div>
 
       <CreateModelModal
         isOpen={showCreate}

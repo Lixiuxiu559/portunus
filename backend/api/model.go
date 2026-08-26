@@ -26,7 +26,9 @@ func listModels(c *gin.Context) {
 			channelID = id
 		}
 	}
-	ms, err := model.List(channelID, c.Query("name"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	ms, total, err := model.List(channelID, c.Query("name"), page, pageSize)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -35,7 +37,7 @@ func listModels(c *gin.Context) {
 	for i := range ms {
 		resp = append(resp, ms[i].ToResponse())
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"total": total, "data": resp})
 }
 
 func getModel(c *gin.Context) {
