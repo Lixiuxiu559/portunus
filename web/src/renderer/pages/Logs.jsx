@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Typography, Spinner, Button } from '@heroui/react';
+import { Typography, Button, TextField, Input, Select, ListBox, Label, DateRangePicker } from '@heroui/react';
 import { Search, RotateCw } from 'lucide-react';
+import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/date';
+import DataTable from '../components/DataTable';
 import { listLogs, getLogStats } from '../api';
+
+const successOptions = [
+  { id: 'all', label: '全部' },
+  { id: 'true', label: '成功' },
+  { id: 'false', label: '失败' },
+];
 
 export default function Logs() {
   const [logs, setLogs] = useState({ total: 0, data: [] });
@@ -11,21 +19,19 @@ export default function Logs() {
   const pageSize = 20;
 
   const [filters, setFilters] = useState({
-    api_key_id: '',
-    channel_id: '',
     model_name: '',
-    success: '',
-    start_time: '',
-    end_time: '',
+    success: 'all',
+    range: null,
   });
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
       const params = { page, page_size: pageSize };
-      Object.entries(filters).forEach(([k, v]) => {
-        if (v !== '' && v !== undefined) params[k] = v;
-      });
+      if (filters.model_name) params.model_name = filters.model_name;
+      if (filters.success !== 'all') params.success = filters.success;
+      if (filters.range?.start) params.start_time = filters.range.start.toString();
+      if (filters.range?.end) params.end_time = filters.range.end.toString();
       const [l, s] = await Promise.all([listLogs(params), getLogStats(params)]);
       setLogs(l || { total: 0, data: [] });
       setStats(s);
@@ -40,11 +46,78 @@ export default function Logs() {
 
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
 
+  const defaultDate = (() => { const d = today(getLocalTimeZone()); return new CalendarDateTime(d.year, d.month, d.day, 0, 0, 0); })();
+
+  const columns = [
+    {
+      title: '时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (val) => (
+        <span className="text-muted font-mono text-xs">
+          {val ? new Date(val).toLocaleString('zh-CN') : '—'}
+        </span>
+      ),
+    },
+    {
+      title: '模型',
+      dataIndex: 'model_name',
+      key: 'model_name',
+      render: (val) => val || '—',
+    },
+    {
+      title: '分组',
+      dataIndex: 'group_name',
+      key: 'group_name',
+      render: (val) => val || '—',
+    },
+    {
+      title: '输入 Tokens',
+      dataIndex: 'input_token',
+      key: 'input_token',
+      width: '120px',
+      render: (val) => (
+        <span className="text-right font-mono block">{formatNum(val)}</span>
+      ),
+    },
+    {
+      title: '输出 Tokens',
+      dataIndex: 'output_token',
+      key: 'output_token',
+      width: '120px',
+      render: (val) => (
+        <span className="text-right font-mono block">{formatNum(val)}</span>
+      ),
+    },
+    {
+      title: '费用',
+      dataIndex: 'cost',
+      key: 'cost',
+      width: '100px',
+      render: (val) => (
+        <span className="text-right font-mono block">${Number(val || 0).toFixed(6)}</span>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'success',
+      key: 'success',
+      width: '80px',
+      render: (val) => (
+        <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
+          val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+        }`}>
+          {val ? '成功' : '失败'}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">调用日志</Typography>
-        <Button variant="ghost" size="sm" onPress={fetchLogs} isLoading={loading}>
+        <Button variant="secondary" size="md" onPress={fetchLogs} isPending={loading}>
           <RotateCw className="size-4" />
         </Button>
       </div>
@@ -61,95 +134,77 @@ export default function Logs() {
       )}
 
       {/* 筛选栏 */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input
-          className="w-40 rounded-lg border border-separator bg-background px-3 py-2 text-sm"
-          placeholder="模型名"
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <TextField
+          name="model_name"
           value={filters.model_name}
-          onChange={(e) => setFilters((f) => ({ ...f, model_name: e.target.value }))}
-        />
-        <select
-          className="rounded-lg border border-separator bg-background px-3 py-2 text-sm"
-          value={filters.success}
-          onChange={(e) => setFilters((f) => ({ ...f, success: e.target.value === 'all' ? '' : e.target.value }))}
+          onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
+          className="w-40"
         >
-          <option value="all">全部</option>
-          <option value="true">成功</option>
-          <option value="false">失败</option>
-        </select>
-        <input
-          className="w-44 rounded-lg border border-separator bg-background px-3 py-2 text-sm"
-          type="datetime-local"
-          value={filters.start_time}
-          onChange={(e) => setFilters((f) => ({ ...f, start_time: e.target.value }))}
-        />
-        <input
-          className="w-44 rounded-lg border border-separator bg-background px-3 py-2 text-sm"
-          type="datetime-local"
-          value={filters.end_time}
-          onChange={(e) => setFilters((f) => ({ ...f, end_time: e.target.value }))}
-        />
-        <Button size="sm" variant="primary" onPress={() => { setPage(1); fetchLogs(); }}>
+          <Label>模型名</Label>
+          <Input placeholder="筛选模型" />
+        </TextField>
+
+        <Select
+          name="success"
+          selectedKey={filters.success}
+          onSelectionChange={(v) => setFilters((f) => ({ ...f, success: v }))}
+          className="w-28"
+        >
+          <Label>状态</Label>
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {successOptions.map((o) => (
+                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+                  {o.label}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+
+        <DateRangePicker
+          granularity="minute"
+          value={filters.range}
+          onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
+          placeholderValue={defaultDate}
+          className="w-fit"
+        >
+          <Label>时间范围</Label>
+          <DateRangePicker.Trigger>
+            <DateRangePicker.TriggerIndicator />
+          </DateRangePicker.Trigger>
+          <DateRangePicker.Popover />
+        </DateRangePicker>
+
+        <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(); }}>
           <Search className="size-4" /> 查询
         </Button>
       </div>
 
       {/* 日志表格 */}
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : !logs?.data?.length ? (
-        <div className="flex justify-center py-16 text-muted">
-          <Typography>暂无日志</Typography>
-        </div>
-      ) : (
-        <>
-          <div className="rounded-xl border border-separator overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-separator bg-accent/5">
-                  <th className="text-left px-4 py-3 font-medium">时间</th>
-                  <th className="text-left px-4 py-3 font-medium">模型</th>
-                  <th className="text-left px-4 py-3 font-medium">分组</th>
-                  <th className="text-right px-4 py-3 font-medium">输入 Tokens</th>
-                  <th className="text-right px-4 py-3 font-medium">输出 Tokens</th>
-                  <th className="text-right px-4 py-3 font-medium">费用</th>
-                  <th className="text-center px-4 py-3 font-medium">状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.data.map((l, i) => (
-                  <tr key={l.id || i} className="border-b border-separator/50 hover:bg-accent/5">
-                    <td className="px-4 py-3 text-muted font-mono text-xs">
-                      {l.created_at ? new Date(l.created_at).toLocaleString('zh-CN') : '—'}
-                    </td>
-                    <td className="px-4 py-3">{l.model_name || '—'}</td>
-                    <td className="px-4 py-3">{l.group_name || '—'}</td>
-                    <td className="px-4 py-3 text-right font-mono">{formatNum(l.input_token)}</td>
-                    <td className="px-4 py-3 text-right font-mono">{formatNum(l.output_token)}</td>
-                    <td className="px-4 py-3 text-right font-mono">${Number(l.cost || 0).toFixed(6)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${l.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {l.success ? '成功' : '失败'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <DataTable
+        dataSource={logs.data || []}
+        columns={columns}
+        loading={loading}
+        emptyText="暂无日志"
+      />
 
-          {/* 分页 */}
-          <div className="flex items-center justify-between mt-3">
-            <Typography type="body-sm" className="text-muted">
-              共 {logs.total} 条，第 {page}/{totalPages} 页
-            </Typography>
-            <div className="flex gap-1">
-              <Button size="sm" variant="ghost" disabled={page <= 1} onPress={() => setPage((p) => p - 1)}>上一页</Button>
-              <Button size="sm" variant="ghost" disabled={page >= totalPages} onPress={() => setPage((p) => p + 1)}>下一页</Button>
-            </div>
-          </div>
-        </>
-      )}
+      {/* 分页 */}
+      <div className="flex items-center justify-between mt-3">
+        <Typography type="body-sm" className="text-muted">
+          共 {logs.total} 条，第 {page}/{totalPages} 页
+        </Typography>
+        <div className="flex gap-1">
+          <Button size="sm" variant="secondary" isDisabled={page <= 1} onPress={() => setPage((p) => p - 1)}>上一页</Button>
+          <Button size="sm" variant="secondary" isDisabled={page >= totalPages} onPress={() => setPage((p) => p + 1)}>下一页</Button>
+        </div>
+      </div>
     </div>
   );
 }

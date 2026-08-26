@@ -2,7 +2,7 @@
  * 通用数据表格组件（基于 HeroUI Table）
  * - dataSource: 数据数组
  * - columns: 列配置 [{ title, dataIndex, key?, render?, width?, isRowHeader?, copy? }]
- * - loading?: 加载状态
+ * - loading?: 加载状态（首次加载显示 Spinner，有数据时仅叠加半透明遮罩）
  * - emptyText?: 空态文案
  *
  * copy 字段：设置为 true 时，单元格内容旁会显示复制图标，hover 时可见，点击可复制文本到剪贴板。
@@ -41,6 +41,8 @@ export interface DataTableProps<T = Record<string, unknown>> {
   emptyText?: string;
   /** 表格 aria-label */
   ariaLabel?: string;
+  /** 额外 className */
+  className?: string;
 }
 
 /* ──────────── 复制按钮子组件 ──────────── */
@@ -92,8 +94,12 @@ export default function DataTable<T extends Record<string, unknown>>({
   loading = false,
   emptyText = '暂无数据',
   ariaLabel = '数据表格',
+  className = '',
 }: DataTableProps<T>) {
-  if (loading) {
+  const hasData = dataSource.length > 0;
+
+  // 首次加载（无数据）：居中显示 Spinner
+  if (loading && !hasData) {
     return (
       <div className="flex justify-center py-12">
         <Spinner />
@@ -101,7 +107,8 @@ export default function DataTable<T extends Record<string, unknown>>({
     );
   }
 
-  if (dataSource.length === 0) {
+  // 空态
+  if (!hasData) {
     return (
       <div className="flex justify-center py-16 text-muted">
         {emptyText}
@@ -110,51 +117,60 @@ export default function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <Table>
-      <Table.ScrollContainer>
-        <Table.Content
-          aria-label={ariaLabel}
-          className="min-w-[600px]"
-          aria-hidden={false}
-        >
-          <Table.Header>
-            {columns.map((col) => (
-              <Table.Column
-                key={col.key || col.dataIndex}
-                isRowHeader={col.isRowHeader}
-                style={col.width ? { width: col.width } : undefined}
-              >
-                {col.title}
-              </Table.Column>
-            ))}
-          </Table.Header>
-          <Table.Body>
-            {dataSource.map((row, rowIndex) => (
-              <Table.Row key={(row as Record<string, unknown>).id as string ?? rowIndex}>
-                {columns.map((col) => {
-                  const cellValue = row[col.dataIndex];
-                  const display: ReactNode = col.render
-                    ? col.render(cellValue, row, rowIndex)
-                    : (cellValue as ReactNode);
+    <div className={`relative ${className}`}>
+      {/* 刷新遮罩：有数据时 loading 叠加在表格上方 */}
+      {loading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px] rounded-xl">
+          <Spinner size="sm" />
+        </div>
+      )}
 
-                  return (
-                    <Table.Cell key={col.key || col.dataIndex}>
-                      {col.copy ? (
-                        <span className="group/cell inline-flex items-center gap-1">
-                          <span>{display}</span>
-                          <CopyButton text={String(cellValue ?? '')} />
-                        </span>
-                      ) : (
-                        display
-                      )}
-                    </Table.Cell>
-                  );
-                })}
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Content>
-      </Table.ScrollContainer>
-    </Table>
+      <Table>
+        <Table.ScrollContainer className="max-h-[calc(100vh-10rem)] overflow-auto">
+          <Table.Content
+            aria-label={ariaLabel}
+            className="min-w-[600px] px-0"
+            aria-hidden={false}
+          >
+            <Table.Header className="sticky top-0 z-10 bg-background shadow-[0_1px_0_var(--border)]">
+              {columns.map((col) => (
+                <Table.Column
+                  key={col.key || col.dataIndex}
+                  isRowHeader={col.isRowHeader}
+                  style={col.width ? { width: col.width } : undefined}
+                >
+                  {col.title}
+                </Table.Column>
+              ))}
+            </Table.Header>
+            <Table.Body>
+              {dataSource.map((row, rowIndex) => (
+                <Table.Row key={(row as Record<string, unknown>).id as string ?? rowIndex}>
+                  {columns.map((col) => {
+                    const cellValue = row[col.dataIndex];
+                    const display: ReactNode = col.render
+                      ? col.render(cellValue, row, rowIndex)
+                      : (cellValue as ReactNode);
+
+                    return (
+                      <Table.Cell key={col.key || col.dataIndex}>
+                        {col.copy ? (
+                          <span className="group/cell inline-flex items-center gap-1">
+                            <span>{display}</span>
+                            <CopyButton text={String(cellValue ?? '')} />
+                          </span>
+                        ) : (
+                          display
+                        )}
+                      </Table.Cell>
+                    );
+                  })}
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Content>
+        </Table.ScrollContainer>
+      </Table>
+    </div>
   );
 }

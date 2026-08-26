@@ -8,3 +8,6 @@
 # 运行时数据（本地数据库、配置）
 data/
 config.json
+
+# 编译产物
+/portunus

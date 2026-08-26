@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Switch, Typography, toast } from '@heroui/react';
-import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Pencil, RotateCw } from 'lucide-react';
 import DataTable from '../../components/DataTable.tsx';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
@@ -145,10 +145,20 @@ export default function Channels() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">渠道管理</Typography>
-        <Button variant="primary" size="md" onPress={() => setIsOpen(true)}>
-          <Plus className="size-4" />
-          新增渠道
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="md"
+            onPress={fetchChannels}
+            isPending={loading}
+          >
+            <RotateCw className="size-4" />
+          </Button>
+          <Button variant="primary" size="md" onPress={() => setIsOpen(true)}>
+            <Plus className="size-4" />
+            新增渠道
+          </Button>
+        </div>
       </div>
 
       <DataTable
