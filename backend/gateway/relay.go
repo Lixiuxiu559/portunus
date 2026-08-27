@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -73,6 +74,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		if errors.As(lastErr, &se) {
 			status = se.status
 		}
+		log.Printf("relay 502: model=%s err=%v", meta.Model, lastErr)
 		c.JSON(status, gin.H{"error": "上游调用失败"})
 	}
 }
@@ -106,7 +108,8 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	status = resp.StatusCode
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		io.Copy(io.Discard, resp.Body)
+		errBody, _ := io.ReadAll(resp.Body)
+		log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
 		return nil, status, &upstreamStatusError{status: status}
 	}
 
