@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -173,6 +174,127 @@ func TestConvertRequestAnthropicToOpenAI(t *testing.T) {
 	// DeepSeek 等上游要求 tool 消息必带 name（对应 tool_use 块的 name）
 	if tool["name"] != "get_weather" {
 		t.Errorf("tool 消息 name 不匹配: %v", tool["name"])
+	}
+}
+
+// TestConvertRequestAnthropicToOpenAIStreamOptions 断言流式请求转 OpenAI 时补 stream_options.include_usage，
+// 否则 OpenAI 兼容上游默认不返回 usage chunk，客户端看不到上下文占用。
+func TestConvertRequestAnthropicToOpenAIStreamOptions(t *testing.T) {
+	// 流式：应补 include_usage=true
+	in := `{
+		"model": "claude-3",
+		"stream": true,
+		"messages": [{"role": "user", "content": "hi"}],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	so, ok := m["stream_options"].(map[string]any)
+	if !ok {
+		t.Fatalf("流式请求应补 stream_options，输出: %s", out)
+	}
+	if so["include_usage"] != true {
+		t.Errorf("stream_options.include_usage 应为 true，实际: %v", so)
+	}
+
+	// 非流式：不应补
+	inNonStream := `{
+		"model": "claude-3",
+		"messages": [{"role": "user", "content": "hi"}],
+		"max_tokens": 100
+	}`
+	out2, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(inNonStream))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m2 := unmarshalAny(t, out2)
+	if _, ok := m2["stream_options"]; ok {
+		t.Errorf("非流式请求不应补 stream_options，输出: %s", out2)
+	}
+}
+
+// TestConvertRequestOpenAIIgnoreStreamOptions 断言 OpenAI→OpenAI 直通时补逻辑不覆盖
+// 请求里已有的 stream_options（如显式 include_usage=false）。
+func TestConvertRequestOpenAIIgnoreStreamOptions(t *testing.T) {
+	in := `{
+		"model": "gpt-4o",
+		"stream": true,
+		"stream_options": {"include_usage": false},
+		"messages": [{"role": "user", "content": "hi"}]
+	}`
+	// from==to 直通，原样返回
+	out, err := ConvertRequest(ProviderOpenAI, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	if string(out) != string([]byte(in)) {
+		t.Errorf("OpenAI→OpenAI 应原样直通，实际: %s", out)
+	}
+}
+
+// TestConvertResponseOpenAIToAnthropicUsageCache 断言非流式 OpenAI 响应转 Anthropic 时
+// usage 缓存字段完整映射（cache_read_input_tokens / cache_creation_input_tokens）。
+func TestConvertResponseOpenAIToAnthropicUsageCache(t *testing.T) {
+	in := `{
+		"id": "chatcmpl-1",
+		"object": "chat.completion",
+		"model": "gpt-4o",
+		"choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
+		"usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150,
+		          "prompt_tokens_details": {"cached_tokens": 60, "cache_creation_tokens": 30}}
+	}`
+	out, err := ConvertResponse(ProviderOpenAI, ProviderAnthropic, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	usage, ok := m["usage"].(map[string]any)
+	if !ok {
+		t.Fatalf("缺少 usage 字段: %s", out)
+	}
+	if usage["input_tokens"].(float64) != 10 {
+		t.Errorf("input_tokens 应为非缓存输入 10，实际: %v", usage["input_tokens"])
+	}
+	if usage["output_tokens"].(float64) != 50 {
+		t.Errorf("output_tokens 应为 50，实际: %v", usage["output_tokens"])
+	}
+	if usage["cache_read_input_tokens"].(float64) != 60 {
+		t.Errorf("cache_read_input_tokens 应为 60，实际: %v", usage["cache_read_input_tokens"])
+	}
+	if usage["cache_creation_input_tokens"].(float64) != 30 {
+		t.Errorf("cache_creation_input_tokens 应为 30，实际: %v", usage["cache_creation_input_tokens"])
+	}
+}
+
+// TestEstimateRequestTokens 验证估算函数：各协议可解析、返回正数且随文本变长而变大。
+func TestEstimateRequestTokens(t *testing.T) {
+	// OpenAI 协议
+	short := EstimateRequestTokens(ProviderOpenAI, []byte(`{"messages":[{"role":"user","content":"hi"}]}`))
+	if short <= 0 {
+		t.Fatalf("OpenAI 短文本估算应 > 0，实际: %d", short)
+	}
+	longBody := `{"messages":[{"role":"user","content":"` + strings.Repeat("hello ", 200) + `"}]}`
+	long := EstimateRequestTokens(ProviderOpenAI, []byte(longBody))
+	if long <= short {
+		t.Errorf("长文本估算应大于短文本: short=%d long=%d", short, long)
+	}
+
+	// Anthropic 原始协议（客户端发给 /v1/messages 的形态）
+	anth := EstimateRequestTokens(ProviderAnthropic, []byte(`{
+		"model":"claude-x","max_tokens":100,"stream":true,
+		"system":"be helpful",
+		"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}]
+	}`))
+	if anth <= 0 {
+		t.Errorf("Anthropic 请求估算应 > 0，实际: %d", anth)
+	}
+
+	// 非法 JSON 返回 0
+	if v := EstimateRequestTokens(ProviderOpenAI, []byte(`{`)); v != 0 {
+		t.Errorf("非法 JSON 应返回 0，实际: %d", v)
 	}
 }
 

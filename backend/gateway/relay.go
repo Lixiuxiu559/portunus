@@ -118,6 +118,13 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if convErr != nil {
 			return nil, status, convErr
 		}
+		// 客户端是 Anthropic 时，message_start 需要 input_tokens 才能显示上下文占用；
+		// 上游流式可能不返回 usage，先按客户端原始请求体估一个值兜底。
+		if clientProto == protocol.ProviderAnthropic {
+			if es, ok := conv.(protocol.EstimateSetter); ok {
+				es.SetEstimateInputTokens(protocol.EstimateRequestTokens(clientProto, reqBody))
+			}
+		}
 		if streamErr := relayStream(c, clientProto, resp, conv); streamErr != nil {
 			// 流已提交，无法 failover；记为失败但不再报错
 			return nil, status, nil

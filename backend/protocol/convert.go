@@ -67,6 +67,12 @@ func parseRequestToOpenAI(from Provider, body []byte) (*ChatCompletionRequest, e
 func renderRequestFromOpenAI(to Provider, req *ChatCompletionRequest) ([]byte, error) {
 	switch to {
 	case ProviderOpenAI:
+		// 跨协议转成 OpenAI 的流式请求默认带上 include_usage，
+		// 否则 OpenAI 兼容上游默认不返回 usage chunk，客户端看不到上下文占用。
+		// 直通（from==to）不经过这里，客户端自己的 stream_options 原样保留。
+		if req.Stream && req.StreamOptions == nil {
+			req.StreamOptions = &StreamOptions{IncludeUsage: true}
+		}
 		return json.Marshal(req)
 	case ProviderAnthropic:
 		return anthropicRequestFromOpenAI(req)
@@ -120,4 +126,43 @@ func UsageFromResponse(from Provider, body []byte) *Usage {
 		return nil
 	}
 	return resp.Usage
+}
+
+// EstimateRequestTokens 对原始客户端请求体做粗略的输入 token 估算。
+// 经 parseRequestToOpenAI 先归一为 OpenAI 规范再接 own 补偿，因此对
+// OpenAI / Anthropic / Gemini / Responses 协议都能解析（依赖现有各协议解析器）。
+// 用于上游未返回 usage 时填充流式 message_start 的 input_tokens，
+// 让客户端能看到上下文占用。按文本 rune 数 / 4 估算（约 4 字符 ≈ 1 token），
+// 仅为近似值，不替代真实计费。
+func EstimateRequestTokens(from Provider, body []byte) int {
+	req, err := parseRequestToOpenAI(from, body)
+	if err != nil {
+		return 0
+	}
+	runes := 0
+	for _, m := range req.Messages {
+		switch v := m.Content.(type) {
+		case string:
+			runes += len([]rune(v))
+		case []any:
+			for _, part := range v {
+				if p, ok := part.(map[string]any); ok {
+					if t, _ := p["text"].(string); t != "" {
+						runes += len([]rune(t))
+					}
+				}
+			}
+		}
+		for _, tc := range m.ToolCalls {
+			runes += len([]rune(tc.Function.Name)) + len([]rune(tc.Function.Arguments))
+		}
+	}
+	// 工具的 name/description/parameters 也计入输入
+	for _, t := range req.Tools {
+		runes += len([]rune(t.Function.Name)) + len([]rune(t.Function.Description))
+	}
+	if runes == 0 {
+		return 0
+	}
+	return runes/4 + 1
 }

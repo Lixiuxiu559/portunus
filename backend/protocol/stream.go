@@ -20,6 +20,13 @@ type StreamConverter interface {
 	Usage() *Usage
 }
 
+// EstimateSetter 可选接口：设置请求输入的预估 token 数。
+// 上游未返回 usage 时，转换器据此填充 message_start 的 input_tokens，
+// 让 Anthropic 客户端能看到上下文占用。仅转换器实现；调用方用类型断言触发。
+type EstimateSetter interface {
+	SetEstimateInputTokens(n int)
+}
+
 // NewStreamConverter 构建 from→to 的流式转换器，经 OpenAI 规范格式中转。
 func NewStreamConverter(from, to Provider) (StreamConverter, error) {
 	if !from.Valid() {
@@ -117,6 +124,14 @@ func (c *chainedStreamConverter) Finish() ([][]byte, error) {
 }
 
 func (c *chainedStreamConverter) Usage() *Usage { return c.first.Usage() }
+
+// SetEstimateInputTokens 把预估输入 token 转发给第二段转换器（openai→to 方向），
+// 由它在 message_start 里填充 input_tokens。
+func (c *chainedStreamConverter) SetEstimateInputTokens(n int) {
+	if s, ok := c.second.(EstimateSetter); ok {
+		s.SetEstimateInputTokens(n)
+	}
+}
 
 // openAIStreamState 是「→OpenAI」方向各转换器共享的 chunk 元信息累积器，
 // 借鉴 new-api 的 ResponseInfo：跨事件累积 id/model/usage/finish_reason/文本。

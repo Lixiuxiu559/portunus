@@ -351,6 +351,127 @@ func TestStreamOpenAIToAnthropicReasoningContent(t *testing.T) {
 	}
 }
 
+// TestStreamOpenAIToAnthropicUsageCacheMapping 断言 OpenAI usage 的缓存字段被完整映射到
+// Anthropic message_delta.usage（cache_read_input_tokens / cache_creation_input_tokens），
+// 否则客户端看不到缓存命中的上下文占用。
+func TestStreamOpenAIToAnthropicUsageCacheMapping(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	feed(`{"id":"c1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}`)
+	// 末尾 usage chunk（带 cached_tokens / cache_creation_tokens）
+	feed(`{"id":"c1","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"prompt_tokens_details":{"cached_tokens":60,"cache_creation_tokens":30}}}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		if ev.Type != "message_delta" || ev.Usage == nil {
+			continue
+		}
+		if ev.Usage.InputTokens != 10 {
+			t.Errorf("input_tokens 应为非缓存输入 10（prompt 100 - cached 60 - cache_creation 30），实际: %d", ev.Usage.InputTokens)
+		}
+		if ev.Usage.OutputTokens != 50 {
+			t.Errorf("output_tokens 应为 50，实际: %d", ev.Usage.OutputTokens)
+		}
+		if ev.Usage.CacheReadInputTokens != 60 {
+			t.Errorf("cache_read_input_tokens 应为 60，实际: %d", ev.Usage.CacheReadInputTokens)
+		}
+		if ev.Usage.CacheCreationInputTokens != 30 {
+			t.Errorf("cache_creation_input_tokens 应为 30，实际: %d", ev.Usage.CacheCreationInputTokens)
+		}
+		return
+	}
+	t.Fatal("未产生带 usage 的 message_delta 事件")
+}
+
+// TestStreamOpenAIToAnthropicMessageStartEstimate 断言设置预估 input_tokens 后，
+// message_start.usage.input_tokens 用预估值填充，客户端据此显示上下文占用；
+// 若上游随后返回真实 usage，message_delta 仍用真实值覆盖。
+func TestStreamOpenAIToAnthropicMessageStartEstimate(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+	es, ok := conv.(EstimateSetter)
+	if !ok {
+		t.Fatal("OpenAI→Anthropic 转换器应实现 EstimateSetter")
+	}
+	es.SetEstimateInputTokens(1234)
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	feed(`{"id":"c1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}`)
+	feed(`{"id":"c1","choices":[],"usage":{"prompt_tokens":50,"completion_tokens":5,"total_tokens":55}}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	// message_start 用预估 input_tokens
+	sawStart := false
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		if ev.Type != "message_start" || ev.Message == nil || ev.Message.Usage == nil {
+			continue
+		}
+		if ev.Message.Usage.InputTokens != 1234 {
+			t.Errorf("message_start.input_tokens 应为预估 1234，实际: %d", ev.Message.Usage.InputTokens)
+		}
+		sawStart = true
+	}
+	if !sawStart {
+		t.Fatal("未产生 message_start 事件")
+	}
+
+	// message_delta 用上游真实 usage（未设置 estimate 时的默认路径）
+	sawDelta := false
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		if ev.Type != "message_delta" || ev.Usage == nil {
+			continue
+		}
+		if ev.Usage.InputTokens != 50 {
+			t.Errorf("message_delta.input_tokens 应为真实 50，实际: %d", ev.Usage.InputTokens)
+		}
+		sawDelta = true
+	}
+	if !sawDelta {
+		t.Fatal("未产生 message_delta 事件")
+	}
+}
+
 func TestStreamOpenAIToAnthropicContentBlockHasIndex(t *testing.T) {
 	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
 	if err != nil {

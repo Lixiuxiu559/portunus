@@ -614,10 +614,7 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		out.StopReason = openAIFinishToAnthropic(choice.FinishReason)
 	}
 	if resp.Usage != nil {
-		out.Usage = &AnthropicUsage{
-			InputTokens:  resp.Usage.PromptTokens,
-			OutputTokens: resp.Usage.CompletionTokens,
-		}
+		out.Usage = toAnthropicUsage(resp.Usage)
 	}
 	return json.Marshal(out)
 }
@@ -652,6 +649,21 @@ func indexOrZero(p *int) int {
 		return 0
 	}
 	return *p
+}
+
+// toAnthropicUsage 把统一 Usage 归一为 Anthropic usage。
+// PromptTokens 已是非缓存输入（见 Usage.UnmarshalJSON），直接作为 input_tokens；
+// 缓存读写单独映射到 cache_read/cache_creation_input_tokens。
+func toAnthropicUsage(u *Usage) *AnthropicUsage {
+	if u == nil {
+		return nil
+	}
+	return &AnthropicUsage{
+		InputTokens:              u.PromptTokens,
+		OutputTokens:             u.CompletionTokens,
+		CacheReadInputTokens:     u.CacheReadTokens,
+		CacheCreationInputTokens: u.CacheWriteTokens,
+	}
 }
 
 // ===== 流式：anthropic → openai =====
@@ -751,10 +763,18 @@ type openAIToAnthropicStream struct {
 	toolName  string
 	finish    string
 	usage     *AnthropicUsage
+	// estimate 是请求输入的预估 token 数；message_start 时上游尚未返回 usage，
+	// 用它填充 input_tokens，让客户端能看到上下文占用。
+	estimate int
 }
 
 func newOpenAIToAnthropicStream() *openAIToAnthropicStream {
 	return &openAIToAnthropicStream{blockIdx: -1}
+}
+
+// SetEstimateInputTokens 设置请求输入的预估 token 数（供 message_start 填充）。
+func (o *openAIToAnthropicStream) SetEstimateInputTokens(n int) {
+	o.estimate = n
 }
 
 // ev 构造一个 Anthropic 流事件并序列化。
@@ -786,7 +806,7 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 	o.id = firstNonEmpty(o.id, chunk.ID)
 	o.model = firstNonEmpty(o.model, chunk.Model)
 	if chunk.Usage != nil {
-		o.usage = &AnthropicUsage{InputTokens: chunk.Usage.PromptTokens, OutputTokens: chunk.Usage.CompletionTokens}
+		o.usage = toAnthropicUsage(chunk.Usage)
 	}
 
 	var out [][]byte
@@ -798,9 +818,10 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 
 	if !o.started {
 		o.started = true
-		// message 的 usage 是必填对象（不能为 null），首 chunk 尚未拿到上游 usage 时兜底空对象。
+		// message 的 usage 是必填对象（不能为 null），首 chunk 尚未拿到上游 usage 时，
+		// 用预估 input_tokens 兜底（若无预估则全 0），保证客户端能看到上下文占用。
 		if o.usage == nil {
-			o.usage = &AnthropicUsage{}
+			o.usage = &AnthropicUsage{InputTokens: o.estimate}
 		}
 		out = append(out, o.ev("message_start", &MessagesResponse{
 			ID:      o.id,

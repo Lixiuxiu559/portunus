@@ -206,6 +206,52 @@ func TestRelayStreamAnthropicToOpenAI(t *testing.T) {
 	}
 }
 
+func TestRelayStreamAnthropicClientOpenAIUpstreamEstimate(t *testing.T) {
+	var gotBody []byte
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fl := w.(http.Flusher)
+		// OpenAI 流式：无 usage chunk（模拟上游没开 include_usage 或忽略）
+		io.WriteString(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: [DONE]\n\n")
+		fl.Flush()
+	})
+
+	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	// Anthropic 客户端请求，带上 message_start 所需的 model/max_tokens
+	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":100,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
+
+	if w.Code != 200 {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	// 上游请求应带 stream_options.include_usage=true
+	var upstreamReq map[string]any
+	if err := json.Unmarshal(gotBody, &upstreamReq); err != nil {
+		t.Fatalf("解析上游请求失败: %v", err)
+	}
+	so, ok := upstreamReq["stream_options"].(map[string]any)
+	if !ok || so["include_usage"] != true {
+		t.Errorf("上游请求应带 stream_options.include_usage=true: %s", gotBody)
+	}
+
+	// 响应里 message_start 的 usage.input_tokens 应有非零预估（hello ≈ 1 token）
+	body := w.Body.String()
+	if !strings.Contains(body, `"type":"message_start"`) {
+		t.Fatalf("缺少 message_start 事件: %s", body)
+	}
+	if !strings.Contains(body, `"input_tokens":2`) {
+		t.Errorf("message_start 的 input_tokens 应为非零预估值: %s", body)
+	}
+	if !strings.Contains(body, `"text_delta"`) || !strings.Contains(body, `"text":"hi"`) {
+		t.Errorf("流式响应未包含 text_delta 内容: %s", body)
+	}
+}
+
 func TestRelayGroupNotFound(t *testing.T) {
 	r, key := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"no-such-group","messages":[]}`, key)
