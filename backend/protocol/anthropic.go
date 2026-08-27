@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -332,11 +333,12 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 				Function: FunctionCall{Name: block.Name, Arguments: args},
 			})
 		case "tool_result":
+			name := toolNames[block.ToolUseID]
 			toolResults = append(toolResults, ChatMessage{
 				Role:       "tool",
 				Content:    anthropicToolResultToContent(block.Content),
 				ToolCallID: block.ToolUseID,
-				Name:       toolNames[block.ToolUseID],
+				Name:       &name,
 			})
 		}
 	}
@@ -752,24 +754,37 @@ func (a *anthropicToOpenAIStream) Usage() *Usage { return a.st.usage }
 // ===== 流式：openai → anthropic =====
 
 // openAIToAnthropicStream 把 OpenAI chunk 逐条映射为 Anthropic 流事件。
+//
+// Anthropic 流式状态机里，多个 content block 可交错 open（按 index 关联），
+// 尤其多工具并行时 OpenAI 会同时流式多个 tool_calls（各带独立的 index），
+// 每个都需映射为一个独立的 tool_use block。这里维护两块状态：
+//   - 单块（text / thinking）：同一时刻至多一个 open
+//   - 并行 tool_use 块：openai tool_calls index → anthropic content block index，
+//     block index 按 open 顺序从 nextIdx 顺序分配，保证 Anthropic 侧 index 连续无空洞
 type openAIToAnthropicStream struct {
-	id        string
-	model     string
-	started   bool
+	id      string
+	model   string
+	started bool
+
+	// 单块状态（text / thinking）
 	blockOpen bool
-	blockType string
+	blockType string // "text" | "thinking"
 	blockIdx  int
-	toolID    string
-	toolName  string
-	finish    string
-	usage     *AnthropicUsage
+
+	// 并行 tool_use 块状态：只记录实际 open 的 offset，
+	// close 时只对 open 过的块发 stop，避免对从未 start 的 index 发孤儿 stop。
+	toolOpen map[int]int // openai tool_calls index → anthropic content block index
+
+	nextIdx int // 下一个可分配的 anthropic content block index
+	finish  string
+	usage   *AnthropicUsage
 	// estimate 是请求输入的预估 token 数；message_start 时上游尚未返回 usage，
 	// 用它填充 input_tokens，让客户端能看到上下文占用。
 	estimate int
 }
 
 func newOpenAIToAnthropicStream() *openAIToAnthropicStream {
-	return &openAIToAnthropicStream{blockIdx: -1}
+	return &openAIToAnthropicStream{}
 }
 
 // SetEstimateInputTokens 设置请求输入的预估 token 数（供 message_start 填充）。
@@ -777,25 +792,107 @@ func (o *openAIToAnthropicStream) SetEstimateInputTokens(n int) {
 	o.estimate = n
 }
 
-// ev 构造一个 Anthropic 流事件并序列化。
-func (o *openAIToAnthropicStream) ev(typ string, msg *MessagesResponse, block *ContentBlock, delta *StreamDelta) []byte {
-	event := MessagesStreamEvent{Type: typ, Message: msg, ContentBlock: block, Delta: delta}
-	switch typ {
-	case "content_block_start", "content_block_delta", "content_block_stop":
-		event.Index = intPtr(o.blockIdx)
-	case "message_delta":
+// evBlock 构造一个 content_block_* 事件（显式指定 index）并序列化。
+func (o *openAIToAnthropicStream) evBlock(typ string, idx int, block *ContentBlock, delta *StreamDelta) []byte {
+	event := MessagesStreamEvent{Type: typ, Index: intPtr(idx), ContentBlock: block, Delta: delta}
+	b, _ := json.Marshal(event)
+	return b
+}
+
+// evMessage 构造一个非 content_block 的事件（message_start / message_delta / message_stop）。
+func (o *openAIToAnthropicStream) evMessage(typ string, msg *MessagesResponse, delta *StreamDelta) []byte {
+	event := MessagesStreamEvent{Type: typ, Message: msg, Delta: delta}
+	if typ == "message_delta" {
 		event.Usage = o.usage
 	}
 	b, _ := json.Marshal(event)
 	return b
 }
 
-// closeBlock 若当前 block 打开则发出 content_block_stop。
-func (o *openAIToAnthropicStream) closeBlock(out *[][]byte) {
+// closeSingleBlock 若 text / thinking 单块打开，发出对应的 content_block_stop。
+func (o *openAIToAnthropicStream) closeSingleBlock(out *[][]byte) {
 	if o.blockOpen {
-		*out = append(*out, o.ev("content_block_stop", nil, nil, nil))
+		*out = append(*out, o.evBlock("content_block_stop", o.blockIdx, nil, nil))
 		o.blockOpen = false
 	}
+}
+
+// closeToolBlocks 关闭所有实际 open 的并行 tool_use 块（只对 open 过的发 stop），
+// 并按 block index 排序保证事件顺序稳定。关闭后清空状态。
+func (o *openAIToAnthropicStream) closeToolBlocks(out *[][]byte) {
+	if len(o.toolOpen) == 0 {
+		return
+	}
+	blockIdxs := make([]int, 0, len(o.toolOpen))
+	for _, blockIdx := range o.toolOpen {
+		blockIdxs = append(blockIdxs, blockIdx)
+	}
+	sort.Ints(blockIdxs)
+	for _, blockIdx := range blockIdxs {
+		*out = append(*out, o.evBlock("content_block_stop", blockIdx, nil, nil))
+	}
+	o.toolOpen = nil
+}
+
+// handleTextBlock 处理 text 或 thinking 增量。类型切换时关闭之前的块。
+func (o *openAIToAnthropicStream) handleTextBlock(typ, text string) [][]byte {
+	var out [][]byte
+	if !o.blockOpen || o.blockType != typ {
+		o.closeSingleBlock(&out)
+		o.closeToolBlocks(&out) // 从 tool 切回 text/thinking，关掉所有 tool 块
+		o.blockIdx = o.nextIdx
+		o.nextIdx++
+		o.blockOpen = true
+		o.blockType = typ
+		blk := &ContentBlock{Type: typ}
+		if typ == "text" {
+			// text 块必须含空 "text" 字段，否则客户端拿不到字符串字段（与 content_block_start 同病根）。
+			blk.Text = ""
+		}
+		out = append(out, o.evBlock("content_block_start", o.blockIdx, blk, nil))
+	}
+	delta := &StreamDelta{Type: "text_delta", Text: text}
+	if typ == "thinking" {
+		delta = &StreamDelta{Type: "thinking_delta", Thinking: text}
+	}
+	out = append(out, o.evBlock("content_block_delta", o.blockIdx, nil, delta))
+	return out
+}
+
+// handleToolCalls 处理并行 tool_calls。每个 OpenAI tool_call 的 index 首次出现时
+// 分配一个独立的 anthropic block index 并发 content_block_start（携带当前帧的
+// id / name，即使为空也保证后续 input_json_delta 有对应的 start）；
+// 其后 arguments 增量发 input_json_delta。
+func (o *openAIToAnthropicStream) handleToolCalls(toolCalls []ChunkToolCall) [][]byte {
+	var out [][]byte
+	o.closeSingleBlock(&out) // 从 text/thinking 切到 tool，关闭单块
+	if o.toolOpen == nil {
+		o.toolOpen = map[int]int{}
+	}
+	for _, tc := range toolCalls {
+		offset := tc.Index
+		if offset < 0 {
+			offset = 0
+		}
+		blockIdx, open := o.toolOpen[offset]
+		if !open {
+			blockIdx = o.nextIdx
+			o.nextIdx++
+			o.toolOpen[offset] = blockIdx
+			out = append(out, o.evBlock("content_block_start", blockIdx, &ContentBlock{
+				Type: "tool_use",
+				ID:   tc.ID,
+				Name: tc.Function.Name,
+			}, nil))
+		}
+		if tc.Function.Arguments != "" {
+			out = append(out, o.evBlock("content_block_delta", blockIdx, nil, &StreamDelta{
+				Type:        "input_json_delta",
+				PartialJSON: tc.Function.Arguments,
+			}))
+		}
+	}
+	return out
 }
 
 func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
@@ -823,59 +920,33 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 		if o.usage == nil {
 			o.usage = &AnthropicUsage{InputTokens: o.estimate}
 		}
-		out = append(out, o.ev("message_start", &MessagesResponse{
+		out = append(out, o.evMessage("message_start", &MessagesResponse{
 			ID:      o.id,
 			Type:    "message",
 			Role:    "assistant",
 			Model:   o.model,
 			Content: []ContentBlock{},
 			Usage:   o.usage,
-		}, nil, nil))
+		}, nil))
 	}
 	if delta.Role != "" {
 		return out, nil
 	}
 
 	if len(delta.ToolCalls) > 0 {
-		tc := delta.ToolCalls[0]
-		if !o.blockOpen || o.blockType != "tool_use" {
-			o.closeBlock(&out)
-			o.blockIdx++
-			o.blockOpen = true
-			o.blockType = "tool_use"
-			o.toolID = tc.ID
-			o.toolName = tc.Function.Name
-			out = append(out, o.ev("content_block_start", nil, &ContentBlock{Type: "tool_use", ID: o.toolID, Name: o.toolName}, nil))
-		}
-		if tc.Function.Arguments != "" {
-			out = append(out, o.ev("content_block_delta", nil, nil, &StreamDelta{Type: "input_json_delta", PartialJSON: tc.Function.Arguments}))
-		}
+		out = append(out, o.handleToolCalls(delta.ToolCalls)...)
 		return out, nil
 	}
 
 	// DeepSeek 等兼容方的 reasoning_content 扩展字段 → Anthropic thinking 块。
 	// 官方 OpenAI 没有该字段；有此字段说明上游是兼容方，思考内容应显式转为 thinking_delta。
 	if delta.ReasoningContent != "" {
-		if !o.blockOpen || o.blockType != "thinking" {
-			o.closeBlock(&out)
-			o.blockIdx++
-			o.blockOpen = true
-			o.blockType = "thinking"
-			out = append(out, o.ev("content_block_start", nil, &ContentBlock{Type: "thinking"}, nil))
-		}
-		out = append(out, o.ev("content_block_delta", nil, nil, &StreamDelta{Type: "thinking_delta", Thinking: delta.ReasoningContent}))
+		out = append(out, o.handleTextBlock("thinking", delta.ReasoningContent)...)
 		return out, nil
 	}
 
 	if delta.Content != "" {
-		if !o.blockOpen || o.blockType != "text" {
-			o.closeBlock(&out)
-			o.blockIdx++
-			o.blockOpen = true
-			o.blockType = "text"
-			out = append(out, o.ev("content_block_start", nil, &ContentBlock{Type: "text", Text: ""}, nil))
-		}
-		out = append(out, o.ev("content_block_delta", nil, nil, &StreamDelta{Type: "text_delta", Text: delta.Content}))
+		out = append(out, o.handleTextBlock("text", delta.Content)...)
 	}
 
 	if finish != "" {
@@ -886,10 +957,8 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 
 func (o *openAIToAnthropicStream) Finish() ([][]byte, error) {
 	var out [][]byte
-	if o.blockOpen {
-		out = append(out, o.ev("content_block_stop", nil, nil, nil))
-		o.blockOpen = false
-	}
+	o.closeSingleBlock(&out)
+	o.closeToolBlocks(&out)
 	if o.started {
 		// stop_reason 上游没给时兜底 end_turn；usage 未累积时兜底空对象，
 		// 保证 message_delta 的 delta.stop_reason 与 usage 两个必填键始终存在。
@@ -899,8 +968,8 @@ func (o *openAIToAnthropicStream) Finish() ([][]byte, error) {
 		if o.usage == nil {
 			o.usage = &AnthropicUsage{}
 		}
-		out = append(out, o.ev("message_delta", nil, nil, &StreamDelta{StopReason: o.finish}))
-		out = append(out, o.ev("message_stop", nil, nil, nil))
+		out = append(out, o.evMessage("message_delta", nil, &StreamDelta{StopReason: o.finish}))
+		out = append(out, o.evMessage("message_stop", nil, nil))
 	}
 	return out, nil
 }

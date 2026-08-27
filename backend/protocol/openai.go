@@ -24,7 +24,7 @@ type ChatCompletionRequest struct {
 type ChatMessage struct {
 	Role       string     `json:"role"` // system / user / assistant / tool
 	Content    any        `json:"content,omitempty"`
-	Name       string     `json:"name,omitempty"`
+	Name       *string    `json:"name,omitempty"` // tool 消息的工具名；指针保证空串也输出（DeepSeek 等上游要求字段存在）
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 }

@@ -114,11 +114,21 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 			out.Messages = append(out.Messages, ChatMessage{Role: "user", Content: v})
 		}
 	case []any:
+		// 先收集 function_call 的 call_id → 工具名映射，供 function_call_output 补 name 字段
+		// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。
+		toolNameByID := map[string]string{}
+		for _, item := range v {
+			b, _ := json.Marshal(item)
+			var it InputItem
+			if json.Unmarshal(b, &it) == nil && it.Type == "function_call" {
+				toolNameByID[it.CallID] = it.Name
+			}
+		}
 		for _, item := range v {
 			b, _ := json.Marshal(item)
 			var it InputItem
 			if json.Unmarshal(b, &it) == nil {
-				out.Messages = append(out.Messages, inputItemToChat(it))
+				out.Messages = append(out.Messages, inputItemToChat(it, toolNameByID))
 			}
 		}
 	}
@@ -140,7 +150,8 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 }
 
 // inputItemToChat 将 Responses 输入项转为 OpenAI ChatMessage。
-func inputItemToChat(it InputItem) ChatMessage {
+// toolNames 是 function_call 的 call_id → 工具名映射，用于给 tool 消息补 name 字段。
+func inputItemToChat(it InputItem, toolNames map[string]string) ChatMessage {
 	switch it.Type {
 	case "function_call":
 		return ChatMessage{
@@ -152,7 +163,8 @@ func inputItemToChat(it InputItem) ChatMessage {
 			}},
 		}
 	case "function_call_output":
-		return ChatMessage{Role: "tool", ToolCallID: it.CallID, Content: it.Output}
+		name := toolNames[it.CallID]
+		return ChatMessage{Role: "tool", ToolCallID: it.CallID, Content: it.Output, Name: &name}
 	default: // message
 		role := it.Role
 		if role == "developer" {

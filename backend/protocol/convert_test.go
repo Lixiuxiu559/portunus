@@ -393,6 +393,93 @@ func TestConvertRequestInvalidProvider(t *testing.T) {
 	}
 }
 
+// TestConvertRequestAnthropicToOpenAIToolNameAlwaysPresent 断言 tool 消息始终带 name 字段。
+// 历史被截断（tool_result 引用的 tool_use 不在请求里）时映射查不到 name，
+// 此时 name 也必须以空串输出——DeepSeek 等上游反序列化要求字段存在（missing field name 会 400）。
+func TestConvertRequestAnthropicToOpenAIToolNameAlwaysPresent(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"messages": [
+			{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "orphan_1", "content": "sunny"}]}
+		],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 1 {
+		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	}
+	tool := msgs[0].(map[string]any)
+	if tool["role"] != "tool" {
+		t.Fatalf("应为 tool 消息: %v", tool)
+	}
+	name, ok := tool["name"]
+	if !ok {
+		t.Fatalf("tool 消息缺 name 字段（上游会报 missing field name），原始 JSON: %s", out)
+	}
+	if name != "" {
+		t.Errorf("查不到映射时 name 应为空串，实际: %v", name)
+	}
+}
+
+// TestConvertRequestResponsesToOpenAIToolNameAlwaysPresent 断言 Responses 请求转 OpenAI 时，
+// function_call_output 生成的 tool 消息同样始终带 name 字段（与 Anthropic 路径同病根）。
+func TestConvertRequestResponsesToOpenAIToolNameAlwaysPresent(t *testing.T) {
+	in := `{
+		"model": "gpt-4o",
+		"input": [
+			{"type": "function_call_output", "call_id": "orphan_1", "output": "sunny"}
+		]
+	}`
+	out, err := ConvertRequest(ProviderOpenAIResponses, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 1 {
+		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	}
+	tool := msgs[0].(map[string]any)
+	if tool["role"] != "tool" {
+		t.Fatalf("应为 tool 消息: %v", tool)
+	}
+	if name, ok := tool["name"]; !ok {
+		t.Fatalf("tool 消息缺 name 字段，原始 JSON: %s", out)
+	} else if name != "" {
+		t.Errorf("查不到映射时 name 应为空串，实际: %v", name)
+	}
+}
+
+// TestConvertRequestResponsesToOpenAIToolNameMapped 断言 function_call 的 name 能映射到
+// 对应的 function_call_output 生成的 tool 消息。
+func TestConvertRequestResponsesToOpenAIToolNameMapped(t *testing.T) {
+	in := `{
+		"model": "gpt-4o",
+		"input": [
+			{"type": "function_call", "call_id": "c1", "name": "get_weather", "arguments": "{}"},
+			{"type": "function_call_output", "call_id": "c1", "output": "sunny"}
+		]
+	}`
+	out, err := ConvertRequest(ProviderOpenAIResponses, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 2 {
+		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	}
+	tool := msgs[1].(map[string]any)
+	if tool["name"] != "get_weather" {
+		t.Errorf("tool 消息 name 应为 get_weather，实际: %v", tool["name"])
+	}
+}
+
 func TestConvertResponseAnthropicToOpenAI(t *testing.T) {
 	in := `{
 		"id": "msg_1",

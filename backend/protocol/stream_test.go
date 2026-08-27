@@ -517,3 +517,143 @@ func TestStreamOpenAIToAnthropicContentBlockHasIndex(t *testing.T) {
 	}
 	t.Fatal("未产生 content_block_start 事件")
 }
+
+// TestStreamOpenAIToAnthropicParallelToolCalls 断言并行多工具时每个工具独立成块：
+// 各自 content_block_start（id/name 正确）→ input_json_delta → content_block_stop，
+// 拼接每个 index 的 partial_json 应得到各自的合法 JSON 参数，互不混拼。
+func TestStreamOpenAIToAnthropicParallelToolCalls(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	feed(`{"id":"c1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`)
+	// 两个工具同时开场（各带 id + name）
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}},{"index":1,"id":"call_2","type":"function","function":{"name":"get_time","arguments":""}}]},"finish_reason":null}]}`)
+	// 参数交错到达
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{\"zone\":"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"Beijing\"}"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"function":{"arguments":"\"UTC\"}"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	starts := map[int]*ContentBlock{} // index -> tool_use block
+	args := map[int]string{}          // index -> 拼接后的 arguments
+	stopped := map[int]bool{}
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		switch ev.Type {
+		case "content_block_start":
+			if ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
+				idx := indexOrZero(ev.Index)
+				starts[idx] = ev.ContentBlock
+			}
+		case "content_block_delta":
+			if ev.Delta != nil && ev.Delta.Type == "input_json_delta" {
+				idx := indexOrZero(ev.Index)
+				args[idx] += ev.Delta.PartialJSON
+			}
+		case "content_block_stop":
+			stopped[indexOrZero(ev.Index)] = true
+		}
+	}
+
+	if len(starts) != 2 {
+		t.Fatalf("应产生 2 个 tool_use content_block_start，实际 %d: %+v", len(starts), starts)
+	}
+	if starts[0] == nil || starts[0].ID != "call_1" || starts[0].Name != "get_weather" {
+		t.Errorf("index 0 的 tool_use 块不匹配: %+v", starts[0])
+	}
+	if starts[1] == nil || starts[1].ID != "call_2" || starts[1].Name != "get_time" {
+		t.Errorf("index 1 的 tool_use 块不匹配: %+v", starts[1])
+	}
+	if args[0] != `{"city":"Beijing"}` {
+		t.Errorf("index 0 参数混拼错误: %q", args[0])
+	}
+	if args[1] != `{"zone":"UTC"}` {
+		t.Errorf("index 1 参数混拼错误: %q", args[1])
+	}
+	if !stopped[0] || !stopped[1] {
+		t.Errorf("两个 tool_use 块都应 content_block_stop: %+v", stopped)
+	}
+}
+
+// TestStreamOpenAIToAnthropicToolIndexGap 断言上游 tool_calls index 跳号（如只有 0 和 2）时，
+// 两个工具仍各自独立成块、anthropic 侧 index 连续（0、1）、
+// 且不对从未 open 的 index 发孤儿 content_block_stop。
+func TestStreamOpenAIToAnthropicToolIndexGap(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	feed(`{"id":"c1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}},{"index":2,"id":"call_3","type":"function","function":{"name":"get_time","arguments":""}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":\"Beijing\"}"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":2,"function":{"arguments":"{\"zone\":\"UTC\"}"}}]},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	openIdxs := map[int]bool{}
+	var stops []int
+	args := map[int]string{}
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		switch ev.Type {
+		case "content_block_start":
+			if ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
+				openIdxs[indexOrZero(ev.Index)] = true
+			}
+		case "content_block_delta":
+			if ev.Delta != nil && ev.Delta.Type == "input_json_delta" {
+				args[indexOrZero(ev.Index)] += ev.Delta.PartialJSON
+			}
+		case "content_block_stop":
+			stops = append(stops, indexOrZero(ev.Index))
+		}
+	}
+	// anthropic 侧 index 必须从 0 连续：只有 0 和 1 两个块
+	if !openIdxs[0] || !openIdxs[1] || len(openIdxs) != 2 {
+		t.Fatalf("应 open index 0 和 1 两个 tool_use 块，实际: %+v", openIdxs)
+	}
+	// stop 只能针对 open 过的 index，且各一次
+	if len(stops) != 2 || !openIdxs[stops[0]] || !openIdxs[stops[1]] {
+		t.Fatalf("stop 事件应对应 open 过的块且无孤儿 stop，实际: %+v", stops)
+	}
+	if args[0] != `{"city":"Beijing"}` || args[1] != `{"zone":"UTC"}` {
+		t.Errorf("参数混拼错误: index0=%q index1=%q", args[0], args[1])
+	}
+}
