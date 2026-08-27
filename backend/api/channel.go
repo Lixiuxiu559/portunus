@@ -127,7 +127,12 @@ func previewChannelModels(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的协议类型"})
 		return
 	}
-	names, err := model.FetchModelNames(req.Type, req.BaseURL, req.Key)
+	upstream, err := protocol.NewUpstream(req.Type, req.BaseURL, req.Key)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	names, err := upstream.FetchModels()
 	if err != nil {
 		respondError(c, err)
 		return

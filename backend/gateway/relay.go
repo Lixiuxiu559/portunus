@@ -100,7 +100,12 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		return nil, 0, err
 	}
 
-	resp, err := doRequest(buildURL(t.Channel, t.Model.Name, stream), buildHeaders(t.Channel), upBody)
+	upstream, err := protocol.NewUpstream(t.Channel.Type, t.Channel.BaseURL, t.Channel.Key)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	resp, err := doRequest(upstream.ChatURL(t.Model.Name, stream), upstream.ChatHeaders(), upBody)
 	if err != nil {
 		return nil, 0, err
 	}
