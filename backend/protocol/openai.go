@@ -124,6 +124,7 @@ func (u *Usage) UnmarshalJSON(data []byte) error {
 type ChatCompletionChunk struct {
 	ID      string        `json:"id"`
 	Object  string        `json:"object"` // chat.completion.chunk
+	Created int64         `json:"created"`
 	Model   string        `json:"model"`
 	Choices []ChunkChoice `json:"choices"`
 	Usage   *Usage        `json:"usage,omitempty"`

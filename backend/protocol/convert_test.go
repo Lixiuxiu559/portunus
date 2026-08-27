@@ -170,6 +170,10 @@ func TestConvertRequestAnthropicToOpenAI(t *testing.T) {
 	if tool["role"] != "tool" || tool["tool_call_id"] != "c1" {
 		t.Errorf("tool 消息不匹配: %v", tool)
 	}
+	// DeepSeek 等上游要求 tool 消息必带 name（对应 tool_use 块的 name）
+	if tool["name"] != "get_weather" {
+		t.Errorf("tool 消息 name 不匹配: %v", tool["name"])
+	}
 }
 
 func TestConvertRequestGeminiToOpenAI(t *testing.T) {
@@ -220,6 +224,30 @@ func TestConvertRequestResponsesToOpenAI(t *testing.T) {
 	}
 	if msgs[1].(map[string]any)["content"] != "hi" {
 		t.Errorf("user 消息 content 不匹配: %v", msgs[1])
+	}
+}
+
+func TestConvertRequestAnthropicThinkingBlockDropped(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"messages": [
+			{"role":"user","content":[{"type":"text","text":"hi"}]},
+			{"role":"assistant","content":[{"type":"thinking","thinking":"我在思考","signature":"sig"}]}
+		],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	// 纯 thinking 的 assistant 消息应被整条丢弃，只剩 user 消息
+	if len(msgs) != 1 {
+		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	}
+	if msgs[0].(map[string]any)["role"] != "user" {
+		t.Errorf("应只剩 user 消息: %v", msgs)
 	}
 }
 

@@ -29,6 +29,34 @@ type AnthropicMessage struct {
 	Content []ContentBlock `json:"content"`
 }
 
+// UnmarshalJSON 兼容 content 的两种形态：字符串（等价单个 text 块）或内容块数组。
+// Anthropic 规范二者等价，但 Claude Code 等客户端两种都会发，缺了这个字符串就解析失败。
+func (m *AnthropicMessage) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	m.Role = aux.Role
+	if len(aux.Content) == 0 || string(aux.Content) == "null" {
+		m.Content = nil
+		return nil
+	}
+	// 字符串 → 单个 text 块
+	if aux.Content[0] == '"' {
+		var s string
+		if err := json.Unmarshal(aux.Content, &s); err != nil {
+			return err
+		}
+		m.Content = []ContentBlock{{Type: "text", Text: s}}
+		return nil
+	}
+	// 数组 → 直接解析
+	return json.Unmarshal(aux.Content, &m.Content)
+}
+
 // ContentBlock 是 Anthropic 消息 content 数组的一个单元。
 type ContentBlock struct {
 	Type      string       `json:"type"` // text / image / tool_use / tool_result / thinking
@@ -40,6 +68,42 @@ type ContentBlock struct {
 	Content   any          `json:"content,omitempty"`     // tool_result 结果（字符串或块数组）
 	Source    *ImageSource `json:"source,omitempty"`      // image
 	Thinking  string       `json:"thinking,omitempty"`    // thinking
+	Signature string       `json:"signature,omitempty"`   // thinking 块的签名
+}
+
+// MarshalJSON 按 Anthropic 规范的字段裁剪序列化：text 块始终携带 text
+// （流式 content_block_start 里 text 块必须含 "text":""，否则客户端拿不到
+// 字符串字段会崩）。tool_use / image 等块不带无意义的 text 空字段。
+func (b ContentBlock) MarshalJSON() ([]byte, error) {
+	m := map[string]any{"type": b.Type}
+	switch b.Type {
+	case "text":
+		m["text"] = b.Text
+	case "tool_use":
+		// id / name / input 都是必填字段，空串/空对象时也必须输出，
+		// 否则客户端拿 undefined 做 slice / 索引会崩（与 text 的 text 同病根）。
+		m["id"] = b.ID
+		m["name"] = b.Name
+		if b.Input != nil {
+			m["input"] = b.Input
+		} else {
+			m["input"] = json.RawMessage(`{}`)
+		}
+	case "image":
+		if b.Source != nil {
+			m["source"] = b.Source
+		}
+	case "tool_result":
+		m["tool_use_id"] = b.ToolUseID
+		if b.Content != nil {
+			m["content"] = b.Content
+		}
+	case "thinking":
+		// thinking / signature 是必填字段，空串时也必须输出（与 text 块的 text 同病根）
+		m["thinking"] = b.Thinking
+		m["signature"] = b.Signature
+	}
+	return json.Marshal(m)
 }
 
 // ImageSource 是 Anthropic 图片来源。
@@ -75,6 +139,33 @@ type MessagesResponse struct {
 	Usage        *AnthropicUsage `json:"usage"`
 }
 
+// MarshalJSON 按规范序列化：stop_reason / stop_sequence 在空串时输出 null
+// （流式 message_start 里二者必须为 null 而非 "" 或省略），content 为 nil 时输出 []。
+func (m MessagesResponse) MarshalJSON() ([]byte, error) {
+	out := map[string]any{
+		"id":      m.ID,
+		"type":    m.Type,
+		"role":    m.Role,
+		"content": m.Content,
+		"model":   m.Model,
+	}
+	if m.StopReason != "" {
+		out["stop_reason"] = m.StopReason
+	} else {
+		out["stop_reason"] = nil
+	}
+	if m.StopSequence != "" {
+		out["stop_sequence"] = m.StopSequence
+	} else {
+		out["stop_sequence"] = nil
+	}
+	out["usage"] = m.Usage
+	if m.Content == nil {
+		out["content"] = []ContentBlock{}
+	}
+	return json.Marshal(out)
+}
+
 // AnthropicUsage 是 Anthropic 用量。
 type AnthropicUsage struct {
 	InputTokens              int `json:"input_tokens"`
@@ -86,7 +177,7 @@ type AnthropicUsage struct {
 // MessagesStreamEvent 是 Anthropic 流式事件（message_start / content_block_* / message_delta / message_stop）。
 type MessagesStreamEvent struct {
 	Type         string            `json:"type"`
-	Index        int               `json:"index,omitempty"`
+	Index        *int              `json:"index,omitempty"` // 仅 content_block_* 事件携带，含 0，故用指针避免 omitempty 吞掉 0
 	Message      *MessagesResponse `json:"message,omitempty"`       // message_start
 	ContentBlock *ContentBlock     `json:"content_block,omitempty"` // content_block_start
 	Delta        *StreamDelta      `json:"delta,omitempty"`         // content_block_delta / message_delta
@@ -99,8 +190,39 @@ type StreamDelta struct {
 	Text         string  `json:"text,omitempty"`
 	PartialJSON  string  `json:"partial_json,omitempty"`
 	Thinking     string  `json:"thinking,omitempty"`
+	Signature    string  `json:"signature,omitempty"`
 	StopReason   string  `json:"stop_reason,omitempty"`
 	StopSequence *string `json:"stop_sequence,omitempty"`
+}
+
+// MarshalJSON 按事件类型区分两种形态：
+//   - message_delta（StopReason 非空）：输出 stop_reason + stop_sequence（nil 时为 null）
+//   - content_block_delta（Type 非空）：输出 type + 对应增量字段（text/partial_json/thinking/signature）
+func (d StreamDelta) MarshalJSON() ([]byte, error) {
+	// message_delta：StopReason / StopSequence 是必填键，stop_sequence 未知时为 null
+	if d.StopReason != "" {
+		m := map[string]any{"stop_reason": d.StopReason}
+		if d.StopSequence != nil {
+			m["stop_sequence"] = *d.StopSequence
+		} else {
+			m["stop_sequence"] = nil
+		}
+		return json.Marshal(m)
+	}
+
+	// content_block_delta：按 delta.type 裁字段
+	m := map[string]any{"type": d.Type}
+	switch d.Type {
+	case "text_delta":
+		m["text"] = d.Text
+	case "input_json_delta":
+		m["partial_json"] = d.PartialJSON
+	case "thinking_delta":
+		m["thinking"] = d.Thinking
+	case "signature_delta":
+		m["signature"] = d.Signature
+	}
+	return json.Marshal(m)
 }
 
 // ===== 请求：anthropic → openai =====
@@ -128,9 +250,23 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		}
 	}
 
+	// 先收集 assistant.tool_use 的 id → 工具名映射，供 tool_result 补 name 字段
+	// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。
+	toolNameByID := map[string]string{}
+	for _, m := range req.Messages {
+		if m.Role != "assistant" {
+			continue
+		}
+		for _, block := range m.Content {
+			if block.Type == "tool_use" {
+				toolNameByID[block.ID] = block.Name
+			}
+		}
+	}
+
 	// messages → chat messages（一条 anthropic 消息可能拆成多条 OpenAI 消息）
 	for _, m := range req.Messages {
-		out.Messages = append(out.Messages, anthropicMessagesToChat(m)...)
+		out.Messages = append(out.Messages, anthropicMessagesToChat(m, toolNameByID)...)
 	}
 
 	// tools → function tools
@@ -170,7 +306,8 @@ func anthropicSystemToText(sys any) string {
 
 // anthropicMessagesToChat 将一条 Anthropic 消息转成若干条 OpenAI ChatMessage。
 // 一条含多个 tool_result 的 user 消息会拆成多条 tool 消息。
-func anthropicMessagesToChat(m AnthropicMessage) []ChatMessage {
+// toolNames 是 assistant.tool_use 的 id→name 映射，用于给 tool 消息补 name 字段。
+func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []ChatMessage {
 	var toolResults []ChatMessage
 	var out ChatMessage
 	out.Role = m.Role
@@ -180,6 +317,8 @@ func anthropicMessagesToChat(m AnthropicMessage) []ChatMessage {
 		switch block.Type {
 		case "text":
 			textParts = append(textParts, block.Text)
+		case "thinking", "redacted_thinking":
+			// 思考块不传给 OpenAI 上游（上游不认思考内容作为输入），直接丢弃。
 		case "tool_use":
 			args := "{}"
 			if block.Input != nil {
@@ -197,12 +336,18 @@ func anthropicMessagesToChat(m AnthropicMessage) []ChatMessage {
 				Role:       "tool",
 				Content:    anthropicToolResultToContent(block.Content),
 				ToolCallID: block.ToolUseID,
+				Name:       toolNames[block.ToolUseID],
 			})
 		}
 	}
 
 	if len(toolResults) > 0 {
 		return toolResults
+	}
+	// 纯 thinking 等无内容块的消息（既无 text 也无 tool_calls）整条丢弃，
+	// 避免生成空的 assistant 消息导致上游 400。
+	if len(textParts) == 0 && len(out.ToolCalls) == 0 {
+		return nil
 	}
 	if len(textParts) > 0 {
 		out.Content = strings.Join(textParts, "")
@@ -501,6 +646,14 @@ func rawJSONOrEmptyObject(s string) json.RawMessage {
 // intPtr 返回 int 指针。
 func intPtr(v int) *int { return &v }
 
+// indexOrZero 解引用 *int，nil 兜底为 0。
+func indexOrZero(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
 // ===== 流式：anthropic → openai =====
 
 // anthropicToOpenAIStream 把 Anthropic 流事件逐条映射为 OpenAI chunk。
@@ -536,7 +689,7 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	case "content_block_start":
 		if ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
 			out = append(out, a.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
-				Index:    ev.Index,
+				Index:    indexOrZero(ev.Index),
 				ID:       ev.ContentBlock.ID,
 				Type:     "function",
 				Function: ChunkFunctionCall{Name: ev.ContentBlock.Name},
@@ -554,7 +707,7 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			out = append(out, a.st.emitChunk(ChunkDelta{ReasoningContent: ev.Delta.Thinking}, ""))
 		case "input_json_delta":
 			out = append(out, a.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
-				Index:    ev.Index,
+				Index:    indexOrZero(ev.Index),
 				Function: ChunkFunctionCall{Arguments: ev.Delta.PartialJSON},
 			}}}, ""))
 		}
@@ -609,7 +762,7 @@ func (o *openAIToAnthropicStream) ev(typ string, msg *MessagesResponse, block *C
 	event := MessagesStreamEvent{Type: typ, Message: msg, ContentBlock: block, Delta: delta}
 	switch typ {
 	case "content_block_start", "content_block_delta", "content_block_stop":
-		event.Index = o.blockIdx
+		event.Index = intPtr(o.blockIdx)
 	case "message_delta":
 		event.Usage = o.usage
 	}
@@ -645,6 +798,10 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 
 	if !o.started {
 		o.started = true
+		// message 的 usage 是必填对象（不能为 null），首 chunk 尚未拿到上游 usage 时兜底空对象。
+		if o.usage == nil {
+			o.usage = &AnthropicUsage{}
+		}
 		out = append(out, o.ev("message_start", &MessagesResponse{
 			ID:      o.id,
 			Type:    "message",
@@ -675,6 +832,20 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 		return out, nil
 	}
 
+	// DeepSeek 等兼容方的 reasoning_content 扩展字段 → Anthropic thinking 块。
+	// 官方 OpenAI 没有该字段；有此字段说明上游是兼容方，思考内容应显式转为 thinking_delta。
+	if delta.ReasoningContent != "" {
+		if !o.blockOpen || o.blockType != "thinking" {
+			o.closeBlock(&out)
+			o.blockIdx++
+			o.blockOpen = true
+			o.blockType = "thinking"
+			out = append(out, o.ev("content_block_start", nil, &ContentBlock{Type: "thinking"}, nil))
+		}
+		out = append(out, o.ev("content_block_delta", nil, nil, &StreamDelta{Type: "thinking_delta", Thinking: delta.ReasoningContent}))
+		return out, nil
+	}
+
 	if delta.Content != "" {
 		if !o.blockOpen || o.blockType != "text" {
 			o.closeBlock(&out)
@@ -699,6 +870,14 @@ func (o *openAIToAnthropicStream) Finish() ([][]byte, error) {
 		o.blockOpen = false
 	}
 	if o.started {
+		// stop_reason 上游没给时兜底 end_turn；usage 未累积时兜底空对象，
+		// 保证 message_delta 的 delta.stop_reason 与 usage 两个必填键始终存在。
+		if o.finish == "" {
+			o.finish = "end_turn"
+		}
+		if o.usage == nil {
+			o.usage = &AnthropicUsage{}
+		}
 		out = append(out, o.ev("message_delta", nil, nil, &StreamDelta{StopReason: o.finish}))
 		out = append(out, o.ev("message_stop", nil, nil, nil))
 	}
