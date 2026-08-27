@@ -92,7 +92,7 @@ export default function Channels() {
       key: 'base_url',
       copy: true,
       render: (val) => (
-        <span className="text-muted truncate max-w-[300px] inline-block" title={val}>
+        <span className="text-foreground/70 truncate max-w-[300px] inline-block" title={val}>
           {val}
         </span>
       ),

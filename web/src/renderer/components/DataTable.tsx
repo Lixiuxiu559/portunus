@@ -117,22 +117,22 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className={`relative flex min-h-0 flex-col ${className}`}>
+    <div className={`relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface/40 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${className}`}>
       {/* 刷新遮罩：有数据时 loading 叠加在表格上方 */}
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px] rounded-xl">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/30 backdrop-blur-[1px] rounded-xl">
           <Spinner size="sm" />
         </div>
       )}
 
-      <Table className="h-full grid-rows-[minmax(0,1fr)]">
+      <Table variant="secondary" className="h-full grid-rows-[minmax(0,1fr)] text-foreground">
         <Table.ScrollContainer className="h-full min-h-0 overflow-auto">
           <Table.Content
             aria-label={ariaLabel}
             className="min-w-[600px] px-0"
             aria-hidden={false}
           >
-            <Table.Header className="sticky top-0 z-10 bg-background shadow-[0_1px_0_var(--border)]">
+            <Table.Header className="sticky top-0 z-10 shadow-[0_1px_0_var(--border)]">
               {columns.map((col) => (
                 <Table.Column
                   key={col.key || col.dataIndex}
@@ -145,7 +145,10 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
             </Table.Header>
             <Table.Body>
               {dataSource.map((row, rowIndex) => (
-                <Table.Row key={(row as Record<string, unknown>).id as string ?? rowIndex}>
+                <Table.Row
+                  key={(row as Record<string, unknown>).id as string ?? rowIndex}
+                  className="text-foreground"
+                >
                   {columns.map((col) => {
                     const cellValue = row[col.dataIndex];
                     const display: ReactNode = col.render

@@ -211,3 +211,14 @@ html.dark .bg-decor .mask {
 .thin-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/*
+ * 表格（DataTable）表头圆角修正：
+ * HeroUI Table secondary 变体给表头列(surface-secondary 实色)设置了独立圆角，
+ * 当它与外层 rounded-2xl 圆角容器叠加时，圆角半径不一致会在左上/左下角
+ * 露出一个月牙形的“倒角缺口”。这里将表头列圆角归零，让表头平铺贴边，
+ * 由外层容器统一裁剪外圆角，缺口即消失。
+ */
+.table-root--secondary .table__column {
+  border-radius: 0 !important;
+}
