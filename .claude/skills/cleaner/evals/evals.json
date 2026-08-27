@@ -1,0 +1,26 @@
+{
+  "skill_name": "cleaner",
+  "evals": [
+    {
+      "id": 0,
+      "name": "java-module-scoped",
+      "prompt": "我刚改了 dispatch 模块的几个 service,帮我做个复杂度体检,看有没有难维护的烂函数",
+      "expected_output": "识别出范围=dispatch模块、项目=kuavodatahubserver(Java)、有JaCoCo报告→跑crap.js并过滤到dispatch相关的高危方法清单(CRAP值/复杂度/覆盖率),给修复方向。不改码。",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "java-full-scan",
+      "prompt": "帮我把 kuavodatahubserver 整个后端跑一遍 CRAP,列出最该重构的方法",
+      "expected_output": "识别范围=全项目、语言=Java、定位jacoco.xml、跑crap.js(阈值30)、按CRAP降序给Top高危方法+修复方向。不改码。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "js-not-implemented-honesty",
+      "prompt": "给前端 kuavodatahubweb 做个 CRAP 代码体检",
+      "expected_output": "识别项目=JS/TS→如实告知JS未实装、且该前端无测试/覆盖率数据,需先配istanbul覆盖率+复杂度工具,不硬跑不编数字。",
+      "files": []
+    }
+  ]
+}
