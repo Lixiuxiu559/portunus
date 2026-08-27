@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 import { createGroup } from '../../api';
 
@@ -16,6 +16,14 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
   const formRef = useRef(null);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
+
+  // 每次打开弹窗重置表单，确保不残留上次的值
+  useEffect(() => {
+    if (isOpen) {
+      setForm(emptyForm);
+      setSaving(false);
+    }
+  }, [isOpen]);
 
   // 切换渠道时清空已选模型（渠道变了，原模型不再属于新渠道）
   const handleChannelChange = (value) => {

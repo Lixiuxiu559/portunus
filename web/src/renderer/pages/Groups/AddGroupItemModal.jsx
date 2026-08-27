@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 import { addGroupItem } from '../../api';
 
@@ -7,6 +7,15 @@ export default function AddGroupItemModal({ group, models, isOpen, onOpenChange,
   const [modelId, setModelId] = useState('');
   const [priority, setPriority] = useState('0');
   const formRef = useRef(null);
+
+  // 每次打开弹窗重置，确保不残留上次的选择
+  useEffect(() => {
+    if (isOpen) {
+      setModelId('');
+      setPriority('0');
+      setSaving(false);
+    }
+  }, [isOpen]);
 
   // 过滤掉分组中已有的模型
   const existingIds = new Set((group?.items || []).map((i) => i.model_id));

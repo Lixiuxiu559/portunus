@@ -27,7 +27,6 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
       base_url: channel.base_url || '',
       key: '',
     });
-    setError('');
     setModels([]);
     listModels({ page: 1, page_size: 1000, channel_id: channel.id })
       .then((res) => {
@@ -84,7 +83,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
       onUpdated?.();
       toast.success('渠道更新成功');
     } catch (e) {
-      setError(e.message || '更新失败');
+      toast.error(e.message || '更新失败');
     } finally {
       setSaving(false);
     }

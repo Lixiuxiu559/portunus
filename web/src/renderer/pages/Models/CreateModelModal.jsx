@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 
 const emptyForm = {
@@ -16,6 +16,14 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
   const formRef = useRef(null);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
+
+  // 每次打开弹窗重置表单，确保不残留上次的值
+  useEffect(() => {
+    if (isOpen) {
+      setForm(emptyForm);
+      setSaving(false);
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,6 +62,7 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
               <Select
                 isRequired
                 name="channel_id"
+                placeholder="请选择渠道"
                 selectedKey={form.channel_id}
                 onSelectionChange={set('channel_id')}
                 validate={(v) => (!v) ? '请选择渠道' : null}

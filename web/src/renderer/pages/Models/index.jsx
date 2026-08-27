@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Switch, Typography, Chip, toast, Select, ListBox, TextField, Input } from '@heroui/react';
-import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
+import { Plus, Trash2, RotateCw, X, Search, Pencil } from 'lucide-react';
 import DataTable from '../../components/DataTable';
 import CreateModelModal from './CreateModelModal';
+import EditModelModal from './EditModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, updateModel, createModel, deleteModel, listChannels } from '../../api';
 
@@ -14,6 +15,7 @@ export default function Models() {
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   // 查询条件（点击查询按钮后才生效）
   const [queryChannel, setQueryChannel] = useState('all');
@@ -110,6 +112,13 @@ export default function Models() {
     await fetchAll();
   };
 
+  const handleUpdate = async (id, data) => {
+    await updateModel(id, data);
+    toast.success('模型价格已更新');
+    // 就地更新当前列表，避免整页刷新导致分页/筛选状态丢失
+    setModels((prev) => prev.map((x) => (x.id === id ? { ...x, ...data } : x)));
+  };
+
   const handleDelete = async (m) => {
     await deleteModel(m.id);
     toast.success('模型已删除');
@@ -178,15 +187,24 @@ export default function Models() {
       title: '操作',
       dataIndex: 'id',
       key: 'action',
-      width: '60px',
+      width: '100px',
       render: (_, record) => (
-        <button
-          aria-label={`删除模型 ${record.name}`}
-          onClick={() => setDeleteTarget(record)}
-          className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            aria-label={`编辑模型 ${record.name}`}
+            onClick={() => setEditTarget(record)}
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            aria-label={`删除模型 ${record.name}`}
+            onClick={() => setDeleteTarget(record)}
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
       ),
     },
     {
@@ -320,6 +338,13 @@ export default function Models() {
         onOpenChange={setShowCreate}
         channels={channels}
         onSubmit={handleCreate}
+      />
+      <EditModelModal
+        model={editTarget}
+        channels={channels}
+        isOpen={editTarget !== null}
+        onOpenChange={(open) => { if (!open) setEditTarget(null); }}
+        onSubmit={handleUpdate}
       />
       <DeleteModelModal
         model={deleteTarget}
