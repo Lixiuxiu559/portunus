@@ -1,10 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -21,12 +23,31 @@ type relayMeta struct {
 	Stream bool   `json:"stream"`
 }
 
-// upstreamStatusError 表示上游返回非 2xx，携带状态码供上层透出。
-type upstreamStatusError struct{ status int }
+// upstreamStatusError 表示上游返回非 2xx，携带状态码与响应体供上层透出。
+type upstreamStatusError struct {
+	status int
+	body   []byte
+}
 
 func (e *upstreamStatusError) Error() string { return "上游返回非 2xx 状态码" }
 
+// isRetryable 判断某次失败是否值得对同一 / 下一上游重试：
+// 5xx 与 429 重试、网络 / 超时错误重试，其余（4xx、协议转换、配置）不重试。
+func isRetryable(err error) bool {
+	var se *upstreamStatusError
+	if errors.As(err, &se) {
+		return se.status >= 500 || se.status == 429
+	}
+	var ne net.Error
+	if errors.As(err, &ne) {
+		return true
+	}
+	return errors.Is(err, context.DeadlineExceeded)
+}
+
 // handleRelay 返回一个 relay handler，客户端协议由 clientProto 固定。
+// 按分组策略遍历目标（外层），每个目标失败后按配置先重试 N 次（内层），
+// 耗尽才换下一个目标；熔断开路的渠道会被跳过。
 func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		body, err := io.ReadAll(c.Request.Body)
@@ -56,38 +77,65 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		apiKeyID := c.GetInt64("api_key_id")
 
 		var lastErr error
+		anyAttempted := false
 		for _, t := range targets {
-			out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID)
-			if err == nil {
-				if !meta.Stream {
-					c.Writer.Header().Set("Content-Type", "application/json")
-					c.Writer.WriteHeader(status)
-					c.Writer.Write(out)
-				}
-				return
+			if !breakerAllow(t.Channel.ID) {
+				continue // 熔断开路，跳过该渠道
 			}
-			lastErr = err
+			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
+				anyAttempted = true
+				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID)
+				if err == nil {
+					if !meta.Stream {
+						c.Writer.Header().Set("Content-Type", "application/json")
+						c.Writer.WriteHeader(status)
+						c.Writer.Write(out)
+					}
+					return
+				}
+				lastErr = err
+				if !isRetryable(err) {
+					break // 不可重试，放弃该目标
+				}
+			}
+		}
+
+		if !anyAttempted {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "所有渠道暂不可用"})
+			return
 		}
 
 		status := http.StatusBadGateway
 		var se *upstreamStatusError
 		if errors.As(lastErr, &se) {
 			status = se.status
+			// 上游 JSON 错误体原样透传，非 JSON 才用通用错误包装
+			if json.Valid(se.body) {
+				c.Writer.Header().Set("Content-Type", "application/json")
+				c.Writer.WriteHeader(status)
+				c.Writer.Write(se.body)
+				return
+			}
 		}
-		log.Printf("relay 502: model=%s err=%v", meta.Model, lastErr)
+		log.Printf("relay 失败: model=%s err=%v", meta.Model, lastErr)
 		c.JSON(status, gin.H{"error": "上游调用失败"})
 	}
 }
 
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
-// 流式：直接写客户端，一旦提交（写入 200 头）不再返回错误触发 failover。
+// 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
 func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
 	defer func() {
 		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds())
+		if success {
+			breakerRecord(t.Channel.ID, false)
+		} else if err != nil && isRetryable(err) {
+			breakerRecord(t.Channel.ID, true)
+		}
 	}()
 
 	reqBody, err := rewriteModel(originalBody, t.Model.Name)
@@ -105,7 +153,14 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		return nil, 0, err
 	}
 
-	resp, err := doRequest(upstream.ChatURL(t.Model.Name, stream), upstream.ChatHeaders(), upBody)
+	reqCtx := c.Request.Context()
+	if !stream {
+		var cancel context.CancelFunc
+		reqCtx, cancel = context.WithTimeout(reqCtx, time.Duration(proxyCfg.NonStreamTimeoutSeconds)*time.Second)
+		defer cancel()
+	}
+
+	resp, err := doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), upstream.ChatHeaders(), upBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -115,7 +170,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		errBody, _ := io.ReadAll(resp.Body)
 		log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
-		return nil, status, &upstreamStatusError{status: status}
+		return nil, status, &upstreamStatusError{status: status, body: errBody}
 	}
 
 	if stream {
@@ -131,8 +186,13 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 			}
 		}
 		if streamErr := relayStream(c, clientProto, resp, conv); streamErr != nil {
-			// 流已提交，无法 failover；记为失败但不再报错
-			return nil, status, nil
+			var committed *streamCommittedError
+			if errors.As(streamErr, &committed) {
+				// 已提交，无法 failover；记为失败但不再报错
+				return nil, status, nil
+			}
+			// 首包前失败，可重试 / 换家
+			return nil, status, streamErr
 		}
 		usage = conv.Usage()
 	} else {

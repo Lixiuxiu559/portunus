@@ -42,9 +42,11 @@ func main() {
 		log.Fatalf("初始化默认设置失败: %v", err)
 	}
 
+	gateway.Configure(cfg.Proxy) // 注入网关转发配置（重试/超时/熔断）
+
 	r := gin.Default()
 
-	gateway.Register(r)          // 对外 /v1 LLM 接口
+	gateway.Register(r)           // 对外 /v1 LLM 接口
 	api.Register(r.Group("/api")) // 管理 API
 
 	cron.Start() // 定时自动同步渠道模型
