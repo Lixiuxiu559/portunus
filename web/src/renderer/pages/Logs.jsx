@@ -96,6 +96,24 @@ export default function Logs() {
       ),
     },
     {
+      title: '缓存读',
+      dataIndex: 'cache_read_token',
+      key: 'cache_read_token',
+      width: '100px',
+      render: (val) => (
+        <span className="text-right font-mono block">{formatNum(val)}</span>
+      ),
+    },
+    {
+      title: '缓存写',
+      dataIndex: 'cache_write_token',
+      key: 'cache_write_token',
+      width: '100px',
+      render: (val) => (
+        <span className="text-right font-mono block">{formatNum(val)}</span>
+      ),
+    },
+    {
       title: '费用',
       dataIndex: 'cost',
       key: 'cost',
