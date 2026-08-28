@@ -361,7 +361,7 @@ type responsesToOpenAIStream struct {
 	st openAIStreamState
 }
 
-func newResponsesToOpenAIStream() *responsesToOpenAIStream { return &responsesToOpenAIStream{} }
+func newResponsesToOpenAIStream() StreamConverter { return &responsesToOpenAIStream{} }
 
 func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	var ev ResponsesStreamEvent
@@ -418,7 +418,7 @@ type openAIToResponsesStream struct {
 	usage   *ResponsesUsage
 }
 
-func newOpenAIToResponsesStream() *openAIToResponsesStream { return &openAIToResponsesStream{} }
+func newOpenAIToResponsesStream() StreamConverter { return &openAIToResponsesStream{} }
 
 func (o *openAIToResponsesStream) ev(typ string, resp *ResponsesResponse, delta string) []byte {
 	b, _ := json.Marshal(ResponsesStreamEvent{Type: typ, Response: resp, Delta: delta})

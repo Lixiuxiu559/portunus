@@ -452,7 +452,7 @@ type geminiToOpenAIStream struct {
 	st openAIStreamState
 }
 
-func newGeminiToOpenAIStream() *geminiToOpenAIStream { return &geminiToOpenAIStream{} }
+func newGeminiToOpenAIStream() StreamConverter { return &geminiToOpenAIStream{} }
 
 func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	var resp GenerateContentResponse
@@ -505,7 +505,7 @@ type openAIToGeminiStream struct {
 	finish string
 }
 
-func newOpenAIToGeminiStream() *openAIToGeminiStream { return &openAIToGeminiStream{} }
+func newOpenAIToGeminiStream() StreamConverter { return &openAIToGeminiStream{} }
 
 func (o *openAIToGeminiStream) Convert(payload []byte) ([][]byte, error) {
 	var chunk ChatCompletionChunk

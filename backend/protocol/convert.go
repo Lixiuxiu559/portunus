@@ -46,76 +46,71 @@ func ConvertResponse(from, to Provider, body []byte) ([]byte, error) {
 
 // parseRequestToOpenAI 按 from 协议解析请求体为 OpenAI 规范请求。
 func parseRequestToOpenAI(from Provider, body []byte) (*ChatCompletionRequest, error) {
-	switch from {
-	case ProviderOpenAI:
-		var req ChatCompletionRequest
-		if err := json.Unmarshal(body, &req); err != nil {
-			return nil, fmt.Errorf("解析 openai 请求失败: %w", err)
-		}
-		return &req, nil
-	case ProviderAnthropic:
-		return anthropicRequestToOpenAI(body)
-	case ProviderGemini:
-		return geminiRequestToOpenAI(body)
-	case ProviderOpenAIResponses:
-		return responsesRequestToOpenAI(body)
+	impl, ok := implFor(from)
+	if !ok {
+		return nil, fmt.Errorf("暂不支持解析 %s 请求", from)
 	}
-	return nil, fmt.Errorf("暂不支持解析 %s 请求", from)
+	return impl.parseRequest(body)
 }
 
 // renderRequestFromOpenAI 将 OpenAI 规范请求渲染为 to 协议请求体。
 func renderRequestFromOpenAI(to Provider, req *ChatCompletionRequest) ([]byte, error) {
-	switch to {
-	case ProviderOpenAI:
-		// 跨协议转成 OpenAI 的流式请求默认带上 include_usage，
-		// 否则 OpenAI 兼容上游默认不返回 usage chunk，客户端看不到上下文占用。
-		// 直通（from==to）不经过这里，客户端自己的 stream_options 原样保留。
-		if req.Stream && req.StreamOptions == nil {
-			req.StreamOptions = &StreamOptions{IncludeUsage: true}
-		}
-		return json.Marshal(req)
-	case ProviderAnthropic:
-		return anthropicRequestFromOpenAI(req)
-	case ProviderGemini:
-		return geminiRequestFromOpenAI(req)
-	case ProviderOpenAIResponses:
-		return responsesRequestFromOpenAI(req)
+	impl, ok := implFor(to)
+	if !ok {
+		return nil, fmt.Errorf("暂不支持渲染 %s 请求", to)
 	}
-	return nil, fmt.Errorf("暂不支持渲染 %s 请求", to)
+	return impl.renderRequest(req)
 }
 
 // parseResponseToOpenAI 按 from 协议解析响应体为 OpenAI 规范响应。
 func parseResponseToOpenAI(from Provider, body []byte) (*ChatCompletionResponse, error) {
-	switch from {
-	case ProviderOpenAI:
-		var resp ChatCompletionResponse
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("解析 openai 响应失败: %w", err)
-		}
-		return &resp, nil
-	case ProviderAnthropic:
-		return anthropicResponseToOpenAI(body)
-	case ProviderGemini:
-		return geminiResponseToOpenAI(body)
-	case ProviderOpenAIResponses:
-		return responsesResponseToOpenAI(body)
+	impl, ok := implFor(from)
+	if !ok {
+		return nil, fmt.Errorf("暂不支持解析 %s 响应", from)
 	}
-	return nil, fmt.Errorf("暂不支持解析 %s 响应", from)
+	return impl.parseResponse(body)
 }
 
 // renderResponseFromOpenAI 将 OpenAI 规范响应渲染为 to 协议响应体。
 func renderResponseFromOpenAI(to Provider, resp *ChatCompletionResponse) ([]byte, error) {
-	switch to {
-	case ProviderOpenAI:
-		return json.Marshal(resp)
-	case ProviderAnthropic:
-		return anthropicResponseFromOpenAI(resp)
-	case ProviderGemini:
-		return geminiResponseFromOpenAI(resp)
-	case ProviderOpenAIResponses:
-		return responsesResponseFromOpenAI(resp)
+	impl, ok := implFor(to)
+	if !ok {
+		return nil, fmt.Errorf("暂不支持渲染 %s 响应", to)
 	}
-	return nil, fmt.Errorf("暂不支持渲染 %s 响应", to)
+	return impl.renderResponse(resp)
+}
+
+// ===== openai 协议直通 =====
+// openai 自身就是 canonical 格式，解析/渲染退化为普通 JSON 编解码。
+
+func parseOpenAIRequest(body []byte) (*ChatCompletionRequest, error) {
+	var req ChatCompletionRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("解析 openai 请求失败: %w", err)
+	}
+	return &req, nil
+}
+
+func renderOpenAIRequest(req *ChatCompletionRequest) ([]byte, error) {
+	// 跨协议转成 OpenAI 的流式请求默认带上 include_usage，
+	// 否则 OpenAI 兼容上游默认不返回 usage chunk，客户端看不到上下文占用。
+	// 直通（from==to）不经过这里，客户端自己的 stream_options 原样保留。
+	if req.Stream && req.StreamOptions == nil {
+		req.StreamOptions = &StreamOptions{IncludeUsage: true}
+	}
+	return json.Marshal(req)
+}
+
+func parseOpenAIResponse(body []byte) (*ChatCompletionResponse, error) {
+	var resp ChatCompletionResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("解析 openai 响应失败: %w", err)
+	}
+	return &resp, nil
+}
+
+func renderOpenAIResponse(resp *ChatCompletionResponse) ([]byte, error) {
+	return json.Marshal(resp)
 }
 
 // UsageFromResponse 从 from 协议的响应体中提取统一用量，供日志 / 计费。

@@ -75,7 +75,7 @@ type anthropicToOpenAIStream struct {
 	st openAIStreamState
 }
 
-func newAnthropicToOpenAIStream() *anthropicToOpenAIStream {
+func newAnthropicToOpenAIStream() StreamConverter {
 	return &anthropicToOpenAIStream{}
 }
 
@@ -183,7 +183,7 @@ type openAIToAnthropicStream struct {
 	estimate int
 }
 
-func newOpenAIToAnthropicStream() *openAIToAnthropicStream {
+func newOpenAIToAnthropicStream() StreamConverter {
 	return &openAIToAnthropicStream{}
 }
 

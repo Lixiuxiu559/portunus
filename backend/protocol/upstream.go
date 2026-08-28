@@ -29,18 +29,29 @@ type baseConfig struct {
 
 // NewUpstream 按协议构建上游接入器，baseURL 只取基础地址（具体路径由各实现补全）。
 func NewUpstream(p Provider, baseURL, key string) (Upstream, error) {
-	cfg := baseConfig{baseURL: strings.TrimRight(baseURL, "/"), key: key}
-	switch p {
-	case ProviderOpenAI:
-		return &bearerUpstream{baseConfig: cfg, chatPath: "/chat/completions"}, nil
-	case ProviderOpenAIResponses:
-		return &bearerUpstream{baseConfig: cfg, chatPath: "/responses"}, nil
-	case ProviderAnthropic:
-		return &anthropicUpstream{baseConfig: cfg}, nil
-	case ProviderGemini:
-		return &geminiUpstream{baseConfig: cfg}, nil
+	impl, ok := implFor(p)
+	if !ok {
+		return nil, fmt.Errorf("未知协议: %s", p)
 	}
-	return nil, fmt.Errorf("未知协议: %s", p)
+	return impl.newUpstream(strings.TrimRight(baseURL, "/"), key)
+}
+
+// ===== 各协议上游工厂 =====
+
+func newOpenAIUpstream(baseURL, key string) (Upstream, error) {
+	return &bearerUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}, chatPath: "/chat/completions"}, nil
+}
+
+func newResponsesUpstream(baseURL, key string) (Upstream, error) {
+	return &bearerUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}, chatPath: "/responses"}, nil
+}
+
+func newAnthropicUpstream(baseURL, key string) (Upstream, error) {
+	return &anthropicUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}}, nil
+}
+
+func newGeminiUpstream(baseURL, key string) (Upstream, error) {
+	return &geminiUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}}, nil
 }
 
 // upstreamClient 拉取模型列表专用，设超时避免拖垮调用方。

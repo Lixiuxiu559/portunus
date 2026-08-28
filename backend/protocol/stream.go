@@ -45,36 +45,24 @@ func NewStreamConverter(from, to Provider) (StreamConverter, error) {
 
 // newToOpenAIStream 返回「from 协议 → OpenAI chunk」的转换器。
 func newToOpenAIStream(from Provider) StreamConverter {
-	switch from {
-	case ProviderOpenAI:
-		return &identityStream{}
-	case ProviderAnthropic:
-		return newAnthropicToOpenAIStream()
-	case ProviderGemini:
-		return newGeminiToOpenAIStream()
-	case ProviderOpenAIResponses:
-		return newResponsesToOpenAIStream()
+	if impl, ok := implFor(from); ok {
+		return impl.newToStream()
 	}
 	return nil
 }
 
 // newFromOpenAIStream 返回「OpenAI chunk → to 协议」的转换器。
 func newFromOpenAIStream(to Provider) StreamConverter {
-	switch to {
-	case ProviderOpenAI:
-		return &identityStream{}
-	case ProviderAnthropic:
-		return newOpenAIToAnthropicStream()
-	case ProviderGemini:
-		return newOpenAIToGeminiStream()
-	case ProviderOpenAIResponses:
-		return newOpenAIToResponsesStream()
+	if impl, ok := implFor(to); ok {
+		return impl.newFromStream()
 	}
 	return nil
 }
 
 // identityStream 直通，用于 from == to 或 OpenAI→OpenAI。
 type identityStream struct{}
+
+func newIdentityStream() StreamConverter { return &identityStream{} }
 
 func (*identityStream) Convert(payload []byte) ([][]byte, error) { return [][]byte{payload}, nil }
 func (*identityStream) Finish() ([][]byte, error)                { return nil, nil }

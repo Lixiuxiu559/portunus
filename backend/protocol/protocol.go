@@ -10,12 +10,8 @@ const (
 	ProviderGemini          Provider = "gemini"           // Google Gemini
 )
 
-// Valid 校验协议枚举。
+// Valid 校验协议枚举。合法性与可分发性同源:注册到 providerImpls 即合法。
 func (p Provider) Valid() bool {
-	switch p {
-	case ProviderOpenAI, ProviderOpenAIResponses, ProviderAnthropic, ProviderGemini:
-		return true
-	default:
-		return false
-	}
+	_, ok := providerImpls[p]
+	return ok
 }
