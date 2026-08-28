@@ -72,9 +72,9 @@ type OutputItem struct {
 
 // ResponsesUsage 是 Responses 用量。
 type ResponsesUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-	TotalTokens  int `json:"total_tokens"`
+	InputTokens        int `json:"input_tokens"`
+	OutputTokens       int `json:"output_tokens"`
+	TotalTokens        int `json:"total_tokens"`
 	InputTokensDetails struct {
 		CachedTokens int `json:"cached_tokens"`
 	} `json:"input_tokens_details"`
