@@ -35,8 +35,10 @@ export interface DataTableProps<T = Record<string, unknown>> {
   dataSource?: T[];
   /** 列配置 */
   columns?: ColumnType<T>[];
-  /** 加载状态 */
+  /** 加载状态（首次加载显示 Spinner） */
   loading?: boolean;
+  /** 刷新状态（仅在表格右上角显示旋转图标） */
+  refreshing?: boolean;
   /** 空态文案 */
   emptyText?: string;
   /** 表格 aria-label */
@@ -92,6 +94,7 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
   dataSource = [],
   columns = [],
   loading = false,
+  refreshing = false,
   emptyText = '暂无数据',
   ariaLabel = '数据表格',
   className = '',
@@ -118,10 +121,10 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className={`relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface/40 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${className}`}>
-      {/* 刷新遮罩：有数据时 loading 叠加在表格上方 */}
-      {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/30 backdrop-blur-[1px] rounded-xl">
-          <Spinner size="sm" />
+      {/* 刷新指示器：表格正中间显示旋转图标 */}
+      {refreshing && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/20 backdrop-blur-[1px] rounded-xl">
+          <Spinner size="sm" className="text-primary" />
         </div>
       )}
 

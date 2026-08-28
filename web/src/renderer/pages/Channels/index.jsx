@@ -20,19 +20,22 @@ export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
 
-  const fetchChannels = async () => {
-    setLoading(true);
+  const fetchChannels = async (isRefresh = false) => {
+    // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
+    const setRefreshState = isRefresh || channels.length > 0 ? setRefreshing : setLoading;
+    setRefreshState(true);
     try {
       setChannels(await listChannels());
     } catch {
       setChannels([]);
     } finally {
-      setLoading(false);
+      setRefreshState(false);
     }
   };
 
@@ -159,8 +162,8 @@ export default function Channels() {
           <Button
             variant="secondary"
             size="md"
-            onPress={fetchChannels}
-            isPending={loading}
+            onPress={() => fetchChannels(true)}
+            isPending={refreshing}
           >
             <RotateCw className="size-4" />
           </Button>
@@ -175,13 +178,14 @@ export default function Channels() {
         dataSource={channels}
         columns={columns}
         loading={loading}
+        refreshing={refreshing}
         emptyText="暂无渠道，点击右上角「新增渠道」创建"
       />
 
       <CreateChannelModal
         isOpen={isOpen}
         onOpenChange={setIsOpen}
-        onCreated={fetchChannels}
+        onCreated={() => fetchChannels(true)}
       />
       <DeleteChannelModal
         channel={deleteTarget}
@@ -189,7 +193,7 @@ export default function Channels() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        onDeleted={fetchChannels}
+        onDeleted={() => fetchChannels(true)}
       />
       <EditChannelModal
         channel={editTarget}
@@ -197,7 +201,7 @@ export default function Channels() {
         onOpenChange={(open) => {
           if (!open) setEditTarget(null);
         }}
-        onUpdated={fetchChannels}
+        onUpdated={() => fetchChannels(true)}
       />
     </div>
   );

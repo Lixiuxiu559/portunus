@@ -13,6 +13,7 @@ export default function Models() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
@@ -58,7 +59,9 @@ export default function Models() {
     const params = { page: targetPage, page_size: pageSize };
     if (channel !== 'all') params.channel_id = channel;
     if (name.trim()) params.name = name.trim();
-    setLoading(true);
+    // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
+    const setRefreshState = models.length > 0 ? setRefreshing : setLoading;
+    setRefreshState(true);
     try {
       const res = await listModels(params);
       setModels(Array.isArray(res?.data) ? res.data : []);
@@ -67,9 +70,9 @@ export default function Models() {
     } catch {
       setModels([]);
     } finally {
-      setLoading(false);
+      setRefreshState(false);
     }
-  }, [pageSize]);
+  }, [pageSize, models.length]);
 
   // 点查询按钮 / 回车：按当前草稿值查询（回到第 1 页）
   const handleSearch = useCallback(() => {
@@ -92,6 +95,9 @@ export default function Models() {
     },
     [performSearch, queryChannel, queryName],
   );
+
+  // 刷新按钮的 isPending 状态
+  const isRefreshing = refreshing;
 
   const handleToggle = async (m) => {
     setTogglingId(m.id);
@@ -234,7 +240,7 @@ export default function Models() {
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">模型管理</Typography>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="md" onPress={fetchAll} isPending={loading}>
+          <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={refreshing}>
             <RotateCw className="size-4" />
           </Button>
           <Button variant="primary" size="md" onPress={() => setShowCreate(true)}>
@@ -303,6 +309,7 @@ export default function Models() {
         dataSource={models}
         columns={columns}
         loading={loading}
+        refreshing={refreshing}
         emptyText={queryName || queryChannel !== 'all'
           ? '没有符合条件的模型'
           : '暂无模型，点击右上角「新增模型」创建'}

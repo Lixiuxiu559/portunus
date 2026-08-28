@@ -19,13 +19,16 @@ export default function Groups() {
   const [models, setModels] = useState([]);
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [addItemTarget, setAddItemTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (isRefresh = false) => {
+    // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
+    const setRefreshState = isRefresh || groups.length > 0 ? setRefreshing : setLoading;
+    setRefreshState(true);
     try {
       const [g, m, c] = await Promise.all([listGroups(), listModels({ page: 1, page_size: 1000 }), listChannels()]);
       setGroups(Array.isArray(g) ? g : []);
@@ -34,7 +37,7 @@ export default function Groups() {
     } catch {
       setGroups([]);
     } finally {
-      setLoading(false);
+      setRefreshState(false);
     }
   };
 
@@ -98,7 +101,7 @@ export default function Groups() {
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">分组管理</Typography>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="md" onPress={fetchAll} isPending={loading}>
+          <Button variant="secondary" size="md" onPress={() => fetchAll(true)} isPending={refreshing}>
             <RotateCw className="size-4" />
           </Button>
           <Button variant="primary" size="md" onPress={() => setShowCreate(true)}>
@@ -220,7 +223,7 @@ export default function Groups() {
       <CreateGroupModal
         isOpen={showCreate}
         onOpenChange={setShowCreate}
-        onCreated={fetchAll}
+        onCreated={() => fetchAll(true)}
         channels={channels}
         models={models}
       />
@@ -228,20 +231,20 @@ export default function Groups() {
         group={editTarget}
         isOpen={editTarget !== null}
         onOpenChange={(open) => { if (!open) setEditTarget(null); }}
-        onUpdated={fetchAll}
+        onUpdated={() => fetchAll(true)}
       />
       <DeleteGroupModal
         group={deleteTarget}
         isOpen={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        onDeleted={fetchAll}
+        onDeleted={() => fetchAll(true)}
       />
       <AddGroupItemModal
         group={addItemTarget}
         models={models}
         isOpen={addItemTarget !== null}
         onOpenChange={(open) => { if (!open) setAddItemTarget(null); }}
-        onAdded={fetchAll}
+        onAdded={() => fetchAll(true)}
       />
     </div>
   );

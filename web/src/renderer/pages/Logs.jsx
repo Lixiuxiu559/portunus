@@ -18,6 +18,7 @@ export default function Logs() {
   const [logs, setLogs] = useState({ total: 0, data: [] });
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
@@ -27,8 +28,10 @@ export default function Logs() {
     range: null,
   });
 
-  const fetchLogs = async () => {
-    setLoading(true);
+  const fetchLogs = async (isRefresh = false) => {
+    // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
+    const setRefreshState = isRefresh || logs.data?.length > 0 ? setRefreshing : setLoading;
+    setRefreshState(true);
     try {
       const params = { page, page_size: pageSize };
       if (filters.model_name) params.model_name = filters.model_name;
@@ -41,7 +44,7 @@ export default function Logs() {
     } catch {
       setLogs({ total: 0, data: [] });
     } finally {
-      setLoading(false);
+      setRefreshState(false);
     }
   };
 
@@ -120,7 +123,7 @@ export default function Logs() {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">调用日志</Typography>
-        <Button variant="secondary" size="md" onPress={fetchLogs} isPending={loading}>
+        <Button variant="secondary" size="md" onPress={() => fetchLogs(true)} isPending={refreshing}>
           <RotateCw className="size-4" />
         </Button>
       </div>
@@ -222,7 +225,7 @@ export default function Logs() {
           </DateRangePicker.Popover>
         </DateRangePicker>
 
-        <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(); }}>
+        <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(true); }}>
           <Search className="size-4" /> 查询
         </Button>
       </div>
@@ -232,6 +235,7 @@ export default function Logs() {
         dataSource={logs.data || []}
         columns={columns}
         loading={loading}
+        refreshing={refreshing}
         emptyText="暂无日志"
       />
 
