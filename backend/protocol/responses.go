@@ -82,10 +82,12 @@ type ResponsesUsage struct {
 
 // ResponsesStreamEvent 是 Responses 流式事件。
 type ResponsesStreamEvent struct {
-	Type     string             `json:"type"`
-	Response *ResponsesResponse `json:"response,omitempty"`
-	Item     *OutputItem        `json:"item,omitempty"`
-	Delta    string             `json:"delta,omitempty"`
+	Type        string             `json:"type"`
+	Response    *ResponsesResponse `json:"response,omitempty"`
+	Item        *OutputItem        `json:"item,omitempty"`
+	Delta       string             `json:"delta,omitempty"`
+	OutputIndex int                `json:"output_index,omitempty"`
+	ItemID      string             `json:"item_id,omitempty"`
 }
 
 // ===== 请求：responses → openai =====
@@ -358,7 +360,8 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 
 // responsesToOpenAIStream 把 Responses 流事件逐条映射为 OpenAI chunk。
 type responsesToOpenAIStream struct {
-	st openAIStreamState
+	st      openAIStreamState
+	sawTool bool // 流式过程中是否出现过 function_call，用于决定 finish_reason
 }
 
 func newResponsesToOpenAIStream() StreamConverter { return &responsesToOpenAIStream{} }
@@ -380,6 +383,26 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		}
 		r.st.text.WriteString(ev.Delta)
 		out = append(out, r.st.emitChunk(ChunkDelta{Content: ev.Delta}, ""))
+	case "response.output_item.added":
+		// Responses 的工具调用以 function_call item 形式流式给出：开场即带 call_id / name，
+		// 后续参数增量走 function_call_arguments.delta。映射为 OpenAI tool_calls 开场 chunk。
+		if ev.Item != nil && ev.Item.Type == "function_call" {
+			r.sawTool = true
+			if b := r.st.emitRole("assistant"); b != nil {
+				out = append(out, b)
+			}
+			out = append(out, r.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+				Index:    ev.OutputIndex,
+				ID:       ev.Item.CallID,
+				Type:     "function",
+				Function: ChunkFunctionCall{Name: ev.Item.Name},
+			}}}, ""))
+		}
+	case "response.function_call_arguments.delta":
+		out = append(out, r.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+			Index:    ev.OutputIndex,
+			Function: ChunkFunctionCall{Arguments: ev.Delta},
+		}}}, ""))
 	case "response.completed":
 		if ev.Response != nil {
 			r.st.setMeta(ev.Response.ID, ev.Response.Model)
@@ -391,12 +414,29 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 					CacheReadTokens:  ev.Response.Usage.InputTokensDetails.CachedTokens,
 				}
 			}
-			r.st.finish = "stop"
+			// finish_reason 取决于流式过程中是否出现过 function_call（更可靠，
+			// 因为部分上游的 completed.response.output 可能为空或只带精简项）；
+			// 若 output 元素里有 function_call 也一并识别。
+			if r.sawTool || hasFunctionCallItem(ev.Response.Output) {
+				r.st.finish = "tool_calls"
+			} else {
+				r.st.finish = "stop"
+			}
 		}
 	case "response.failed":
 		// 错误暂不映射为 chunk
 	}
 	return out, nil
+}
+
+// hasFunctionCallItem 判断 responses output 是否含 function_call 项，用于决定 finish_reason。
+func hasFunctionCallItem(output []OutputItem) bool {
+	for _, it := range output {
+		if it.Type == "function_call" {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *responsesToOpenAIStream) Finish() ([][]byte, error) {
