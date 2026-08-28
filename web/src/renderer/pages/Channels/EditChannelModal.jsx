@@ -16,6 +16,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
   const [form, setForm] = useState({ name: '', type: 'openai', base_url: '', key: '' });
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
   const formRef = useRef(null);
 
   // 打开弹窗时用渠道数据填充表单，并加载已有模型
@@ -186,26 +187,38 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                     暂无模型
                   </Typography>
                 ) : (
-                  <ScrollShadow
-                    className="flex flex-wrap gap-2 max-h-[190px] p-1"
-                    orientation="vertical"
-                    hideScrollBar
-                  >
-                    {models.map((m) => (
-                      <Chip key={m.id} variant="soft" size="sm">
-                        <span className="flex items-center gap-1">
-                          {m.name}
-                          <button
-                            onClick={() => handleDeleteModel(m)}
-                            className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
-                            aria-label={`删除模型 ${m.name}`}
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </span>
-                      </Chip>
-                    ))}
-                  </ScrollShadow>
+                  <>
+                    <Input
+                      type="text"
+                      size="xs"
+                      placeholder="搜索模型…"
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      className="w-full mb-2"
+                    />
+                    <ScrollShadow
+                      className="flex flex-wrap gap-2 max-h-[190px] p-1"
+                      orientation="vertical"
+                      hideScrollBar
+                    >
+                      {models
+                        .filter((m) => !modelSearch || m.name.toLowerCase().includes(modelSearch.toLowerCase()))
+                        .map((m) => (
+                        <Chip key={m.id} variant="soft" size="sm">
+                          <span className="flex items-center gap-1">
+                            {m.name}
+                            <button
+                              onClick={() => handleDeleteModel(m)}
+                              className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
+                              aria-label={`删除模型 ${m.name}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        </Chip>
+                      ))}
+                    </ScrollShadow>
+                  </>
                 )}
               </div>
             </Form>

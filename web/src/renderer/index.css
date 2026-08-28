@@ -222,3 +222,21 @@ html.dark .bg-decor .mask {
 .table-root--secondary .table__column {
   border-radius: 0 !important;
 }
+
+/*
+ * Electron 窗口拖拽区域：
+ * header 设置 -webkit-app-region: drag 后整体可拖拽，
+ * 其中 tabs 和按钮需设为 no-drag 保持可点击。
+ * 此处兜底防止拖拽区域内文本被选中。
+ */
+header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+header [style*="no-drag"],
+header button,
+header a,
+header input {
+  -webkit-app-region: no-drag;
+}

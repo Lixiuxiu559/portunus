@@ -97,6 +97,12 @@ export default function Settings() {
     }
   };
 
+  const maskKey = (key) => {
+    if (!key) return '';
+    if (key.length <= 8) return key;
+    return key.slice(0, 4) + '****' + key.slice(-4);
+  };
+
   const loadSyncSettings = async () => {
     try {
       const s = await getSettings();
@@ -249,6 +255,9 @@ export default function Settings() {
                   <div key={k.id} className="flex items-center justify-between py-2">
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <Typography className="font-medium truncate">{k.name}</Typography>
+                      <Typography type="body-xs" className="text-muted font-mono">
+                        {maskKey(k.key)}
+                      </Typography>
                       <Typography type="body-xs" className="text-muted">
                         创建于 {new Date(k.created_at).toLocaleDateString()}
                       </Typography>

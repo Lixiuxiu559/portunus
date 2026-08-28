@@ -44,6 +44,7 @@ export default function Groups() {
   useEffect(() => { fetchAll(); }, []);
 
   const modelMap = Object.fromEntries(models.map((m) => [m.id, m.name]));
+  const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
 
   const handleSetActive = async (groupId, itemId) => {
     try {
@@ -162,11 +163,11 @@ export default function Groups() {
                               <div
                                 ref={draggableProvided.innerRef}
                                 {...draggableProvided.draggableProps}
-                                onClick={() => handleSetActive(g.id, item.id)}
-                                className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer shadow-sm ${
-                                  g.active_item_id === item.id
-                                    ? 'bg-accent/10'
-                                    : ''
+                                onClick={() => g.strategy === 'manual' && handleSetActive(g.id, item.id)}
+                                className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm shadow-sm ${
+                                  g.strategy === 'manual'
+                                    ? `cursor-pointer ${g.active_item_id === item.id ? 'bg-accent/10' : ''}`
+                                    : 'bg-accent/10'
                                 } ${snapshot.isDragging ? 'shadow-lg' : ''}`}
                               >
                                 <div className="flex items-center gap-2">
@@ -179,6 +180,13 @@ export default function Groups() {
                                     <GripVertical className="size-4" />
                                   </button>
                                   <span className="font-medium">{modelMap[item.model_id] || `#${item.model_id}`}</span>
+                                  {(() => {
+                                    const model = models.find((m) => m.id === item.model_id);
+                                    const channelName = model ? channelMap[model.channel_id] : null;
+                                    return channelName ? (
+                                      <span className="text-xs text-muted">{channelName}</span>
+                                    ) : null;
+                                  })()}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   {g.strategy === 'manual' && g.active_item_id === item.id && (
@@ -242,6 +250,7 @@ export default function Groups() {
       <AddGroupItemModal
         group={addItemTarget}
         models={models}
+        channels={channels}
         isOpen={addItemTarget !== null}
         onOpenChange={(open) => { if (!open) setAddItemTarget(null); }}
         onAdded={() => fetchAll(true)}

@@ -33,6 +33,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
   const [form, setForm] = useState(emptyForm);
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
   const formRef = useRef(null);
 
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
@@ -193,30 +194,42 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                     暂无模型
                   </Typography>
                 ) : (
-                  <ScrollShadow
-                    className="flex flex-wrap gap-2 max-h-[190px] p-1"
-                    orientation="vertical"
-                    hideScrollBar
-                  >
-                    {models.map((name) => (
-                      <Chip
-                        key={name}
-                        variant="soft"
-                        size="sm"
-                      >
-                        <span className="flex items-center gap-1">
-                          {name}
-                          <button
-                            onClick={() => handleRemoveModel(name)}
-                            className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
-                            aria-label={`移除模型 ${name}`}
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </span>
-                      </Chip>
-                    ))}
-                  </ScrollShadow>
+                  <>
+                    <Input
+                      type="text"
+                      size="xs"
+                      placeholder="搜索模型…"
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      className="w-full mb-2"
+                    />
+                    <ScrollShadow
+                      className="flex flex-wrap gap-2 max-h-[190px] p-1"
+                      orientation="vertical"
+                      hideScrollBar
+                    >
+                      {models
+                        .filter((name) => !modelSearch || name.toLowerCase().includes(modelSearch.toLowerCase()))
+                        .map((name) => (
+                        <Chip
+                          key={name}
+                          variant="soft"
+                          size="sm"
+                        >
+                          <span className="flex items-center gap-1">
+                            {name}
+                            <button
+                              onClick={() => handleRemoveModel(name)}
+                              className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
+                              aria-label={`移除模型 ${name}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        </Chip>
+                      ))}
+                    </ScrollShadow>
+                  </>
                 )}
               </div>
             </Form>
