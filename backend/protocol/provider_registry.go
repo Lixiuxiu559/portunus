@@ -1,5 +1,10 @@
 package protocol
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // providerImpl 汇总一个协议的全部转换能力:请求/响应的解析与渲染、
 // 两个方向的流式转换器、上游接入器。convert.go / stream.go / upstream.go
 // 的分发统一查 providerImpls,不再各自按 Provider switch。
@@ -10,20 +15,42 @@ type providerImpl struct {
 	renderResponse func(*ChatCompletionResponse) ([]byte, error)
 	newToStream    func() StreamConverter // from 协议 → OpenAI chunk
 	newFromStream  func() StreamConverter // OpenAI chunk → to 协议
-	newUpstream    func(baseURL, key string) (Upstream, error)
+	newUpstream    func(baseConfig) Upstream
+}
+
+// renderOpenAIRequest 渲染 OpenAI 请求体。openai 自身就是 canonical,仅此一步带直通特有逻辑:
+// 跨协议转成 OpenAI 的流式请求默认带上 include_usage,否则 OpenAI 兼容上游默认不返回
+// usage chunk,客户端看不到上下文占用。直通(from==to)不经过这里,客户端自己的 stream_options 原样保留。
+func renderOpenAIRequest(req *ChatCompletionRequest) ([]byte, error) {
+	if req.Stream && req.StreamOptions == nil {
+		req.StreamOptions = &StreamOptions{IncludeUsage: true}
+	}
+	return json.Marshal(req)
 }
 
 // providerImpls 是「Provider → 能力」的唯一事实来源。
 // 加新协议 = 在此新增一个完整注册项,并实现对应的 7 个函数;合法性与分发都随之生效。
 var providerImpls = map[Provider]providerImpl{
 	ProviderOpenAI: {
-		parseRequest:   parseOpenAIRequest,
-		renderRequest:  renderOpenAIRequest,
-		parseResponse:  parseOpenAIResponse,
-		renderResponse: renderOpenAIResponse,
+		parseRequest: func(body []byte) (*ChatCompletionRequest, error) {
+			var req ChatCompletionRequest
+			if err := json.Unmarshal(body, &req); err != nil {
+				return nil, fmt.Errorf("解析 openai 请求失败: %w", err)
+			}
+			return &req, nil
+		},
+		renderRequest: renderOpenAIRequest,
+		parseResponse: func(body []byte) (*ChatCompletionResponse, error) {
+			var resp ChatCompletionResponse
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, fmt.Errorf("解析 openai 响应失败: %w", err)
+			}
+			return &resp, nil
+		},
+		renderResponse: func(resp *ChatCompletionResponse) ([]byte, error) { return json.Marshal(resp) },
 		newToStream:    newIdentityStream,
 		newFromStream:  newIdentityStream,
-		newUpstream:    newOpenAIUpstream,
+		newUpstream:    newBearerUpstream("/chat/completions"),
 	},
 	ProviderOpenAIResponses: {
 		parseRequest:   responsesRequestToOpenAI,
@@ -32,7 +59,7 @@ var providerImpls = map[Provider]providerImpl{
 		renderResponse: responsesResponseFromOpenAI,
 		newToStream:    newResponsesToOpenAIStream,
 		newFromStream:  newOpenAIToResponsesStream,
-		newUpstream:    newResponsesUpstream,
+		newUpstream:    newBearerUpstream("/responses"),
 	},
 	ProviderAnthropic: {
 		parseRequest:   anthropicRequestToOpenAI,

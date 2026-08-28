@@ -33,25 +33,25 @@ func NewUpstream(p Provider, baseURL, key string) (Upstream, error) {
 	if !ok {
 		return nil, fmt.Errorf("未知协议: %s", p)
 	}
-	return impl.newUpstream(strings.TrimRight(baseURL, "/"), key)
+	return impl.newUpstream(baseConfig{baseURL: strings.TrimRight(baseURL, "/"), key: key}), nil
 }
 
 // ===== 各协议上游工厂 =====
 
-func newOpenAIUpstream(baseURL, key string) (Upstream, error) {
-	return &bearerUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}, chatPath: "/chat/completions"}, nil
+// newBearerUpstream 返回构造 OpenAI Chat Completions / Responses 上游的工厂，
+// 二者仅对话路径不同，鉴权（Bearer）与模型集（/models + OpenAI 形状）完全一致。
+func newBearerUpstream(chatPath string) func(baseConfig) Upstream {
+	return func(cfg baseConfig) Upstream {
+		return &bearerUpstream{baseConfig: cfg, chatPath: chatPath}
+	}
 }
 
-func newResponsesUpstream(baseURL, key string) (Upstream, error) {
-	return &bearerUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}, chatPath: "/responses"}, nil
+func newAnthropicUpstream(cfg baseConfig) Upstream {
+	return &anthropicUpstream{baseConfig: cfg}
 }
 
-func newAnthropicUpstream(baseURL, key string) (Upstream, error) {
-	return &anthropicUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}}, nil
-}
-
-func newGeminiUpstream(baseURL, key string) (Upstream, error) {
-	return &geminiUpstream{baseConfig: baseConfig{baseURL: baseURL, key: key}}, nil
+func newGeminiUpstream(cfg baseConfig) Upstream {
+	return &geminiUpstream{baseConfig: cfg}
 }
 
 // upstreamClient 拉取模型列表专用，设超时避免拖垮调用方。

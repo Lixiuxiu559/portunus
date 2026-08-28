@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -82,36 +81,8 @@ func renderResponseFromOpenAI(to Provider, resp *ChatCompletionResponse) ([]byte
 
 // ===== openai 协议直通 =====
 // openai 自身就是 canonical 格式，解析/渲染退化为普通 JSON 编解码。
-
-func parseOpenAIRequest(body []byte) (*ChatCompletionRequest, error) {
-	var req ChatCompletionRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, fmt.Errorf("解析 openai 请求失败: %w", err)
-	}
-	return &req, nil
-}
-
-func renderOpenAIRequest(req *ChatCompletionRequest) ([]byte, error) {
-	// 跨协议转成 OpenAI 的流式请求默认带上 include_usage，
-	// 否则 OpenAI 兼容上游默认不返回 usage chunk，客户端看不到上下文占用。
-	// 直通（from==to）不经过这里，客户端自己的 stream_options 原样保留。
-	if req.Stream && req.StreamOptions == nil {
-		req.StreamOptions = &StreamOptions{IncludeUsage: true}
-	}
-	return json.Marshal(req)
-}
-
-func parseOpenAIResponse(body []byte) (*ChatCompletionResponse, error) {
-	var resp ChatCompletionResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("解析 openai 响应失败: %w", err)
-	}
-	return &resp, nil
-}
-
-func renderOpenAIResponse(resp *ChatCompletionResponse) ([]byte, error) {
-	return json.Marshal(resp)
-}
+// 直通实现内联在 provider_registry.go 的注册表 lambda 里（除 renderOpenAIRequest 含
+// include_usage 注入逻辑、按具名函数保留在 registry 文件），此处不再重复。
 
 // UsageFromResponse 从 from 协议的响应体中提取统一用量，供日志 / 计费。
 // 解析失败或响应无 usage 时返回 nil。
