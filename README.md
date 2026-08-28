@@ -46,6 +46,18 @@ go run .
 
 Listens on `0.0.0.0:3060` by default. Database: `data/portunus.db` (SQLite).
 
+### Frontend (Management UI)
+
+The management UI lives in `web/` (Electron + React + Vite). The dev server proxies `/api` and `/v1` to the backend at `localhost:3060`, so start the backend first (`go run .`).
+
+```bash
+cd web
+pnpm install        # install dependencies
+pnpm run dev:web    # start Vite and open http://localhost:5173
+pnpm run dev        # start Vite + Electron desktop window
+pnpm run build      # build renderer and package the desktop app
+```
+
 ## 📝 Configuration
 
 A `config.json` is auto-generated on first run:

@@ -46,6 +46,18 @@ go run .
 
 服务默认监听 `0.0.0.0:3060`，数据库文件 `data/portunus.db`。
 
+### 前端（管理后台）
+
+管理后台位于 `web/`（Electron + React + Vite）。开发服务器会把 `/api`、`/v1` 代理到后端 `localhost:3060`，因此需先启动后端（`go run .`）。
+
+```bash
+cd web
+pnpm install        # 安装依赖
+pnpm run dev:web    # 启动 Vite 并打开 http://localhost:5173
+pnpm run dev        # 同时启动 Vite + Electron 桌面窗口
+pnpm run build      # 构建渲染层并打包桌面应用
+```
+
 ## 📝 配置
 
 首次运行自动生成 `config.json`：
