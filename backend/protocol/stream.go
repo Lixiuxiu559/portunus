@@ -36,11 +36,89 @@ func NewStreamConverter(from, to Provider) (StreamConverter, error) {
 		return nil, fmt.Errorf("未知的目标协议: %s", to)
 	}
 	if from == to {
-		return &identityStream{}, nil
+		// 同协议直通：仍按源协议提取 usage，否则流式日志的 token/费用丢失
+		return newProtocolAwarePassthrough(from), nil
 	}
 	first := newToOpenAIStream(from)
 	second := newFromOpenAIStream(to)
 	return &chainedStreamConverter{first: first, second: second}, nil
+}
+
+// protocolAwarePassthrough 同协议直通，按源协议从原始流事件中累积 usage。
+type protocolAwarePassthrough struct {
+	extract func(payload []byte)
+	usage   *Usage
+}
+
+func newProtocolAwarePassthrough(p Provider) *protocolAwarePassthrough {
+	pt := &protocolAwarePassthrough{}
+	switch p {
+	case ProviderOpenAI:
+		pt.extract = func(payload []byte) {
+			var chunk ChatCompletionChunk
+			if json.Unmarshal(payload, &chunk) == nil && chunk.Usage != nil {
+				pt.usage = chunk.Usage
+			}
+		}
+	case ProviderAnthropic:
+		pt.extract = func(payload []byte) {
+			var ev MessagesStreamEvent
+			if json.Unmarshal(payload, &ev) != nil {
+				return
+			}
+			switch ev.Type {
+			case "message_start":
+				if ev.Message != nil && ev.Message.Usage != nil {
+					u := ev.Message.Usage
+					pt.usage = &Usage{
+						PromptTokens:     u.InputTokens - u.CacheCreationInputTokens - u.CacheReadInputTokens,
+						CacheReadTokens:  u.CacheReadInputTokens,
+						CacheWriteTokens: u.CacheCreationInputTokens,
+						TotalTokens:      u.InputTokens + u.OutputTokens,
+					}
+				}
+			case "message_delta":
+				if ev.Usage != nil {
+					if pt.usage == nil {
+						pt.usage = &Usage{}
+					}
+					pt.usage.CompletionTokens = ev.Usage.OutputTokens
+					pt.usage.TotalTokens = pt.usage.PromptTokens + pt.usage.CompletionTokens + pt.usage.CacheReadTokens + pt.usage.CacheWriteTokens
+				}
+			}
+		}
+	case ProviderOpenAIResponses:
+		pt.extract = func(payload []byte) {
+			var ev ResponsesStreamEvent
+			if json.Unmarshal(payload, &ev) != nil {
+				return
+			}
+			if ev.Type == "response.completed" && ev.Response != nil && ev.Response.Usage != nil {
+				u := ev.Response.Usage
+				pt.usage = &Usage{
+					PromptTokens:     u.InputTokens - u.InputTokensDetails.CachedTokens,
+					CompletionTokens: u.OutputTokens,
+					TotalTokens:      u.TotalTokens,
+					CacheReadTokens:  u.InputTokensDetails.CachedTokens,
+				}
+			}
+		}
+	}
+	return pt
+}
+
+func (p *protocolAwarePassthrough) Convert(payload []byte) ([][]byte, error) {
+	if p.extract != nil {
+		p.extract(payload)
+	}
+	return [][]byte{payload}, nil
+}
+func (*protocolAwarePassthrough) Finish() ([][]byte, error) { return nil, nil }
+func (p *protocolAwarePassthrough) Usage() *Usage {
+	if p.usage != nil {
+		return p.usage
+	}
+	return nil
 }
 
 // newToOpenAIStream 返回「from 协议 → OpenAI chunk」的转换器。
@@ -59,14 +137,29 @@ func newFromOpenAIStream(to Provider) StreamConverter {
 	return nil
 }
 
-// identityStream 直通，用于 from == to 或 OpenAI→OpenAI。
-type identityStream struct{}
+// identityStream OpenAI 协议段的直通转换器，用于跨协议链路里的 OpenAI 端点
+//（from==to 的同协议直通走 protocolAwarePassthrough）。仍解析每一个 chunk 累积
+// usage：否则 OpenAI 端点返回的 usage 会在日志落库时丢失（chain 的 Usage() 只取第一段）。
+type identityStream struct {
+	usage *Usage
+}
 
 func newIdentityStream() StreamConverter { return &identityStream{} }
 
-func (*identityStream) Convert(payload []byte) ([][]byte, error) { return [][]byte{payload}, nil }
-func (*identityStream) Finish() ([][]byte, error)                { return nil, nil }
-func (*identityStream) Usage() *Usage                            { return nil }
+func (s *identityStream) Convert(payload []byte) ([][]byte, error) {
+	var chunk ChatCompletionChunk
+	if json.Unmarshal(payload, &chunk) == nil && chunk.Usage != nil {
+		s.usage = chunk.Usage
+	}
+	return [][]byte{payload}, nil
+}
+func (*identityStream) Finish() ([][]byte, error) { return nil, nil }
+func (s *identityStream) Usage() *Usage {
+	if s.usage != nil {
+		return s.usage
+	}
+	return nil
+}
 
 // chainedStreamConverter 串联「from→openai」与「openai→to」两个转换器。
 type chainedStreamConverter struct {
