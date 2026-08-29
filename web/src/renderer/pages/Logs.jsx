@@ -83,7 +83,7 @@ export default function Logs() {
       key: 'input_token',
       width: '120px',
       render: (val) => (
-        <span className="text-right font-mono block">{formatNum(val)}</span>
+        <span className="text-left font-mono block">{formatNum(val)}</span>
       ),
     },
     {
@@ -92,7 +92,7 @@ export default function Logs() {
       key: 'output_token',
       width: '120px',
       render: (val) => (
-        <span className="text-right font-mono block">{formatNum(val)}</span>
+        <span className="text-left font-mono block">{formatNum(val)}</span>
       ),
     },
     {
