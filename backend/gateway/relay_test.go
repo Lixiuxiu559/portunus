@@ -305,3 +305,76 @@ func TestListModels(t *testing.T) {
 		t.Errorf("created 应为非零时间戳")
 	}
 }
+
+// TestRelayStreamAnthropicClientOpenAIToolUseToAnthropic 复现真实场景：Claude Code 客户端走
+// /v1/messages（Anthropic 协议），上游为 OpenAI Chat Completions 流式返回工具调用。
+// 断言 Anthropic 流完整：tool_use 块 start（开 id/name）、input_json_delta（参数）、
+// content_block_stop、stop_reason=tool_use 四个信号缺一不可——任何缺失都会让客户端
+// 渲染出 Tool use interrupted。
+func TestRelayStreamAnthropicClientOpenAIToolUseToAnthropic(t *testing.T) {
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fl := w.(http.Flusher)
+		// 真实 OpenAI 工具调用流式：开场 chunk 带 id/name，参数增量分片，最后 finish_reason=tool_calls
+		io.WriteString(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call_abc\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"Bei\"}}]},\"finish_reason\":null}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"jing\\\"}\"}}]},\"finish_reason\":null}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n")
+		fl.Flush()
+		io.WriteString(w, "data: [DONE]\n\n")
+		fl.Flush()
+	})
+
+	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	// Claude Code 的 Anthropic 流式请求：带 stream:true + get_weather 工具定义
+	body := `{"model":"my-model","max_tokens":100,"stream":true,"messages":[{"role":"user","content":"北京天气怎么样?"}],"tools":[{"name":"get_weather","description":"查询天气","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}],"tool_choice":{"type":"auto"}}`
+	w := doReq(t, r, "/v1/messages", body, key)
+
+	if w.Code != 200 {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+	got := w.Body.String()
+	// 工具调用完整性的四个信号
+	if !strings.Contains(got, `"type":"tool_use"`) {
+		t.Errorf("缺少 tool_use 块 start（Claude Code 会渲染 Tool use interrupted）:\n%s", got)
+	}
+	if !strings.Contains(got, `"name":"get_weather"`) {
+		t.Errorf("tool_use 块缺 name=get_weather:\n%s", got)
+	}
+	if !strings.Contains(got, `"partial_json"`) {
+		t.Errorf("缺少参数增量 input_json_delta（工具参数为空）:\n%s", got)
+	}
+	if !strings.Contains(got, `"type":"content_block_stop"`) {
+		t.Errorf("缺少 content_block_stop（块未正常收尾）:\n%s", got)
+	}
+	if !strings.Contains(got, `"stop_reason":"tool_use"`) {
+		t.Errorf("缺少 stop_reason=tool_use（客户端看不到工具调用结束）:\n%s", got)
+	}
+	// 拼装的工具参数要完整：流式里参数是分片 partial_json 增量，客户端会累积拼接成完整 JSON。
+	// 收集所有 content_block_delta.input_json_delta 增量，断言拼装结果 = {"city":"Beijing"}。
+	var assembledArgs string
+	for _, raw := range strings.Split(got, "\n\n") {
+		if !strings.HasPrefix(raw, "event: content_block_delta\ndata: ") {
+			continue
+		}
+		payload := strings.TrimPrefix(raw, "event: content_block_delta\ndata: ")
+		var ev struct {
+			Delta struct {
+				Type        string `json:"type"`
+				PartialJSON string `json:"partial_json"`
+			} `json:"delta"`
+		}
+		if json.Unmarshal([]byte(payload), &ev) != nil {
+			continue
+		}
+		if ev.Delta.Type == "input_json_delta" {
+			assembledArgs += ev.Delta.PartialJSON
+		}
+	}
+	if assembledArgs != `{"city":"Beijing"}` {
+		t.Errorf("拼装的工具参数不完整: %q, want {\"city\":\"Beijing\"}", assembledArgs)
+	}
+}

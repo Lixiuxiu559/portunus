@@ -329,7 +329,10 @@ func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
 			Usage:   o.usage,
 		}, nil))
 	}
-	if delta.Role != "" {
+	if delta.Role != "" && len(delta.ToolCalls) == 0 && delta.ReasoningContent == "" && delta.Content == "" {
+		// 纯 role 标记 chunk（OpenAI 首个 chunk 仅声明 assistant 角色），无可转换内容，忽略。
+		// 不能直接按 role 非空 return：官方 OpenAI 的工具开场块 role 与 tool_calls 同帧，
+		// 整帧被吞后后续参数帧拿不到 id/name，tool_use 块发空 id 导致客户端 Tool use interrupted。
 		return out, nil
 	}
 

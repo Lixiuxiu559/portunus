@@ -657,3 +657,71 @@ func TestStreamOpenAIToAnthropicToolIndexGap(t *testing.T) {
 		t.Errorf("参数混拼错误: index0=%q index1=%q", args[0], args[1])
 	}
 }
+
+// TestStreamOpenAIToAnthropicRoleFramedToolCallHasID 覆盖官方 OpenAI 流式写法：
+// 工具开场块 role 与 tool_calls 同帧（{"delta":{"role":"assistant","tool_calls":[...]}}）。
+// 回归测试：Modify role 分支不能把含 tool_calls 的同帧直接吞掉，否则后续参数帧拿不到
+// id/name，tool_use 块发空 id 导致客户端 Tool use interrupted。
+func TestStreamOpenAIToAnthropicRoleFramedToolCallHasID(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	// 官方 OpenAI：第一个 chunk 同帧声明 role + tool_calls（带 id/name），后续参数增量分片
+	feed(`{"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_abc","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}`)
+	feed(`{"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":\"Bei"}}]},"finish_reason":null}]}`)
+	feed(`{"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"jing\"}"}}]},"finish_reason":null}]}`)
+	feed(`{"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	var toolName, toolID, assembledArgs string
+	var stopReason string
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		switch ev.Type {
+		case "content_block_start":
+			if ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
+				toolName = ev.ContentBlock.Name
+				toolID = ev.ContentBlock.ID
+			}
+		case "content_block_delta":
+			if ev.Delta != nil && ev.Delta.Type == "input_json_delta" {
+				assembledArgs += ev.Delta.PartialJSON
+			}
+		case "message_delta":
+			if ev.Delta != nil {
+				stopReason = ev.Delta.StopReason
+			}
+		}
+	}
+	// 核心断言：tool_use 块必须带 id/name（本回归测试守护的修复点）
+	if toolName != "get_weather" {
+		t.Errorf("tool_use 块 name 应为 get_weather, 实际 %q（空 name 会 Tool use interrupted）", toolName)
+	}
+	if toolID != "call_abc" {
+		t.Errorf("tool_use 块 id 应为 call_abc, 实际 %q（空 id 会 Tool use interrupted）", toolID)
+	}
+	if assembledArgs != `{"city":"Beijing"}` {
+		t.Errorf("拼装的参数不完整: %q, want {\"city\":\"Beijing\"}", assembledArgs)
+	}
+	if stopReason != "tool_use" {
+		t.Errorf("stop_reason 应为 tool_use, 实际 %q", stopReason)
+	}
+}
