@@ -101,7 +101,7 @@ export default function Logs() {
       key: 'cache_read_token',
       width: '100px',
       render: (val) => (
-        <span className="text-right font-mono block">{formatNum(val)}</span>
+        <span className="text-left font-mono block">{formatNum(val)}</span>
       ),
     },
     {
@@ -110,7 +110,7 @@ export default function Logs() {
       key: 'cache_write_token',
       width: '100px',
       render: (val) => (
-        <span className="text-right font-mono block">{formatNum(val)}</span>
+        <span className="text-left font-mono block">{formatNum(val)}</span>
       ),
     },
     {
@@ -199,6 +199,7 @@ export default function Logs() {
           value={filters.range}
           onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
           placeholderValue={defaultDate}
+          isClearable
           className="w-fit"
         >
           <Label>时间范围</Label>

@@ -52,7 +52,7 @@ export default function Layout() {
         </div>
       </header>
       <main className="flex-1 min-h-0 p-6">
-        <div className="mx-auto max-w-5xl h-full flex flex-col">
+        <div className="mx-auto max-w-7xl h-full flex flex-col">
           <Outlet />
         </div>
       </main>
