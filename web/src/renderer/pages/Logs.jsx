@@ -3,7 +3,7 @@ import {
   Typography, Button, Card, TextField, Input, Select, ListBox, Label,
   DateRangePicker, DateField, RangeCalendar,
 } from '@heroui/react';
-import { Search, RotateCw } from 'lucide-react';
+import { Search, RotateCw, X } from 'lucide-react';
 import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/date';
 import DataTable from '../components/DataTable';
 import { listLogs, getLogStats } from '../api';
@@ -199,7 +199,6 @@ export default function Logs() {
           value={filters.range}
           onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
           placeholderValue={defaultDate}
-          isClearable
           className="w-fit"
         >
           <Label>时间范围</Label>
@@ -243,6 +242,17 @@ export default function Logs() {
             </RangeCalendar>
           </DateRangePicker.Popover>
         </DateRangePicker>
+
+        {filters.range && (
+          <Button
+            size="md"
+            variant="secondary"
+            onPress={() => setFilters((f) => ({ ...f, range: null }))}
+            className="gap-1"
+          >
+            <X className="size-4" /> 清除时间
+          </Button>
+        )}
 
         <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(true); }}>
           <Search className="size-4" /> 查询
