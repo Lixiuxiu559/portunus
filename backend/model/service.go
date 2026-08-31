@@ -89,7 +89,7 @@ func List(channelID int64, name string, page, pageSize int) ([]Model, int64, err
 		pageSize = 20
 	}
 	var ms []Model
-	err := q.Order("id").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ms).Error
+	err := q.Order("lower(name), id").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ms).Error
 	return ms, total, err
 }
 
