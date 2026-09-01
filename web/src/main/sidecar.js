@@ -1,23 +1,16 @@
-const { spawn } = require('child_process');
-const path = require('path');
 const { app } = require('electron');
 
 const isDev = process.env.NODE_ENV === 'development';
 const SERVER_PORT = 3060;
-
-let serverProcess = null;
-
-/**
- * 获取生产模式下的 Go 二进制路径
- * 打包时通过 electron-builder extraResources 复制到 resources/ 目录
+/*
+ * 说明：Go 后端不再打包进应用（不随安装包分发），
+ * 生产模式下 app 直接连接本机已运行的 Go 后端（默认 3060 端口）。
+ * Go 后端需由用户在外部单独启动，例如：
+ *   go run . / go build -o portunus . 然后运行 ./portunus
  */
-function getBinaryPath() {
-  const binaryName = process.platform === 'win32' ? 'portunus.exe' : 'portunus';
-  return path.join(process.resourcesPath, binaryName);
-}
 
 /**
- * 等待服务端就绪（轮询端口）
+ * 等待服务端就绪（轮询 /api/ping）
  */
 function waitForServer(url, retries = 30, interval = 500) {
   return new Promise((resolve, reject) => {
@@ -48,50 +41,19 @@ function waitForServer(url, retries = 30, interval = 500) {
   });
 }
 
-/**
- * 启动 Go 服务端子进程（仅生产模式）
- */
 async function startServer() {
   if (isDev) {
-    // 开发模式：假设开发者已手动启动 go run .
-    console.log('[sidecar] 开发模式，跳过后端启动，期望服务已在 localhost:3060 运行');
+    console.log('[sidecar] 开发模式，等待后端就绪...');
     return waitForServer(`http://localhost:${SERVER_PORT}`);
   }
-
-  const binaryPath = getBinaryPath();
-  console.log(`[sidecar] 启动后端: ${binaryPath}`);
-
-  serverProcess = spawn(binaryPath, [], {
-    cwd: process.resourcesPath,
-    stdio: 'pipe',
-    env: { ...process.env, PORT: String(SERVER_PORT) },
-  });
-
-  serverProcess.stdout.on('data', (data) => {
-    console.log(`[portunus] ${data.toString().trim()}`);
-  });
-
-  serverProcess.stderr.on('data', (data) => {
-    console.error(`[portunus:err] ${data.toString().trim()}`);
-  });
-
-  serverProcess.on('exit', (code) => {
-    console.log(`[sidecar] 后端进程退出，code=${code}`);
-    serverProcess = null;
-  });
-
-  return waitForServer(`http://localhost:${SERVER_PORT}`);
+  // 生产模式：后端由用户独立部署（远程服务器或本地单独启动）
+  // app 不再等待/连接后端，由渲染进程根据配置的 serverUrl 直接请求
+  console.log('[sidecar] 生产模式，后端由外部部署，跳过连接检测');
 }
 
-/**
- * 优雅关闭 Go 服务端
- */
+// Go 后端由用户外部启动，不归 app 管理，因此无需杀进程
 function stopServer() {
-  if (serverProcess) {
-    console.log('[sidecar] 正在关闭后端...');
-    serverProcess.kill('SIGTERM');
-    serverProcess = null;
-  }
+  // 无内置子进程，无操作
 }
 
 module.exports = { startServer, stopServer, SERVER_PORT, isDev };

@@ -12,7 +12,9 @@ import { toast } from '@heroui/react';
  * - 失败：HTTP 状态码 + { error: "消息" }
  */
 const isProd = typeof window !== 'undefined' && window.location.protocol === 'file:';
-const BASE_URL = isProd ? 'http://localhost:3060/api' : '/api';
+// 生产模式：从 preload 读取配置的后端地址；开发模式：用 Vite proxy
+const serverUrl = isProd ? (window.api?.getServerUrl?.() || 'http://localhost:3060') : '';
+const BASE_URL = isProd ? `${serverUrl}/api` : '/api';
 
 const request = axios.create({
   baseURL: BASE_URL,

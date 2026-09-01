@@ -2,22 +2,20 @@
   "name": "@portunus/web",
   "version": "0.1.0",
   "description": "Portunus 管理后台（Electron + React + Vite 模板）",
+  "author": "Lixiuxiu559",
   "main": "src/main/main.js",
   "build": {
     "appId": "com.portunus.app",
     "productName": "Portunus",
+    "compression": "store",
     "directories": {
       "output": "dist-electron"
     },
     "files": [
       "src/main/**/*",
-      "dist/renderer/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "../portunus${ext}",
-        "to": "./portunus${ext}"
-      }
+      "dist/renderer/**/*",
+      "!**/*.map",
+      "!**/.DS_Store"
     ],
     "mac": {
       "category": "public.app-category.utilities",
@@ -51,29 +49,31 @@
     "build": "pnpm run build:go && VITE_BASE=./ vite build && electron-builder",
     "build:renderer": "vite build",
     "build:web": "vite build",
+    "build:mac": "pnpm run build:renderer && electron-builder --mac zip --arm64",
+    "build:win": "pnpm run build:renderer && electron-builder --win nsis --x64",
     "start": "electron ."
   },
   "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
     "@hello-pangea/dnd": "^18.0.1",
     "@heroui/react": "3.2.4",
     "@heroui/styles": "3.2.4",
     "@internationalized/date": "^3.12.3",
-    "axios": "^1.18.0",
-    "electron": "42.3.3",
-    "electron-updater": "^6.6.2",
-    "lucide-react": "^1.34.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.2"
-  },
-  "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.0.2",
+    "axios": "^1.18.0",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
+    "electron": "42.3.3",
     "electron-builder": "^26.0.12",
+    "lucide-react": "^1.34.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.2",
     "tailwindcss": "^4.3.0",
     "typescript": "^7.0.2",
     "vite": "^8.0.16",

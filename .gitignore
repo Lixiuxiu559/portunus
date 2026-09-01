@@ -11,3 +11,4 @@ config.json
 
 # 编译产物
 /portunus
+.DS_Store
