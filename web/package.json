@@ -48,8 +48,9 @@
     "dev:web": "vite --open",
     "dev:main": "cross-env NODE_ENV=development electron .",
     "build:go": "cd .. && go build -o portunus .",
-    "build": "pnpm run build:go && vite build && electron-builder",
+    "build": "pnpm run build:go && VITE_BASE=./ vite build && electron-builder",
     "build:renderer": "vite build",
+    "build:web": "vite build",
     "start": "electron ."
   },
   "dependencies": {

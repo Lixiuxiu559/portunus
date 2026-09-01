@@ -21,17 +21,75 @@ Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，�
 
 ## 🚀 快速开始
 
-### Docker
+### Docker Compose（推荐）
 
-```bash
-docker run -d --name portunus -v /path/to/data:/app/data -p 3060:3060 lixiuxiu559/portunus
+新建一个目录和 `docker-compose.yml`：
+
+```yaml
+services:
+  # 后端：Go 服务（仅容器内网，统一走 web 反代）
+  backend:
+    image: lijx559/portunus-backend:latest
+    container_name: portunus-backend
+    restart: unless-stopped
+    environment:
+      PORTUNUS_SERVER_HOST: 0.0.0.0
+      PORTUNUS_SERVER_PORT: "3060"
+      PORTUNUS_DATABASE_PATH: /app/data/portunus.db
+    volumes:
+      - ./data:/app/data
+
+  # 前端：nginx 静态托管 + 反代 /api、/v1 到后端
+  web:
+    image: lijx559/portunus-web:latest
+    container_name: portunus-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3060:80"
 ```
-
-或使用 Docker Compose：
 
 ```bash
 docker compose up -d
 ```
+
+启动后访问 `http://localhost:3060`：
+
+| 路径 | 说明 |
+|---|---|
+| `http://localhost:3060/` | Web 管理后台 |
+| `http://localhost:3060/api/*` | 管理 API（后台同源，无需 CORS） |
+| `http://localhost:3060/v1/*` | LLM 网关（Claude Code / Codex 的 base_url 填 `http://localhost:3060`） |
+
+**自定义数据目录**：SQLite 数据库默认落在 compose 文件同级的 `./data`，改 volumes 左侧宿主机路径即可换到任意位置：
+
+```yaml
+    volumes:
+      - /your/custom/path:/app/data
+```
+
+> ⚠️ 镜像内已设 `PORTUNUS_DATABASE_PATH=/app/data/portunus.db`，因此只需换左侧宿主机路径，右侧保持 `/app/data` 不变。
+
+### Docker Run
+
+不想用 Compose 的话，两条命令手动起（先建网络，后端不暴露宿主机端口，由 web 反代）：
+
+```bash
+docker network create portunus
+
+docker run -d --name portunus-backend \
+  --network portunus \
+  -v /path/to/data:/app/data \
+  lijx559/portunus-backend:latest
+
+docker run -d --name portunus-web \
+  --network portunus \
+  -p 3060:80 \
+  lijx559/portunus-web:latest
+```
+
+镜像均为多架构（linux/amd64 + linux/arm64）。
 
 ### 从源码运行
 

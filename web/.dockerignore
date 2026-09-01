@@ -1,0 +1,5 @@
+node_modules/
+dist/
+dist-electron/
+src/main/
+src/renderer/assets/chatgpt.png

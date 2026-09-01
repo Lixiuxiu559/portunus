@@ -21,17 +21,75 @@ Portunus is a lightweight LLM API aggregation service: connect multiple upstream
 
 ## 🚀 Quick Start
 
-### Docker
+### Docker Compose (Recommended)
 
-```bash
-docker run -d --name portunus -v /path/to/data:/app/data -p 3060:3060 lixiuxiu559/portunus
+Create a directory with a `docker-compose.yml`:
+
+```yaml
+services:
+  # Backend: Go service (internal network only, accessed via web reverse proxy)
+  backend:
+    image: lijx559/portunus-backend:latest
+    container_name: portunus-backend
+    restart: unless-stopped
+    environment:
+      PORTUNUS_SERVER_HOST: 0.0.0.0
+      PORTUNUS_SERVER_PORT: "3060"
+      PORTUNUS_DATABASE_PATH: /app/data/portunus.db
+    volumes:
+      - ./data:/app/data
+
+  # Frontend: nginx static hosting + reverse proxy for /api and /v1
+  web:
+    image: lijx559/portunus-web:latest
+    container_name: portunus-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3060:80"
 ```
-
-Or use Docker Compose:
 
 ```bash
 docker compose up -d
 ```
+
+Then open `http://localhost:3060`:
+
+| Path | Description |
+|---|---|
+| `http://localhost:3060/` | Web management UI |
+| `http://localhost:3060/api/*` | Management API (same origin as the UI, no CORS needed) |
+| `http://localhost:3060/v1/*` | LLM gateway (set base_url to `http://localhost:3060` for Claude Code / Codex) |
+
+**Custom data directory**: the SQLite database lands in `./data` next to the compose file by default. Change the host-side path in volumes to move it anywhere:
+
+```yaml
+    volumes:
+      - /your/custom/path:/app/data
+```
+
+> ⚠️ The image sets `PORTUNUS_DATABASE_PATH=/app/data/portunus.db`, so only change the host-side path (left side of the colon); keep the container-side path (`/app/data`) unchanged.
+
+### Docker Run
+
+Prefer plain Docker? Two commands (create a network first; the backend gets no host port — web proxies it):
+
+```bash
+docker network create portunus
+
+docker run -d --name portunus-backend \
+  --network portunus \
+  -v /path/to/data:/app/data \
+  lijx559/portunus-backend:latest
+
+docker run -d --name portunus-web \
+  --network portunus \
+  -p 3060:80 \
+  lijx559/portunus-web:latest
+```
+
+Images are multi-arch (linux/amd64 + linux/arm64).
 
 ### Run from Source
 

@@ -1,9 +1,45 @@
+# Portunus 部署编排
+# 直接 `docker compose up -d`，访问 http://localhost:3060 即 Web 管理后台。
+#
+# 架构：nginx(web) 对外 3060 → /api /v1 反代到后端(backend:3060，仅容器内网)
+#   宿主机 3060 同时承载：
+#     - http://localhost:3060/          Web 管理后台
+#     - http://localhost:3060/api/*     管理 API（前端同源，无需 CORS）
+#     - http://localhost:3060/v1/*      LLM 网关（claude code / codex base_url 填 http://localhost:3060）
+#
+# 镜像已发布到 Docker Hub（amd64 + arm64），首次运行自动拉取，无需本地构建。
+# 本地改了代码想重新构建时，取消 build: 段注释即可（build 优先于 image）。
+
 services:
-  portunus:
-    image: lixiuxiu559/portunus
-    ports:
-      - '3060:3060'
-    volumes:
-      - './data:/app/data'
-    container_name: portunus
+  # ─── 后端：Go 服务 ───
+  backend:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     GOPROXY: https://goproxy.cn,direct
+    image: lijx559/portunus-backend:latest
+    container_name: portunus-backend
     restart: unless-stopped
+    environment:
+      PORTUNUS_SERVER_HOST: 0.0.0.0
+      PORTUNUS_SERVER_PORT: "3060"
+      PORTUNUS_DATABASE_PATH: /app/data/portunus.db
+    volumes:
+      # 数据目录：SQLite 数据库。换到任意位置改左侧宿主机路径即可，右侧保持 /app/data
+      - ./data:/app/data
+
+  # ─── 前端：nginx 静态 + 反代 ───
+  web:
+    # build:
+    #   context: ./web
+    #   dockerfile: Dockerfile
+    #   args:
+    #     NPM_REGISTRY: https://registry.npmmirror.com
+    image: lijx559/portunus-web:latest
+    container_name: portunus-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '3060:80'
