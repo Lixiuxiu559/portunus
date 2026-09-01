@@ -27,27 +27,14 @@ Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，�
 
 ```yaml
 services:
-  # 后端：Go 服务（仅容器内网，统一走 web 反代）
-  backend:
-    image: lijx559/portunus-backend:latest
-    container_name: portunus-backend
+  portunus:
+    image: lijx559/portunus:latest
+    container_name: portunus
     restart: unless-stopped
-    environment:
-      PORTUNUS_SERVER_HOST: 0.0.0.0
-      PORTUNUS_SERVER_PORT: "3060"
-      PORTUNUS_DATABASE_PATH: /app/data/portunus.db
-    volumes:
-      - ./data:/app/data
-
-  # 前端：nginx 静态托管 + 反代 /api、/v1 到后端
-  web:
-    image: lijx559/portunus-web:latest
-    container_name: portunus-web
-    restart: unless-stopped
-    depends_on:
-      - backend
     ports:
       - "3060:80"
+    volumes:
+      - ./data:/app/data
 ```
 
 ```bash
@@ -69,27 +56,18 @@ docker compose up -d
       - /your/custom/path:/app/data
 ```
 
-> ⚠️ 镜像内已设 `PORTUNUS_DATABASE_PATH=/app/data/portunus.db`，因此只需换左侧宿主机路径，右侧保持 `/app/data` 不变。
+> ⚠️ 镜像内已固定数据库路径为 `/app/data/portunus.db`，因此只需换左侧宿主机路径，右侧保持 `/app/data` 不变。
 
 ### Docker Run
 
-不想用 Compose 的话，两条命令手动起（先建网络，后端不暴露宿主机端口，由 web 反代）：
-
 ```bash
-docker network create portunus
-
-docker run -d --name portunus-backend \
-  --network portunus \
-  -v /path/to/data:/app/data \
-  lijx559/portunus-backend:latest
-
-docker run -d --name portunus-web \
-  --network portunus \
+docker run -d --name portunus \
   -p 3060:80 \
-  lijx559/portunus-web:latest
+  -v /path/to/data:/app/data \
+  lijx559/portunus:latest
 ```
 
-镜像均为多架构（linux/amd64 + linux/arm64）。
+镜像为多架构（linux/amd64 + linux/arm64），单镜像内含 Web 管理后台（nginx）+ Go 后端。
 
 ### 从源码运行
 

@@ -27,27 +27,14 @@ Create a directory with a `docker-compose.yml`:
 
 ```yaml
 services:
-  # Backend: Go service (internal network only, accessed via web reverse proxy)
-  backend:
-    image: lijx559/portunus-backend:latest
-    container_name: portunus-backend
+  portunus:
+    image: lijx559/portunus:latest
+    container_name: portunus
     restart: unless-stopped
-    environment:
-      PORTUNUS_SERVER_HOST: 0.0.0.0
-      PORTUNUS_SERVER_PORT: "3060"
-      PORTUNUS_DATABASE_PATH: /app/data/portunus.db
-    volumes:
-      - ./data:/app/data
-
-  # Frontend: nginx static hosting + reverse proxy for /api and /v1
-  web:
-    image: lijx559/portunus-web:latest
-    container_name: portunus-web
-    restart: unless-stopped
-    depends_on:
-      - backend
     ports:
       - "3060:80"
+    volumes:
+      - ./data:/app/data
 ```
 
 ```bash
@@ -69,27 +56,18 @@ Then open `http://localhost:3060`:
       - /your/custom/path:/app/data
 ```
 
-> ⚠️ The image sets `PORTUNUS_DATABASE_PATH=/app/data/portunus.db`, so only change the host-side path (left side of the colon); keep the container-side path (`/app/data`) unchanged.
+> ⚠️ The database path is fixed to `/app/data/portunus.db` inside the image, so only change the host-side path (left side of the colon); keep the container-side path (`/app/data`) unchanged.
 
 ### Docker Run
 
-Prefer plain Docker? Two commands (create a network first; the backend gets no host port — web proxies it):
-
 ```bash
-docker network create portunus
-
-docker run -d --name portunus-backend \
-  --network portunus \
-  -v /path/to/data:/app/data \
-  lijx559/portunus-backend:latest
-
-docker run -d --name portunus-web \
-  --network portunus \
+docker run -d --name portunus \
   -p 3060:80 \
-  lijx559/portunus-web:latest
+  -v /path/to/data:/app/data \
+  lijx559/portunus:latest
 ```
 
-Images are multi-arch (linux/amd64 + linux/arm64).
+The image is multi-arch (linux/amd64 + linux/arm64) and contains both the Web management UI (nginx) and the Go backend in a single container.
 
 ### Run from Source
 

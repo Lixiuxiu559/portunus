@@ -34,13 +34,15 @@ GOPROXY=https://goproxy.cn,direct go mod tidy
 
 ## Docker
 
+单镜像：前端（nginx 托管 + 反代）和后端（Go 二进制，同容器监听 127.0.0.1:3060）打包为一个镜像。
+
 ```bash
-docker compose up -d    # 纯拉 Docker Hub 镜像直接起：web(nginx, 对外 3060) + backend(Go, 仅内网)
+docker compose up -d    # 纯拉 Docker Hub 镜像直接起，对外 3060
 ```
 
 compose 默认只用 `image:`（远程镜像），不触发本地构建；要本地构建时取消 compose 里 `build:` 段注释（build 优先于 image）。
 
-架构：宿主机 3060 端口三用 —— `http://localhost:3060/` Web 管理后台、`/api/*` 管理 API（nginx 反代）、`/v1/*` LLM 网关（nginx 反代，已为 SSE 关缓冲放宽超时）。后端不直接暴露端口。
+宿主机 3060 端口三用 —— `http://localhost:3060/` Web 管理后台、`/api/*` 管理 API（nginx 反代）、`/v1/*` LLM 网关（nginx 反代，已为 SSE 关缓冲放宽超时）。
 
 发布镜像（需先 `HTTPS_PROXY=http://127.0.0.1:7890 docker login`；直连 auth.docker.io 被墙，必须走代理）：
 
@@ -48,11 +50,7 @@ compose 默认只用 `image:`（远程镜像），不触发本地构建；要本
 # 构建并推送多架构镜像（amd64 + arm64）
 HTTPS_PROXY=http://127.0.0.1:7890 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -f Dockerfile -t lijx559/portunus-backend:latest --push .
-
-HTTPS_PROXY=http://127.0.0.1:7890 docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -f web/Dockerfile -t lijx559/portunus-web:latest --push web/
+  -f Dockerfile -t lijx559/portunus:latest --push .
 ```
 
 推送后 `docker compose pull && docker compose up -d` 更新本地。
