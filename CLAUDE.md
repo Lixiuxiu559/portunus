@@ -53,9 +53,11 @@ HTTPS_PROXY=http://127.0.0.1:7890 docker buildx build \
   -f Dockerfile -t lijx559/portunus:latest --push .
 ```
 
-推送后 `docker compose pull && docker compose up -d` 更新本地。
+推送后 `HTTPS_PROXY=http://127.0.0.1:7890 docker compose pull && docker compose up -d` 更新本地。
 
 注意：macOS 系统代理（如未启动的 clash 127.0.0.1:7890）会被自动注入为 build-arg 且 ENV 无法覆盖，Dockerfile 已在各联网 RUN 前 unset 处理；基础镜像默认走 DaoCloud 国内加速（`--build-arg BASE_REGISTRY=library` 切回官方源）。
+
+代理约定：`~/.docker/config.json` 已删除 `proxies` 段，Docker CLI 默认**不再自动走代理**（也避免把 `127.0.0.1:7890` 注入容器导致上游调用 connection refused）。因此所有访问 Docker Hub 的命令（`docker login` / `docker pull` / `docker compose pull` / `docker buildx push` 等）都需手动加 `HTTPS_PROXY=http://127.0.0.1:7890` 前缀；纯本地操作（`docker compose up -d` 启动已缓存镜像、`docker build` 本地构建）无需代理。原配置备份在 `~/.docker/config.json.bak`。
 
 ## 架构
 

@@ -19,6 +19,15 @@ services:
     image: lijx559/portunus:latest
     container_name: portunus
     restart: unless-stopped
+    environment:
+      # 清空 Docker CLI 从 ~/.docker/config.json 自动注入的宿主代理
+      # （容器内 127.0.0.1:7890 不可达，会导致所有上游调用失败）
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      ALL_PROXY: ''
+      all_proxy: ''
     ports:
       - '3060:80'
     volumes:
