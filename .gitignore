@@ -4,6 +4,7 @@
 .cursorrules
 .github/copilot-instructions.md
 .mcp.json
+.claude/settings.local.json
 
 # 运行时数据（本地数据库、配置）
 data/
