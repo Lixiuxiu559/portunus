@@ -231,7 +231,7 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		})
 	}
 	if req.ToolChoice != nil {
-		out.ToolChoice = req.ToolChoice
+		out.ToolChoice = anthropicToolChoiceToOpenAI(req.ToolChoice)
 	}
 	return out, nil
 }
@@ -324,6 +324,54 @@ func anthropicToolResultToContent(c any) any {
 	return ""
 }
 
+// anthropicToolChoiceToOpenAI 将 Anthropic tool_choice 映射为 OpenAI tool_choice。
+// Anthropic 用 {type:auto|any|tool|none}，OpenAI 用 "auto"|"none"|"required" 或
+// {type:function,function:{name}}。若不映射直接透传 {type:auto}，OpenAI 兼容上游
+// （Rust serde）会报 "tool_choice: field `type`: unknown variant `auto`, expected `function`"。
+func anthropicToolChoiceToOpenAI(choice any) any {
+	m, ok := choice.(map[string]any)
+	if !ok {
+		return choice
+	}
+	switch m["type"] {
+	case "auto":
+		return "auto"
+	case "any":
+		return "required"
+	case "none":
+		return "none"
+	case "tool":
+		name, _ := m["name"].(string)
+		return map[string]any{"type": "function", "function": map[string]any{"name": name}}
+	}
+	return choice
+}
+
+// openAIToolChoiceToAnthropic 将 OpenAI tool_choice 映射为 Anthropic tool_choice。
+// OpenAI 用 "auto"|"none"|"required" 或 {type:function,function:{name}}，
+// Anthropic 用 {type:auto|any|tool|none}。
+func openAIToolChoiceToAnthropic(choice any) any {
+	switch v := choice.(type) {
+	case string:
+		switch v {
+		case "none":
+			return map[string]any{"type": "none"}
+		case "required":
+			return map[string]any{"type": "any"}
+		case "auto":
+			return map[string]any{"type": "auto"}
+		}
+	case map[string]any:
+		if v["type"] == "function" {
+			if fn, ok := v["function"].(map[string]any); ok {
+				name, _ := fn["name"].(string)
+				return map[string]any{"type": "tool", "name": name}
+			}
+		}
+	}
+	return choice
+}
+
 // ===== 请求：openai → anthropic =====
 
 // anthropicRequestFromOpenAI 将 OpenAI 规范请求转为 Anthropic 请求体。
@@ -389,7 +437,7 @@ func anthropicRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		})
 	}
 	if req.ToolChoice != nil {
-		out.ToolChoice = req.ToolChoice
+		out.ToolChoice = openAIToolChoiceToAnthropic(req.ToolChoice)
 	}
 	return json.Marshal(out)
 }

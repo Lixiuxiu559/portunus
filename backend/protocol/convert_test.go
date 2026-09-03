@@ -655,3 +655,68 @@ func TestConvertResponseIdentity(t *testing.T) {
 		t.Errorf("恒等路径应原样返回")
 	}
 }
+
+// TestConvertRequestAnthropicToOpenAIToolChoice 断言 Anthropic tool_choice 对象
+// 被正确映射为 OpenAI tool_choice（字符串或 {type:function}），而不是原样透传
+// {type:auto}——否则 OpenAI 兼容上游（Rust serde）会报
+// "tool_choice: field `type`: unknown variant `auto`, expected `function`" 的 400。
+func TestConvertRequestAnthropicToOpenAIToolChoice(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string // 请求里的 tool_choice 值
+		want any    // 期望转换后的 tool_choice
+	}{
+		{"auto", `{"type":"auto"}`, "auto"},
+		{"any", `{"type":"any"}`, "required"},
+		{"none", `{"type":"none"}`, "none"},
+		{"tool", `{"type":"tool","name":"get_weather"}`, map[string]any{"type": "function", "function": map[string]any{"name": "get_weather"}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			in := `{"model":"m","max_tokens":100,"messages":[{"role":"user","content":"hi"}],"tool_choice":` + c.in + `}`
+			out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+			if err != nil {
+				t.Fatalf("转换失败: %v", err)
+			}
+			m := unmarshalAny(t, out)
+			assertJSONEqual(t, m["tool_choice"], c.want)
+		})
+	}
+}
+
+// TestConvertRequestOpenAIToAnthropicToolChoice 断言 OpenAI tool_choice
+// （字符串或 {type:function}）被正确映射为 Anthropic tool_choice 对象，
+// 而不是原样透传——Anthropic 上游不认 "auto" 字符串或 {type:function}。
+func TestConvertRequestOpenAIToAnthropicToolChoice(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want any
+	}{
+		{"auto", `"auto"`, map[string]any{"type": "auto"}},
+		{"required", `"required"`, map[string]any{"type": "any"}},
+		{"none", `"none"`, map[string]any{"type": "none"}},
+		{"function", `{"type":"function","function":{"name":"get_weather"}}`, map[string]any{"type": "tool", "name": "get_weather"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			in := `{"model":"m","messages":[{"role":"user","content":"hi"}],"tool_choice":` + c.in + `}`
+			out, err := ConvertRequest(ProviderOpenAI, ProviderAnthropic, []byte(in))
+			if err != nil {
+				t.Fatalf("转换失败: %v", err)
+			}
+			m := unmarshalAny(t, out)
+			assertJSONEqual(t, m["tool_choice"], c.want)
+		})
+	}
+}
+
+// assertJSONEqual 把两个值都 JSON 序列化后比较，屏蔽 map 键序差异。
+func assertJSONEqual(t *testing.T, got, want any) {
+	t.Helper()
+	gotJSON, _ := json.Marshal(got)
+	wantJSON, _ := json.Marshal(want)
+	if string(gotJSON) != string(wantJSON) {
+		t.Errorf("不匹配:\n got  %s\n want %s", gotJSON, wantJSON)
+	}
+}
