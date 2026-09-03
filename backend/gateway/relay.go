@@ -129,8 +129,13 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
+	var first time.Time // 流式首包写出时刻，非流式 / 首包前失败为零值
 	defer func() {
-		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds())
+		firstTokenMs := int64(0)
+		if !first.IsZero() {
+			firstTokenMs = first.Sub(start).Milliseconds()
+		}
+		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds(), firstTokenMs)
 		if success {
 			breakerRecord(t.Channel.ID, false)
 		} else if err != nil && isRetryable(err) {
@@ -185,7 +190,9 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 				es.SetEstimateInputTokens(protocol.EstimateRequestTokens(clientProto, reqBody))
 			}
 		}
-		if streamErr := relayStream(c, clientProto, resp, conv); streamErr != nil {
+		var streamErr error
+		first, streamErr = relayStream(c, clientProto, resp, conv)
+		if streamErr != nil {
 			var committed *streamCommittedError
 			if errors.As(streamErr, &committed) {
 				// 已提交，无法 failover；记为失败但不再报错

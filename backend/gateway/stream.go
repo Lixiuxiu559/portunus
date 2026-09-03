@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,7 +22,8 @@ func (e *streamCommittedError) Unwrap() error { return e.err }
 // relayStream 把上游流式响应逐 chunk 转成客户端协议并 SSE 写回。
 // 提交 200 头被推迟到成功转换出首个有效事件之后，因此「首包前」的失败仍可返回错误触发重试 / failover；
 // 「首包后」的失败（静默断连 / 中途转换错误）返回 streamCommittedError，仅中断流、不再换家。
-func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *http.Response, conv protocol.StreamConverter) error {
+// 返回 first 为首个有效事件写出时刻（首包前失败或未产出事件时为零值），供上层计算客户端 TTFT。
+func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *http.Response, conv protocol.StreamConverter) (first time.Time, err error) {
 	scanner := bufio.NewScanner(upstreamResp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 放大缓冲，避免长行截断
 
@@ -36,9 +38,10 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		}
 		chunks, err := conv.Convert([]byte(payload))
 		if err != nil {
-			return wrapStreamErr(committed, err)
+			return first, wrapStreamErr(committed, err)
 		}
 		if !committed {
+			first = time.Now()
 			writeStreamHeaders(c)
 			committed = true
 		}
@@ -48,15 +51,16 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		c.Writer.Flush()
 	}
 	if err := scanner.Err(); err != nil {
-		return wrapStreamErr(committed, err)
+		return first, wrapStreamErr(committed, err)
 	}
 
 	finals, err := conv.Finish()
 	if err != nil {
-		return wrapStreamErr(committed, err)
+		return first, wrapStreamErr(committed, err)
 	}
 	if !committed {
 		// 上游 200 但未产出有效事件（如空流）：提交头后再收尾，交给客户端结束。
+		// 未产出任何 token，first 保持零值（无首包语义），与「未产出事件时为零值」的注释约定一致。
 		writeStreamHeaders(c)
 		committed = true
 	}
@@ -68,7 +72,7 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		c.Writer.WriteString("data: [DONE]\n\n")
 	}
 	c.Writer.Flush()
-	return nil
+	return first, nil
 }
 
 // wrapStreamErr 把错误包装为普通错误（首包前，可 failover）或 streamCommittedError（首包后，不可 failover）。

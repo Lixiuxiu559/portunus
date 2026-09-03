@@ -10,15 +10,16 @@ import (
 
 // logCall 写一条调用日志。
 // 暂为同步写入（单条 SQLite insert 开销极小）；后续若成为瓶颈可改为队列异步落库。
-func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success bool, usage *protocol.Usage, durationMs int64) {
+func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success bool, usage *protocol.Usage, durationMs, firstTokenMs int64) {
 	entry := shared.Log{
-		APIKeyID:   apiKeyID,
-		GroupName:  g.Name,
-		ChannelID:  t.Channel.ID,
-		ModelName:  t.Model.Name,
-		Status:     status,
-		Success:    success,
-		DurationMs: durationMs,
+		APIKeyID:     apiKeyID,
+		GroupName:    g.Name,
+		ChannelID:    t.Channel.ID,
+		ModelName:    t.Model.Name,
+		Status:       status,
+		Success:      success,
+		DurationMs:   durationMs,
+		FirstTokenMs: firstTokenMs,
 	}
 	if usage != nil {
 		entry.InputToken = int64(usage.PromptTokens)

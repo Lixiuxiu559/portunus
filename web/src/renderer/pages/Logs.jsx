@@ -123,6 +123,24 @@ export default function Logs() {
       ),
     },
     {
+      title: '耗时',
+      dataIndex: 'duration_ms',
+      key: 'duration_ms',
+      width: '90px',
+      render: (val) => (
+        <span className="text-left font-mono block">{formatMs(val)}</span>
+      ),
+    },
+    {
+      title: '首包',
+      dataIndex: 'first_token_ms',
+      key: 'first_token_ms',
+      width: '90px',
+      render: (val) => (
+        <span className="text-left font-mono block">{formatMs(val)}</span>
+      ),
+    },
+    {
       title: '状态',
       dataIndex: 'success',
       key: 'success',
@@ -301,4 +319,10 @@ function formatNum(n) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
   return String(n);
+}
+
+function formatMs(ms) {
+  if (ms == null || ms <= 0) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }

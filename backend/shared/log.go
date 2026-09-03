@@ -21,6 +21,7 @@ type Log struct {
 	CacheWriteToken int64     `json:"cache_write_token"`
 	Cost            float64   `json:"cost"`
 	DurationMs      int64     `json:"duration_ms"`
+	FirstTokenMs    int64     `json:"first_token_ms"` // 流式首包耗时（客户端 TTFT），非流式为 0
 	CreatedAt       time.Time `gorm:"index" json:"created_at"`
 }
 
