@@ -195,7 +195,9 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if streamErr != nil {
 			var committed *streamCommittedError
 			if errors.As(streamErr, &committed) {
-				// 已提交，无法 failover；记为失败但不再报错
+				// 已提交，无法 failover；记为失败但不再报错。
+				// 已交付的部分流量仍可能累积了 usage，一并落库，避免费用漏记。
+				usage = conv.Usage()
 				return nil, status, nil
 			}
 			// 首包前失败，可重试 / 换家
