@@ -245,6 +245,28 @@ func TestRelayCircuitSkipsOpenModel(t *testing.T) {
 	if got := atomic.LoadInt32(&calls); got != 0 {
 		t.Errorf("开路模型不应再调用上游，实际调用 %d 次", got)
 	}
+
+	// 503 必须落库（err_kind=circuit_open）：此前只写 stdout，管理端日志页零痕迹，
+	// 用户报障只能登服务器翻容器日志。
+	var entry shared.Log
+	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
+		t.Fatalf("查日志失败: %v", err)
+	}
+	if entry.Success {
+		t.Fatalf("503 落库应为失败记录")
+	}
+	if entry.Status != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", entry.Status)
+	}
+	if entry.ErrKind != "circuit_open" {
+		t.Errorf("err_kind = %q, want circuit_open", entry.ErrKind)
+	}
+	if entry.GroupName != "my-model" {
+		t.Errorf("group_name = %q, want my-model", entry.GroupName)
+	}
+	if !strings.Contains(entry.ErrMsg, "熔断") {
+		t.Errorf("err_msg 应包含被跳过目标的熔断详情: %q", entry.ErrMsg)
+	}
 }
 
 // TestRelayCircuitIsolatedPerModel 锁定模型级熔断粒度：同一渠道上一个模型连续失败

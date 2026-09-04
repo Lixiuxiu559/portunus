@@ -312,8 +312,15 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 	}
 
 	if len(toolResults) > 0 {
-		if len(toolImages) > 0 {
-			toolResults = append(toolResults, ChatMessage{Role: "user", Content: toolImages})
+		// tool_result 与其他内容块混排：Anthropic 允许 tool_result 后跟 text/image，
+		// 拆出的 tool 消息之外，剩余文本与图片（含 tool_result 内的图）拼成一条
+		// user 消息补在末尾，不随提前 return 整体丢弃。
+		if hasImage || len(toolImages) > 0 {
+			parts := contentParts
+			parts = append(parts, toolImages...)
+			toolResults = append(toolResults, ChatMessage{Role: m.Role, Content: parts})
+		} else if len(textParts) > 0 {
+			toolResults = append(toolResults, ChatMessage{Role: m.Role, Content: strings.Join(textParts, "")})
 		}
 		return toolResults
 	}
@@ -332,13 +339,16 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 
 // imageSourceToContentPart 把 Anthropic image 块的 source 转为 OpenAI image_url
 // 内容块：base64 源拼成 data URI（media_type 缺省按 png），url 源直接透传。
-// 无法识别的源返回 nil（跳过该块）。
+// 无法识别的源（base64 缺 data、url 为空）返回 nil（跳过该块）。
 func imageSourceToContentPart(src *ImageSource) map[string]any {
 	if src == nil {
 		return nil
 	}
 	url := src.URL
 	if src.Type == "base64" {
+		if src.Data == "" {
+			return nil // 空 data 只会拼出空载荷 data URI，发给上游必被拒
+		}
 		media := src.MediaType
 		if media == "" {
 			media = "image/png"
@@ -352,21 +362,19 @@ func imageSourceToContentPart(src *ImageSource) map[string]any {
 }
 
 // imageSourceFromAny 把 tool_result content 里未经类型化的 image source
-// （解析后的 map[string]any）还原为 ImageSource。
+// （解析后的 map[string]any）还原为 ImageSource。逐字段类型断言，避免对可能
+// 含多 MB base64 载荷的 map 做整串 marshal/unmarshal 往返（每图约 3 倍瞬态分配）。
 func imageSourceFromAny(v any) *ImageSource {
 	m, ok := v.(map[string]any)
 	if !ok {
 		return nil
 	}
-	b, err := json.Marshal(m)
-	if err != nil {
-		return nil
-	}
-	var src ImageSource
-	if err := json.Unmarshal(b, &src); err != nil {
-		return nil
-	}
-	return &src
+	src := &ImageSource{}
+	src.Type, _ = m["type"].(string)
+	src.MediaType, _ = m["media_type"].(string)
+	src.Data, _ = m["data"].(string)
+	src.URL, _ = m["url"].(string)
+	return src
 }
 
 // anthropicToolResultText 提取 tool_result content 的纯文本（OpenAI tool 消息

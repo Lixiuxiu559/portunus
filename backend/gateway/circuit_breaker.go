@@ -18,7 +18,10 @@ const (
 // circuitBreaker 是单个模型的进程内熔断状态，按连续失败 / 成功计数。
 // 粒度是模型而非渠道：中转上游常是个别模型路由故障（假流 / 超时），
 // 渠道级熔断会把同渠道的无关模型一起冤枉掉，单渠道分组更是直接全灭 503。
+// 字段由 mu 保护：sync.Map 只管键的增删，同一模型被多分组并发请求时
+// state / 计数 / openedAt 的读写必须互斥，否则计数漂移、多字撕裂读。
 type circuitBreaker struct {
+	mu                 sync.Mutex
 	state              circuitState
 	consecutiveFailure int
 	consecutiveSuccess int
@@ -35,6 +38,8 @@ var breakers = &sync.Map{} // int64(modelID) -> *circuitBreaker
 func breakerAllow(modelID int64) (bool, string) {
 	v, _ := breakers.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
 	b := v.(*circuitBreaker)
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	switch b.state {
 	case stateClosed, stateHalfOpen:
 		return true, ""
@@ -56,6 +61,8 @@ func breakerAllow(modelID int64) (bool, string) {
 func breakerRecord(modelID int64, retryableFailure bool) {
 	v, _ := breakers.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
 	b := v.(*circuitBreaker)
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	if retryableFailure {
 		b.consecutiveSuccess = 0

@@ -22,6 +22,7 @@ const (
 	errKindConvert         = "convert_error"      // 协议转换 / 请求改写失败
 	errKindNetwork         = "network"            // 连接 / 超时等网络层失败
 	errKindInternal        = "internal"           // 其余未归类失败
+	errKindCircuitOpen     = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
 )
 
 // logCall 写一条调用日志。callErr 非 nil 时把失败归因（类别 + 截断原文）一并落库，
@@ -84,21 +85,39 @@ func classifyErr(err error) string {
 	}
 }
 
-// truncateErr 把错误信息截断到不超过 max 字节（含 3 字节省略号，多字节字符
-// 不被切半），短于上限的原文原样保留。
+// truncateErr 把错误信息截断到不超过 max 字节（含 3 字节省略号，末尾不落在
+// 多字节字符中间），短于上限的原文原样保留。只保证边界完整，不要求整串
+// 合法 UTF-8——中部坏字节原样保留（garbage in, garbage out），不从首个坏
+// 字节起整段丢弃。
 func truncateErr(s string, max int) string {
+	const ellipsis = "…"
+	if max <= 0 {
+		return ""
+	}
 	if len(s) <= max {
 		return s
 	}
-	const ellipsis = "…"
-	cut := s[:max-len(ellipsis)] // 预留省略号空间，保证总长不超 max
-	for len(cut) > 0 && !utf8.ValidString(cut) {
-		cut = cut[:len(cut)-1] // 尾部切在多字节字符中间，回退到合法边界
+	cut := s[:max]
+	withEllipsis := false
+	if max > len(ellipsis) {
+		cut = s[:max-len(ellipsis)] // 预留省略号空间，保证总长不超 max
+		withEllipsis = true
+	}
+	// 末尾回退到完整 rune 边界（多字节序列最长 4 字节，最多回退 3 次）
+	for i := 0; i < 3 && len(cut) > 0; i++ {
+		r, size := utf8.DecodeLastRuneInString(cut)
+		if r != utf8.RuneError || size > 1 {
+			break // 末尾已是完整 rune（含合法的 U+FFFD）
+		}
+		cut = cut[:len(cut)-1]
 	}
 	if len(cut) == 0 {
 		return ""
 	}
-	return cut + ellipsis
+	if withEllipsis {
+		return cut + ellipsis
+	}
+	return cut
 }
 
 // computeCost 按四维价格计算一次调用费用（价格单位：每 1M token）。

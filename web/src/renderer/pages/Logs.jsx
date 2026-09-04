@@ -23,6 +23,7 @@ const errKindLabels = {
   convert_error: '转换失败',
   network: '网络错误',
   internal: '内部错误',
+  circuit_open: '熔断开路',
 };
 
 export default function Logs() {

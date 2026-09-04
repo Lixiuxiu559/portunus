@@ -116,6 +116,35 @@ func TestTruncateErrUtf8Safe(t *testing.T) {
 	}
 }
 
+// TestTruncateErrMidStringInvalidBytes 错误原文中部含非法 UTF-8 字节时，
+// 只需保证末尾不切半多字节字符，前部内容（含坏字节）不应被整段丢弃。
+// 此前用 utf8.ValidString(整串) 判定，从首个坏字节起全部丢失。
+func TestTruncateErrMidStringInvalidBytes(t *testing.T) {
+	s := "abc\xff" + strings.Repeat("x", 300) // 第 4 字节非法，共 304 字节
+	out := truncateErr(s, 256)
+	if len(out) > 256 {
+		t.Errorf("截断后长度 %d 超限", len(out))
+	}
+	if !strings.HasPrefix(out, "abc\xff") {
+		t.Errorf("前部内容不应丢失: %q", out[:8])
+	}
+	// 末尾必须是完整 rune 边界（ASCII x 恒完整，这里主要锁不 panic、不早丢）
+	if !strings.HasSuffix(out, "…") {
+		t.Errorf("截断结果应以省略号结尾: %q", out[len(out)-8:])
+	}
+}
+
+// TestTruncateErrTinyMax 上限极小（放不下省略号）时不应 panic（此前 s[:max-3] 负下标越界）。
+func TestTruncateErrTinyMax(t *testing.T) {
+	long := strings.Repeat("x", 100)
+	for _, max := range []int{0, 1, 2, 3} {
+		out := truncateErr(long, max) // 不应 panic
+		if len(out) > max {
+			t.Errorf("max=%d 时输出长度 %d 超限", max, len(out))
+		}
+	}
+}
+
 func TestComputeCost(t *testing.T) {
 	m := model.Model{InputPrice: 2.5, OutputPrice: 10, CacheReadPrice: 1.25, CacheWritePrice: 2.5}
 

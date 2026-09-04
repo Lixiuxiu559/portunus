@@ -754,6 +754,106 @@ func TestConvertRequestOpenAIToAnthropicToolChoice(t *testing.T) {
 	}
 }
 
+// TestConvertRequestAnthropicToOpenAIMixedToolResultAndText 断言 tool_result 与
+// text/image 块混排的消息：拆出的 tool 消息之外，剩余文本与图片拼成一条 user 消息
+// 补在末尾。此前 len(toolResults)>0 提前 return，用户指令与图片被整体静默丢弃。
+func TestConvertRequestAnthropicToOpenAIMixedToolResultAndText(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [
+			{"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "f", "input": {}}]},
+			{"role": "user", "content": [
+				{"type": "tool_result", "tool_use_id": "c1", "content": "sunny"},
+				{"type": "text", "text": "请用中文回答"},
+				{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "eHg="}}
+			]}
+		]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	// assistant(tool_use) + tool + user(text+image) = 3
+	if len(msgs) != 3 {
+		t.Fatalf("消息数不匹配: %d, 输出: %s", len(msgs), out)
+	}
+	tool := msgs[1].(map[string]any)
+	if tool["role"] != "tool" || tool["content"] != "sunny" {
+		t.Errorf("tool 消息不匹配: %v", tool)
+	}
+	user := msgs[2].(map[string]any)
+	if user["role"] != "user" {
+		t.Fatalf("第三条应为承接剩余内容的 user 消息: %v", user)
+	}
+	content, ok := user["content"].([]any)
+	if !ok {
+		t.Fatalf("混排消息剩余内容应为数组，实际: %v", user["content"])
+	}
+	if len(content) != 2 {
+		t.Fatalf("剩余内容块数不匹配: %d", len(content))
+	}
+	assertJSONEqual(t, content[0], map[string]any{"type": "text", "text": "请用中文回答"})
+	assertJSONEqual(t, content[1], map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": "data:image/png;base64,eHg="},
+	})
+
+	// tool_result + 纯文本（无图）：剩余文本以字符串形态补一条 user 消息
+	inTextOnly := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [
+			{"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "f", "input": {}}]},
+			{"role": "user", "content": [
+				{"type": "tool_result", "tool_use_id": "c1", "content": "sunny"},
+				{"type": "text", "text": "请用中文回答"}
+			]}
+		]
+	}`
+	out2, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(inTextOnly))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m2 := unmarshalAny(t, out2)
+	msgs2 := sliceAt(t, m2, "messages")
+	if len(msgs2) != 3 {
+		t.Fatalf("消息数不匹配: %d", len(msgs2))
+	}
+	user2 := msgs2[2].(map[string]any)
+	if user2["role"] != "user" || user2["content"] != "请用中文回答" {
+		t.Errorf("剩余文本应为字符串形态的 user 消息: %v", user2)
+	}
+}
+
+// TestConvertRequestAnthropicToOpenAIEmptyBase64Skipped 断言 base64 源缺 data 的
+// image 块被跳过（不拼出空载荷 data URI），消息退化为纯文本。
+func TestConvertRequestAnthropicToOpenAIEmptyBase64Skipped(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [{
+			"role": "user",
+			"content": [
+				{"type": "text", "text": "看图"},
+				{"type": "image", "source": {"type": "base64", "media_type": "image/png"}}
+			]
+		}]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	user := msgs[0].(map[string]any)
+	if user["content"] != "看图" {
+		t.Errorf("空 data 的图片块应被跳过，content 退化为纯文本，实际: %v", user["content"])
+	}
+}
+
 // assertJSONEqual 把两个值都 JSON 序列化后比较，屏蔽 map 键序差异。
 func assertJSONEqual(t *testing.T, got, want any) {
 	t.Helper()

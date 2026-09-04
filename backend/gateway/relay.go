@@ -17,6 +17,7 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/router"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // relayMeta 是三种客户端协议请求体的最小公共字段。
@@ -31,7 +32,11 @@ type upstreamStatusError struct {
 	body   []byte
 }
 
-func (e *upstreamStatusError) Error() string { return "上游返回非 2xx 状态码" }
+func (e *upstreamStatusError) Error() string {
+	// err_msg 会落库：带上状态码与响应体片段，否则最高频的 upstream_error
+	// 类失败全是同一句无信息量文案，无法区分限流与上游内部错误。
+	return fmt.Sprintf("上游返回 %d: %s", e.status, truncateErr(string(e.body), 200))
+}
 
 // convertError 标记请求 / 响应协议转换阶段的失败（客户端请求体或渠道配置问题），
 // 与上游 / 网络故障区分开，供日志归因与排障。
@@ -131,8 +136,18 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		}
 
 		if !anyAttempted {
-			// 503 的唯一出口必须留痕：此前零日志，排查只能靠毫秒耗时反推是熔断。
-			log.Printf("relay 拒绝: model=%s 所有目标不可用: %s", meta.Model, strings.Join(skipped, "; "))
+			// 503 的唯一出口必须留痕：stdout + 日志库（err_kind=circuit_open）。
+			// 此前只写 stdout，管理端日志页零痕迹，用户报障只能登服务器翻容器日志。
+			detail := "所有目标熔断开路: " + strings.Join(skipped, "; ")
+			log.Printf("relay 拒绝: model=%s %s", meta.Model, detail)
+			shared.LogDB.Create(&shared.Log{
+				APIKeyID:  apiKeyID,
+				GroupName: g.Name,
+				Status:    http.StatusServiceUnavailable,
+				Success:   false,
+				ErrKind:   errKindCircuitOpen,
+				ErrMsg:    truncateErr(detail, 256),
+			})
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "所有渠道暂不可用"})
 			return
 		}
@@ -150,6 +165,11 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			}
 		}
 		log.Printf("relay 失败: model=%s err=%v", meta.Model, lastErr)
+		if len(skipped) > 0 {
+			// 部分目标被熔断跳过、其余失败：跳过明细一并留痕，否则无从得知
+			// failover 候选实际少了谁。
+			log.Printf("relay 失败: 另有 %d 个目标被熔断跳过: %s", len(skipped), strings.Join(skipped, "; "))
+		}
 		c.JSON(status, gin.H{"error": "上游调用失败"})
 	}
 }
@@ -249,7 +269,10 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 				// 已提交，无法 failover；记为失败但不再报错。
 				// 已交付的部分流量仍可能累积了 usage，一并落库，避免费用漏记。
 				usage = conv.Usage()
-				failReason = committed.err
+				// 存包装体而非解包的内层错误：classifyErr 靠 errors.As 命中
+				// streamCommittedError 才能归为 stream_interrupted，存内层会让
+				// 该类别在生产路径不可达（Unwrap 已保证取消仍归 client_cancel）。
+				failReason = committed
 				// 除客户端主动断开外，半途失败仍是模型不健康（假流 / 静默超时 / 断连），
 				// 计入熔断：committed 分支 err 为 nil，不走下方 defer 的熔断记录，
 				// 不补记的话持续假死的模型永远开不了路，后续请求继续撞墙干等。
