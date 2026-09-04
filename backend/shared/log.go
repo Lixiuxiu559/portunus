@@ -21,7 +21,9 @@ type Log struct {
 	CacheWriteToken int64     `json:"cache_write_token"`
 	Cost            float64   `json:"cost"`
 	DurationMs      int64     `json:"duration_ms"`
-	FirstTokenMs    int64     `json:"first_token_ms"` // 流式首包耗时（客户端 TTFT），非流式为 0
+	FirstTokenMs    int64     `json:"first_token_ms"`                  // 流式首包耗时（客户端 TTFT），非流式为 0
+	ErrKind         string    `gorm:"index" json:"err_kind,omitempty"` // 失败类别（见 gateway.classifyErr），成功为空
+	ErrMsg          string    `json:"err_msg,omitempty"`               // 失败原文（截断），成功为空
 	CreatedAt       time.Time `gorm:"index" json:"created_at"`
 }
 

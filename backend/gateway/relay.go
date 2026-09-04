@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +33,13 @@ type upstreamStatusError struct {
 
 func (e *upstreamStatusError) Error() string { return "上游返回非 2xx 状态码" }
 
+// convertError 标记请求 / 响应协议转换阶段的失败（客户端请求体或渠道配置问题），
+// 与上游 / 网络故障区分开，供日志归因与排障。
+type convertError struct{ err error }
+
+func (e *convertError) Error() string { return e.err.Error() }
+func (e *convertError) Unwrap() error { return e.err }
+
 // isRetryable 判断某次失败是否值得对同一 / 下一上游重试：
 // 首包前静默超时、5xx 与 429、网络 / 超时错误重试，其余（流已提交、4xx、协议转换、配置）不重试。
 func isRetryable(err error) bool {
@@ -44,7 +53,7 @@ func isRetryable(err error) bool {
 	// 客户端主动取消（context.Canceled）不是上游故障，不重试也不计入熔断。
 	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
 	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度，
-	// 连续几次便使整个渠道熔断开路，导致后续所有请求 503。
+	// 连续几次便使该模型熔断开路，导致所有请求 503。
 	if errors.Is(err, context.Canceled) {
 		return false
 	}
@@ -66,7 +75,7 @@ func isRetryable(err error) bool {
 
 // handleRelay 返回一个 relay handler，客户端协议由 clientProto 固定。
 // 按分组策略遍历目标（外层），每个目标失败后按配置先重试 N 次（内层），
-// 耗尽才换下一个目标；熔断开路的渠道会被跳过。
+// 耗尽才换下一个目标；熔断开路的模型会被跳过。
 func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		body, err := io.ReadAll(c.Request.Body)
@@ -97,9 +106,11 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 
 		var lastErr error
 		anyAttempted := false
+		var skipped []string // 被熔断挡掉的目标描述，全跳过时用于日志
 		for _, t := range targets {
-			if !breakerAllow(t.Channel.ID) {
-				continue // 熔断开路，跳过该渠道
+			if allow, reason := breakerAllow(t.Model.ID); !allow {
+				skipped = append(skipped, fmt.Sprintf("%s(id=%d) %s", t.Model.Name, t.Model.ID, reason))
+				continue // 熔断开路，跳过该模型
 			}
 			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
 				anyAttempted = true
@@ -120,6 +131,8 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		}
 
 		if !anyAttempted {
+			// 503 的唯一出口必须留痕：此前零日志，排查只能靠毫秒耗时反推是熔断。
+			log.Printf("relay 拒绝: model=%s 所有目标不可用: %s", meta.Model, strings.Join(skipped, "; "))
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "所有渠道暂不可用"})
 			return
 		}
@@ -148,28 +161,39 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
-	var first time.Time // 流式首包写出时刻，非流式 / 首包前失败为零值
+	var first time.Time  // 流式首包写出时刻，非流式 / 首包前失败为零值
+	var failReason error // committed 分支对外返回 nil 错误，真实失败原因暂存于此供日志归因
 	defer func() {
 		firstTokenMs := int64(0)
 		if !first.IsZero() {
 			firstTokenMs = first.Sub(start).Milliseconds()
 		}
-		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds(), firstTokenMs)
+		logErr := err
+		if logErr == nil {
+			logErr = failReason
+		}
+		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds(), firstTokenMs, logErr)
+		if !success {
+			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
+			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
+			log.Printf("relay 尝试失败: group=%s model=%s channel=%s kind=%s err=%v",
+				g.Name, t.Model.Name, t.Channel.Name, classifyErr(logErr), logErr)
+		}
 		if success {
-			breakerRecord(t.Channel.ID, false)
+			breakerRecord(t.Model.ID, false)
 		} else if err != nil && isRetryable(err) {
-			breakerRecord(t.Channel.ID, true)
+			breakerRecord(t.Model.ID, true)
 		}
 	}()
 
 	reqBody, err := rewriteModel(originalBody, t.Model.Name)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, &convertError{err}
 	}
 
 	upBody, err := protocol.ConvertRequest(clientProto, t.Channel.Type, reqBody)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, &convertError{err}
 	}
 
 	upstream, err := protocol.NewUpstream(t.Channel.Type, t.Channel.BaseURL, t.Channel.Key)
@@ -208,7 +232,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	if stream {
 		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto)
 		if convErr != nil {
-			return nil, status, convErr
+			return nil, status, &convertError{convErr}
 		}
 		// 客户端是 Anthropic 时，message_start 需要 input_tokens 才能显示上下文占用；
 		// 上游流式可能不返回 usage，先按客户端原始请求体估一个值兜底。
@@ -225,12 +249,13 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 				// 已提交，无法 failover；记为失败但不再报错。
 				// 已交付的部分流量仍可能累积了 usage，一并落库，避免费用漏记。
 				usage = conv.Usage()
-				// 除客户端主动断开外，半途失败仍是渠道不健康（假流 / 静默超时 / 断连），
+				failReason = committed.err
+				// 除客户端主动断开外，半途失败仍是模型不健康（假流 / 静默超时 / 断连），
 				// 计入熔断：committed 分支 err 为 nil，不走下方 defer 的熔断记录，
-				// 不补记的话持续假死的渠道永远开不了路，后续请求继续撞墙干等。
+				// 不补记的话持续假死的模型永远开不了路，后续请求继续撞墙干等。
+				// 失败明细由 defer 的「relay 尝试失败」统一留痕（kind=stream_interrupted）。
 				if !errors.Is(committed.err, context.Canceled) {
-					log.Printf("流已提交后中断: model=%s err=%v", t.Model.Name, committed.err)
-					breakerRecord(t.Channel.ID, true)
+					breakerRecord(t.Model.ID, true)
 				}
 				return nil, status, nil
 			}
@@ -246,7 +271,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		usage = protocol.UsageFromResponse(t.Channel.Type, upRespBody)
 		out, err = protocol.ConvertResponse(t.Channel.Type, clientProto, upRespBody)
 		if err != nil {
-			return nil, status, err
+			return nil, status, &convertError{err}
 		}
 	}
 
