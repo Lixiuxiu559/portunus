@@ -121,7 +121,7 @@ export default function Groups() {
           暂无分组，点击右上角「新增分组」创建
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (

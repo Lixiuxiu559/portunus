@@ -213,6 +213,18 @@ html.dark .bg-decor .mask {
 }
 
 /*
+ * 无滚动条：隐藏滚动条视觉，但保留滚动能力（滚轮/触控板仍可用）。
+ * 分组卡片区希望干净外观、又需内容可滚动时使用。
+ */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chromium / Electron */
+}
+
+/*
  * 表格（DataTable）表头圆角修正：
  * HeroUI Table secondary 变体给表头列(surface-secondary 实色)设置了独立圆角，
  * 当它与外层 rounded-2xl 圆角容器叠加时，圆角半径不一致会在左上/左下角
