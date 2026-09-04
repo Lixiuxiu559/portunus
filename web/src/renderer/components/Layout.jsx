@@ -30,12 +30,12 @@ export default function Layout() {
           <img src={logo} alt="Portunus" className="h-10 w-auto pointer-events-none" />
           <div style={{ WebkitAppRegion: 'no-drag' }}>
             <Tabs
-              className="w-fit"
+              className="w-fit whitespace-nowrap"
               selectedKey={currentTab}
               onSelectionChange={handleTabChange}
             >
               <Tabs.ListContainer>
-                <Tabs.List aria-label="导航">
+                <Tabs.List aria-label="导航" className="flex-nowrap">
                   {tabs.map((tab) => (
                     <Tabs.Tab id={tab.id} key={tab.id}>
                       {tab.label}
