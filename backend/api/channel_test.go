@@ -50,8 +50,8 @@ func TestDeleteChannelCascades(t *testing.T) {
 	if err := shared.DB.Create(&ch).Error; err != nil {
 		t.Fatalf("建渠道失败: %v", err)
 	}
-	m1 := model.Model{ChannelID: ch.ID, Name: "m1", Enabled: true}
-	m2 := model.Model{ChannelID: ch.ID, Name: "m2", Enabled: true}
+	m1 := model.Model{ChannelID: ch.ID, Name: "m1"}
+	m2 := model.Model{ChannelID: ch.ID, Name: "m2"}
 	if err := shared.DB.Create(&m1).Error; err != nil {
 		t.Fatalf("建模型 m1 失败: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestDeleteChannelCascades(t *testing.T) {
 	if err := shared.DB.Create(&ch2).Error; err != nil {
 		t.Fatalf("建渠道 c2 失败: %v", err)
 	}
-	m3 := model.Model{ChannelID: ch2.ID, Name: "m3", Enabled: true}
+	m3 := model.Model{ChannelID: ch2.ID, Name: "m3"}
 	if err := shared.DB.Create(&m3).Error; err != nil {
 		t.Fatalf("建模型 m3 失败: %v", err)
 	}

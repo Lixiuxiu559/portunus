@@ -11,7 +11,6 @@ type Model struct {
 	OutputPrice     float64   `json:"output_price"`      // 输出价（每 1M token）
 	CacheReadPrice  float64   `json:"cache_read_price"`  // 缓存输入价（每 1M token）
 	CacheWritePrice float64   `json:"cache_write_price"` // 缓存输出价（每 1M token）
-	Enabled         bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }

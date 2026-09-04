@@ -9,7 +9,7 @@ import (
 )
 
 // SyncFromChannel 从渠道上游拉取模型列表，把本地缺失的模型同步到模型表。
-// 已存在（channel_id + name）的模型不覆盖，保留用户手动设置的价格与启停状态。
+// 已存在（channel_id + name）的模型不覆盖，保留用户手动设置的价格。
 // 返回新增的模型数量。
 func SyncFromChannel(ch *channel.Channel) (int, error) {
 	upstream, err := protocol.NewUpstream(ch.Type, ch.BaseURL, ch.Key)
@@ -29,7 +29,7 @@ func SyncFromChannel(ch *channel.Channel) (int, error) {
 		if count > 0 {
 			continue
 		}
-		m := Model{ChannelID: ch.ID, Name: name, Enabled: true}
+		m := Model{ChannelID: ch.ID, Name: name}
 		m.ApplyDefaultPrice()
 		if err := shared.DB.Create(&m).Error; err != nil {
 			return added, err

@@ -3,7 +3,7 @@ import request from './request';
 /**
  * 模型：归渠道，带价格（输入/输出/缓存读/缓存写，每 1M token）
  * 创建字段：channel_id, name, input_price?, output_price?,
- *   cache_read_price?, cache_write_price?, enabled?（价格不传则用内置默认价）
+ *   cache_read_price?, cache_write_price?（价格不传则用内置默认价）
  * 更新字段均为可选。
  */
 

@@ -38,8 +38,8 @@ func setupRouter(t *testing.T) *group.Group {
 	if err := shared.DB.Create(&ch).Error; err != nil {
 		t.Fatalf("建渠道失败: %v", err)
 	}
-	m1 := model.Model{ChannelID: ch.ID, Name: "m1", Enabled: true}
-	m2 := model.Model{ChannelID: ch.ID, Name: "m2", Enabled: true}
+	m1 := model.Model{ChannelID: ch.ID, Name: "m1"}
+	m2 := model.Model{ChannelID: ch.ID, Name: "m2"}
 	if err := shared.DB.Create(&m1).Error; err != nil {
 		t.Fatalf("建模型失败: %v", err)
 	}

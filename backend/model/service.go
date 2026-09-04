@@ -24,7 +24,6 @@ type CreateRequest struct {
 	OutputPrice     *float64 `json:"output_price"`      // 不传则用内置默认价
 	CacheReadPrice  *float64 `json:"cache_read_price"`  // 不传则用内置默认价
 	CacheWritePrice *float64 `json:"cache_write_price"` // 不传则用内置默认价
-	Enabled         *bool    `json:"enabled"`
 }
 
 // UpdateRequest 更新模型请求，仅包含需要变更的字段。
@@ -35,7 +34,6 @@ type UpdateRequest struct {
 	OutputPrice     *float64 `json:"output_price"`
 	CacheReadPrice  *float64 `json:"cache_read_price"`
 	CacheWritePrice *float64 `json:"cache_write_price"`
-	Enabled         *bool    `json:"enabled"`
 }
 
 // Response 是模型的对外响应。
@@ -47,7 +45,6 @@ type Response struct {
 	OutputPrice     float64   `json:"output_price"`
 	CacheReadPrice  float64   `json:"cache_read_price"`
 	CacheWritePrice float64   `json:"cache_write_price"`
-	Enabled         bool      `json:"enabled"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
@@ -62,7 +59,6 @@ func (m *Model) ToResponse() Response {
 		OutputPrice:     m.OutputPrice,
 		CacheReadPrice:  m.CacheReadPrice,
 		CacheWritePrice: m.CacheWritePrice,
-		Enabled:         m.Enabled,
 		CreatedAt:       m.CreatedAt,
 		UpdatedAt:       m.UpdatedAt,
 	}
@@ -123,10 +119,6 @@ func Create(req CreateRequest) (*Model, error) {
 		OutputPrice:     resolvePrice(req.OutputPrice, def.Output),
 		CacheReadPrice:  resolvePrice(req.CacheReadPrice, def.CacheRead),
 		CacheWritePrice: resolvePrice(req.CacheWritePrice, def.CacheWrite),
-		Enabled:         true,
-	}
-	if req.Enabled != nil {
-		m.Enabled = *req.Enabled
 	}
 	if err := shared.DB.Create(&m).Error; err != nil {
 		return nil, err
@@ -167,9 +159,6 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 	}
 	if req.CacheWritePrice != nil {
 		m.CacheWritePrice = *req.CacheWritePrice
-	}
-	if req.Enabled != nil {
-		m.Enabled = *req.Enabled
 	}
 	if err := shared.DB.Save(&m).Error; err != nil {
 		return nil, err

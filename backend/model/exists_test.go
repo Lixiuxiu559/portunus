@@ -35,7 +35,7 @@ func TestExists(t *testing.T) {
 	if ok, _ := Exists(1); ok {
 		t.Error("不存在的模型应返回 false")
 	}
-	m := Model{ChannelID: 1, Name: "m1", Enabled: true}
+	m := Model{ChannelID: 1, Name: "m1"}
 	if err := shared.DB.Create(&m).Error; err != nil {
 		t.Fatalf("建模型失败: %v", err)
 	}

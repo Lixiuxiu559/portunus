@@ -301,7 +301,7 @@ func TestRelayCircuitIsolatedPerModel(t *testing.T) {
 	if err := shared.DB.First(&ch).Error; err != nil {
 		t.Fatalf("查询渠道失败: %v", err)
 	}
-	bad := model.Model{ChannelID: ch.ID, Name: "bad-model", Enabled: true}
+	bad := model.Model{ChannelID: ch.ID, Name: "bad-model"}
 	if err := shared.DB.Create(&bad).Error; err != nil {
 		t.Fatalf("建 bad-model 失败: %v", err)
 	}

@@ -23,13 +23,13 @@ func setupListTest(t *testing.T) (*channel.Channel, *channel.Channel) {
 
 	// c1 下 25 个模型，c2 下 3 个
 	for i := 1; i <= 25; i++ {
-		m := Model{ChannelID: c1.ID, Name: fmt.Sprintf("model-%02d", i), Enabled: true}
+		m := Model{ChannelID: c1.ID, Name: fmt.Sprintf("model-%02d", i)}
 		if err := shared.DB.Create(&m).Error; err != nil {
 			t.Fatalf("建模型失败: %v", err)
 		}
 	}
 	for _, name := range []string{"gpt-4o", "gpt-4o-mini", "claude-sonnet"} {
-		m := Model{ChannelID: c2.ID, Name: name, Enabled: true}
+		m := Model{ChannelID: c2.ID, Name: name}
 		if err := shared.DB.Create(&m).Error; err != nil {
 			t.Fatalf("建模型失败: %v", err)
 		}
