@@ -142,7 +142,7 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
                   isRowHeader={col.isRowHeader}
                   style={col.width ? { width: col.width } : undefined}
                 >
-                  {col.title}
+                  <span className="block w-full text-center">{col.title}</span>
                 </Table.Column>
               ))}
             </Table.Header>

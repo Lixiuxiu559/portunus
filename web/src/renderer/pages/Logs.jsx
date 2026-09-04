@@ -59,17 +59,11 @@ export default function Logs() {
       title: '时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (val) => {
-        if (!val) return '—';
-        const d = new Date(val);
-        return (
-          <span className="block whitespace-nowrap font-mono text-xs text-muted">
-            {d.toLocaleDateString('zh-CN')}
-            <br />
-            {d.toLocaleTimeString('zh-CN', { hour12: false })}
-          </span>
-        );
-      },
+      render: (val) => (
+        <span className="whitespace-nowrap font-mono text-xs text-muted">
+          {val ? new Date(val).toLocaleString('zh-CN') : '—'}
+        </span>
+      ),
     },
     {
       title: '模型',
@@ -121,7 +115,7 @@ export default function Logs() {
         const isStream = record?.first_token_ms > 0;
         return (
           <span className="flex items-center gap-1">
-            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-primary/15 text-primary">
+            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-blue-500 text-white">
               {formatMs(val)}
             </span>
             {isStream && (
@@ -129,7 +123,7 @@ export default function Logs() {
                 {formatMs(record.first_token_ms)}
               </span>
             )}
-            <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-default/15 text-default'}`}>
+            <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-zinc-500 text-white'}`}>
               {isStream ? '流' : '非流'}
             </span>
           </span>
