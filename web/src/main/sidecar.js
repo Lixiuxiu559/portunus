@@ -1,10 +1,10 @@
 const { app } = require('electron');
 
 const isDev = process.env.NODE_ENV === 'development';
-const SERVER_PORT = 3060;
+const SERVER_PORT = 3061;
 /*
  * 说明：Go 后端不再打包进应用（不随安装包分发），
- * 生产模式下 app 直接连接本机已运行的 Go 后端（默认 3060 端口）。
+ * 生产模式下 app 直接连接本机已运行的 Go 后端（默认 3061 端口）。
  * Go 后端需由用户在外部单独启动，例如：
  *   go run . / go build -o portunus . 然后运行 ./portunus
  */

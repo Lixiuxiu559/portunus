@@ -17,7 +17,7 @@ Portunus 是一个 LLM API 聚合服务：多渠道接入、按渠道模型定�
 
 ```bash
 go build ./...       # 编译所有包
-go run .             # 启动服务（默认监听 0.0.0.0:3060，数据库 data/portunus.db）
+go run .             # 启动服务（默认监听 0.0.0.0:3061，数据库 data/portunus.db）
 go test ./...        # 运行所有测试
 go test ./... -run TestXxx -v   # 运行单个测试（按函数名）
 go vet ./...         # 静态检查

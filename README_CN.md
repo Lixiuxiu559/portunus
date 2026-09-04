@@ -80,11 +80,11 @@ GOPROXY=https://goproxy.cn,direct go mod tidy   # 网络直连超时可用国内
 go run .
 ```
 
-服务默认监听 `0.0.0.0:3060`，数据库文件 `data/portunus.db`。
+服务默认监听 `0.0.0.0:3061`，数据库文件 `data/portunus.db`。
 
 ### 前端（管理后台）
 
-管理后台位于 `web/`（Electron + React + Vite）。开发服务器会把 `/api`、`/v1` 代理到后端 `localhost:3060`，因此需先启动后端（`go run .`）。
+管理后台位于 `web/`（Electron + React + Vite）。开发服务器会把 `/api`、`/v1` 代理到后端 `localhost:3061`，因此需先启动后端（`go run .`）。
 
 ```bash
 cd web
@@ -100,7 +100,7 @@ pnpm run build      # 构建渲染层并打包桌面应用
 
 ```json
 {
-  "server": { "host": "0.0.0.0", "port": 3060 },
+  "server": { "host": "0.0.0.0", "port": 3061 },
   "database": { "type": "sqlite", "path": "data/portunus.db" }
 }
 ```
@@ -108,7 +108,7 @@ pnpm run build      # 构建渲染层并打包桌面应用
 | 配置项 | 说明 | 默认值 |
 |---|---|---|
 | `server.host` | 监听地址 | `0.0.0.0` |
-| `server.port` | 监听端口 | `3060` |
+| `server.port` | 监听端口 | `3061` |
 | `database.type` | 数据库类型（`sqlite` / `mysql` / `postgres`） | `sqlite` |
 | `database.path` | 数据库路径 | `data/portunus.db` |
 

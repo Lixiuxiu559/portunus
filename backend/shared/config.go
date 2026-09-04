@@ -38,7 +38,7 @@ func DefaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
 		RetryCount:               2,
 		ConnectTimeoutSeconds:    30,
-		FirstByteTimeoutSeconds:  60,
+		FirstByteTimeoutSeconds:  20,
 		StreamIdleTimeoutSeconds: 120,
 		NonStreamTimeoutSeconds:  600,
 		CircuitFailureThreshold:  4,
@@ -51,7 +51,7 @@ func DefaultProxyConfig() ProxyConfig {
 func DefaultConfig() *Config {
 	c := &Config{}
 	c.Server.Host = "0.0.0.0"
-	c.Server.Port = 3060
+	c.Server.Port = 3061
 	c.Database.Type = "sqlite"
 	c.Database.Path = "data/portunus.db"
 	c.Proxy = DefaultProxyConfig()

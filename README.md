@@ -80,11 +80,11 @@ GOPROXY=https://goproxy.cn,direct go mod tidy
 go run .
 ```
 
-Listens on `0.0.0.0:3060` by default. Database: `data/portunus.db` (SQLite).
+Listens on `0.0.0.0:3061` by default. Database: `data/portunus.db` (SQLite).
 
 ### Frontend (Management UI)
 
-The management UI lives in `web/` (Electron + React + Vite). The dev server proxies `/api` and `/v1` to the backend at `localhost:3060`, so start the backend first (`go run .`).
+The management UI lives in `web/` (Electron + React + Vite). The dev server proxies `/api` and `/v1` to the backend at `localhost:3061`, so start the backend first (`go run .`).
 
 ```bash
 cd web
@@ -100,7 +100,7 @@ A `config.json` is auto-generated on first run:
 
 ```json
 {
-  "server": { "host": "0.0.0.0", "port": 3060 },
+  "server": { "host": "0.0.0.0", "port": 3061 },
   "database": { "type": "sqlite", "path": "data/portunus.db" }
 }
 ```
@@ -108,7 +108,7 @@ A `config.json` is auto-generated on first run:
 | Option | Description | Default |
 |---|---|---|
 | `server.host` | Listen address | `0.0.0.0` |
-| `server.port` | Server port | `3060` |
+| `server.port` | Server port | `3061` |
 | `database.type` | Database type (`sqlite` / `mysql` / `postgres`) | `sqlite` |
 | `database.path` | Database path | `data/portunus.db` |
 
