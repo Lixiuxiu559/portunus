@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -153,7 +154,7 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		}
 		chunks, err := conv.Convert([]byte(payload))
 		if err != nil {
-			return first, wrapStreamErr(committed, err)
+			return first, failCommittedStream(c, clientProto, committed, err, "api_error")
 		}
 		if !committed {
 			first = time.Now()
@@ -170,14 +171,14 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		// 看门狗触发（上游静默超时）时底层是 ctx 取消错误，还原为可读的静默超时，
 		// 避免与客户端主动断连（同为 context.Canceled）混淆。
 		if stall := wd.Fired(); stall != nil {
-			return first, wrapStreamErr(committed, stall)
+			err = stall
 		}
-		return first, wrapStreamErr(committed, err)
+		return first, failCommittedStream(c, clientProto, committed, err, "overloaded_error")
 	}
 
 	finals, err := conv.Finish()
 	if err != nil {
-		return first, wrapStreamErr(committed, err)
+		return first, failCommittedStream(c, clientProto, committed, err, "api_error")
 	}
 	if !committed {
 		// 上游 200 但未产出有效事件（如空流）：提交头后再收尾，交给客户端结束。
@@ -196,12 +197,28 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 	return first, nil
 }
 
-// wrapStreamErr 把错误包装为普通错误（首包前，可 failover）或 streamCommittedError（首包后，不可 failover）。
-func wrapStreamErr(committed bool, err error) error {
-	if committed {
-		return &streamCommittedError{err: err}
+// failCommittedStream 提交后失败：向 Anthropic 客户端发协议内 error 事件再包装为
+// streamCommittedError；未提交时原样返回错误（走 failover，客户端什么都还没收到）。
+//
+// Anthropic 流式协议的 error 是终止事件，Claude Code 收到后按类型走标准退避重试，
+// 避免对着无声截断的流报「check your network」干等。分类：静默掐断 / 上游断连 →
+// overloaded_error（过载重试语义）；转换失败 → api_error（由调用方传入）。
+// OpenAI / Responses 客户端无对应的流内错误标准形式，保持截断，由客户端按断流处理。
+// 客户端主动断连（context.Canceled）不发事件——连接已亡，写了无意义。
+func failCommittedStream(c *gin.Context, clientProto protocol.Provider, committed bool, err error, anthropicType string) error {
+	if !committed {
+		return err
 	}
-	return err
+	if clientProto == protocol.ProviderAnthropic && !errors.Is(err, context.Canceled) {
+		if payload, merr := json.Marshal(map[string]any{
+			"type":    "error",
+			"message": map[string]string{"type": anthropicType, "message": err.Error()},
+		}); merr == nil {
+			writeSSE(c.Writer, clientProto, payload)
+			c.Writer.Flush()
+		}
+	}
+	return &streamCommittedError{err: err}
 }
 
 // parseSSEDataLine 解析一行 SSE：是 `data:` 行则返回去除前缀与空白的载荷（trim 后非空），

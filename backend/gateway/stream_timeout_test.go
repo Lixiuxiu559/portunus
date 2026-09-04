@@ -3,12 +3,16 @@ package gateway
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
@@ -267,5 +271,122 @@ func TestRelayStreamIdleTimeoutNoFalsePositive(t *testing.T) {
 	}
 	if got := strings.Count(w.Body.String(), `"content":"hi"`); got != 4 {
 		t.Errorf("应完整收到 4 个事件，实际 %d", got)
+	}
+}
+
+// ─── 提交后失败的流内 error 事件（Anthropic 客户端） ───
+
+// fakeConv 可控的转换器：每个 payload 都产出一条 anthropic 事件，第 failAt 个报错。
+type fakeConv struct {
+	calls  int
+	failAt int // 从 1 计；0 = 不报错
+	fail   error
+}
+
+func (f *fakeConv) Convert([]byte) ([][]byte, error) {
+	f.calls++
+	if f.failAt > 0 && f.calls >= f.failAt {
+		return nil, f.fail
+	}
+	return [][]byte{[]byte(`{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}`)}, nil
+}
+func (f *fakeConv) Finish() ([][]byte, error) { return nil, nil }
+func (f *fakeConv) Usage() *protocol.Usage    { return nil }
+
+// seqReader 依次返回 parts，耗尽后返回 err（nil 则 EOF）。
+type seqReader struct {
+	parts [][]byte
+	i     int
+	err   error
+}
+
+func (r *seqReader) Read(p []byte) (int, error) {
+	if r.i < len(r.parts) {
+		n := copy(p, r.parts[r.i])
+		r.i++
+		return n, nil
+	}
+	if r.err != nil {
+		return 0, r.err
+	}
+	return 0, io.EOF
+}
+
+// streamRelayTestCtx 构造 relayStream 单测环境：看门狗禁用（0 时限），不干扰错误分类断言。
+func streamRelayTestCtx(t *testing.T, body io.Reader, conv protocol.StreamConverter) (*httptest.ResponseRecorder, *gin.Context, *http.Response, *streamWatchdog) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(body),
+	}
+	_, wd := newStreamWatchdog(context.Background(), 0, 0)
+	return w, c, resp, wd
+}
+
+// 提交后转换失败 → Anthropic 客户端应收到流内 error 事件（api_error），
+// 而不是对着截断的流报连接错误。
+func TestRelayStreamConvertErrorEmitsAPIError(t *testing.T) {
+	body := &seqReader{parts: [][]byte{
+		[]byte("data: {\"id\":\"1\"}\n\n"),
+		[]byte("data: {\"id\":\"2\"}\n\n"),
+	}}
+	conv := &fakeConv{failAt: 2, fail: errors.New("字段映射失败")}
+	w, c, resp, wd := streamRelayTestCtx(t, body, conv)
+	defer wd.Stop()
+
+	_, err := relayStream(c, protocol.ProviderAnthropic, resp, conv, wd)
+	var sce *streamCommittedError
+	if !errors.As(err, &sce) {
+		t.Fatalf("提交后错误应包装为 streamCommittedError，实际 %v", err)
+	}
+	if out := w.Body.String(); !strings.Contains(out, "event: error") || !strings.Contains(out, `"type":"api_error"`) {
+		t.Fatalf("应发流内 api_error 事件，实际 body=%q", out)
+	}
+}
+
+// 提交后客户端主动断连（context.Canceled）：不发 error 事件（连接已亡），
+// 但仍包装为 streamCommittedError 供上层区分熔断语义。
+func TestRelayStreamNoErrorEventOnClientCancel(t *testing.T) {
+	body := &seqReader{
+		parts: [][]byte{[]byte("data: {\"id\":\"1\"}\n\n")},
+		err:   context.Canceled,
+	}
+	conv := &fakeConv{}
+	w, c, resp, wd := streamRelayTestCtx(t, body, conv)
+	defer wd.Stop()
+
+	_, err := relayStream(c, protocol.ProviderAnthropic, resp, conv, wd)
+	var sce *streamCommittedError
+	if !errors.As(err, &sce) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("应返回 streamCommittedError{context.Canceled}，实际 %v", err)
+	}
+	if out := w.Body.String(); strings.Contains(out, "event: error") {
+		t.Fatalf("客户端断连不应发 error 事件，实际 body=%q", out)
+	}
+}
+
+// 线上场景完整链路（Anthropic 客户端 ← OpenAI 上游假流）：先收到内容，静默超时
+// 掐断后应收到流内 overloaded_error，让 Claude Code 按标准过载退避重试。
+func TestRelayStreamAnthropicInStreamErrorOnIdleTimeout(t *testing.T) {
+	pc := shared.DefaultProxyConfig()
+	pc.RetryCount = 0
+	pc.StreamIdleTimeoutSeconds = 1
+	setProxyConfigForTest(t, pc)
+
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeStalledSSE(t, w, r, true)
+	})
+
+	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":64,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
+
+	out := w.Body.String()
+	if !strings.Contains(out, "event: error") || !strings.Contains(out, `"type":"overloaded_error"`) {
+		t.Fatalf("静默掐断后应发流内 overloaded_error，实际 body=%q", out)
 	}
 }
