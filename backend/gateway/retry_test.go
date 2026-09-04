@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -232,5 +234,24 @@ func TestRelayCircuitSkipsOpenChannel(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&calls); got != 0 {
 		t.Errorf("开路渠道不应再调用上游，实际调用 %d 次", got)
+	}
+}
+
+// TestIsRetryableClientCancel 断言客户端主动取消（context.Canceled）不被判为可重试失败。
+// 根因：claude-cli 等客户端断连/取消时，doRequest 返回 "Post ...: context canceled"
+// （*url.Error 包装 context.Canceled）。url.Error 实现了 net.Error，被 isRetryable 的
+// net.Error 分支误判为可重试 → 既触发无意义重试，又被 breakerRecord 记入熔断，
+// 连续几次用户取消就把整个渠道熔断开路，导致后续所有请求 503「所有渠道暂不可用」。
+func TestIsRetryableClientCancel(t *testing.T) {
+	if isRetryable(context.Canceled) {
+		t.Error("context.Canceled（客户端主动取消）不应被判定为可重试")
+	}
+	wrapped := &url.Error{Op: "Post", URL: "https://upstream/v1/chat/completions", Err: context.Canceled}
+	if isRetryable(wrapped) {
+		t.Error("被 url.Error 包装的 context.Canceled 不应被判定为可重试")
+	}
+	// 上游超时（context.DeadlineExceeded）仍是可重试失败，不能被上面误伤
+	if !isRetryable(context.DeadlineExceeded) {
+		t.Error("context.DeadlineExceeded 应被判定为可重试")
 	}
 }

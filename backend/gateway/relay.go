@@ -34,6 +34,13 @@ func (e *upstreamStatusError) Error() string { return "上游返回非 2xx 状�
 // isRetryable 判断某次失败是否值得对同一 / 下一上游重试：
 // 5xx 与 429 重试、网络 / 超时错误重试，其余（4xx、协议转换、配置）不重试。
 func isRetryable(err error) bool {
+	// 客户端主动取消（context.Canceled）不是上游故障，不重试也不计入熔断。
+	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
+	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度，
+	// 连续几次便使整个渠道熔断开路，导致后续所有请求 503。
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
 	var se *upstreamStatusError
 	if errors.As(err, &se) {
 		return se.status >= 500 || se.status == 429
