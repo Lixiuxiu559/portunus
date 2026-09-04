@@ -99,7 +99,7 @@ export default function Groups() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <Typography type="h2">分组管理</Typography>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="md" onPress={() => fetchAll(true)} isPending={refreshing}>
@@ -121,6 +121,7 @@ export default function Groups() {
           暂无分组，点击右上角「新增分组」创建
         </div>
       ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (
@@ -226,6 +227,7 @@ export default function Groups() {
           ))}
         </div>
         </DragDropContext>
+        </div>
       )}
 
       <CreateGroupModal
