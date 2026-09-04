@@ -54,7 +54,8 @@
     "start": "electron ."
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "smol-toml": "^1.8.0"
   },
   "devDependencies": {
     "@hello-pangea/dnd": "^18.0.1",

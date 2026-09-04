@@ -5,6 +5,7 @@ import Channels from './pages/Channels';
 import Models from './pages/Models';
 import Groups from './pages/Groups';
 import Logs from './pages/Logs';
+import Clients from './pages/Clients';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="models" element={<Models />} />
           <Route path="groups" element={<Groups />} />
           <Route path="logs" element={<Logs />} />
+          <Route path="clients" element={<Clients />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

@@ -12,7 +12,7 @@ function getServerUrl() {
       if (config.serverUrl) return config.serverUrl;
     }
   } catch (_) {}
-  return 'http://localhost:3060';
+  return 'http://localhost:3061';
 }
 
 const SERVER_URL = getServerUrl();
@@ -43,4 +43,13 @@ contextBridge.exposeInMainWorld('api', {
 
   // 打开外部链接（默认浏览器）
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+});
+
+// ─── 客户端配置文件读写（Claude Code / Codex）───
+contextBridge.exposeInMainWorld('clientConfig', {
+  getPaths: () => ipcRenderer.invoke('client-config:paths'),
+  readClaude: () => ipcRenderer.invoke('client-config:read-claude'),
+  writeClaude: (cfg) => ipcRenderer.invoke('client-config:write-claude', cfg),
+  readCodex: () => ipcRenderer.invoke('client-config:read-codex'),
+  writeCodex: (cfg) => ipcRenderer.invoke('client-config:write-codex', cfg),
 });

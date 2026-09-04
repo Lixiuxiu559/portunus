@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
 const { startServer, stopServer, SERVER_PORT, isDev: sidecarIsDev } = require('./sidecar');
+const clientConfig = require('./client-config');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -25,7 +26,7 @@ function ensureConfig() {
   const configPath = path.join(configDir, 'config.json');
   if (!fs.existsSync(configPath)) {
     const defaultConfig = {
-      serverUrl: 'http://localhost:3060',
+      serverUrl: 'http://localhost:3061',
     };
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
@@ -81,6 +82,24 @@ ipcMain.handle('open-external', (_event, url) => {
   }
   return Promise.reject(new Error('不支持的链接'));
 });
+
+// ─── IPC：客户端配置文件读写（Claude Code / Codex）───
+// 统一包成 { ok, data | error }，避免主进程异常直接冒泡到渲染层。
+function wrapClientConfig(fn) {
+  return async (_event, ...args) => {
+    try {
+      return { ok: true, data: await fn(...args) };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  };
+}
+
+ipcMain.handle('client-config:paths', wrapClientConfig(() => clientConfig.getPaths()));
+ipcMain.handle('client-config:read-claude', wrapClientConfig(() => clientConfig.readClaude()));
+ipcMain.handle('client-config:write-claude', wrapClientConfig((cfg) => clientConfig.writeClaude(cfg)));
+ipcMain.handle('client-config:read-codex', wrapClientConfig(() => clientConfig.readCodex()));
+ipcMain.handle('client-config:write-codex', wrapClientConfig((cfg) => clientConfig.writeCodex(cfg)));
 
 app.whenReady().then(() => {
   ensureConfig();
