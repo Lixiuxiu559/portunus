@@ -200,9 +200,13 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 // failCommittedStream 提交后失败：向 Anthropic 客户端发协议内 error 事件再包装为
 // streamCommittedError；未提交时原样返回错误（走 failover，客户端什么都还没收到）。
 //
-// Anthropic 流式协议的 error 是终止事件，Claude Code 收到后按类型走标准退避重试，
-// 避免对着无声截断的流报「check your network」干等。分类：静默掐断 / 上游断连 →
-// overloaded_error（过载重试语义）；转换失败 → api_error（由调用方传入）。
+// Anthropic 流式协议的 error 是终止事件，形如 {"type":"error","error":{"type":...,
+// "message":...}}——嵌套错误对象必须在 "error" 键下（官方 SDK 只读 body.error.type
+// 判类型，写别的键名客户端识别不了，只能退化为非流式回退）。Claude Code 收到后：
+// 已有部分内容时按「Server error mid-response」把已有部分定稿收尾；无内容时
+// overloaded_error 触发流式重试（配合本网关熔断换渠道），api_error 走非流式回退。
+// 分类：静默掐断 / 上游断连 → overloaded_error（过载重试语义）；转换失败 →
+// api_error（由调用方传入）。
 // OpenAI / Responses 客户端无对应的流内错误标准形式，保持截断，由客户端按断流处理。
 // 客户端主动断连（context.Canceled）不发事件——连接已亡，写了无意义。
 func failCommittedStream(c *gin.Context, clientProto protocol.Provider, committed bool, err error, anthropicType string) error {
@@ -211,8 +215,8 @@ func failCommittedStream(c *gin.Context, clientProto protocol.Provider, committe
 	}
 	if clientProto == protocol.ProviderAnthropic && !errors.Is(err, context.Canceled) {
 		if payload, merr := json.Marshal(map[string]any{
-			"type":    "error",
-			"message": map[string]string{"type": anthropicType, "message": err.Error()},
+			"type":  "error",
+			"error": map[string]string{"type": anthropicType, "message": err.Error()},
 		}); merr == nil {
 			writeSSE(c.Writer, clientProto, payload)
 			c.Writer.Flush()

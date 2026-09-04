@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -346,6 +347,61 @@ func TestRelayStreamConvertErrorEmitsAPIError(t *testing.T) {
 	}
 	if out := w.Body.String(); !strings.Contains(out, "event: error") || !strings.Contains(out, `"type":"api_error"`) {
 		t.Fatalf("应发流内 api_error 事件，实际 body=%q", out)
+	}
+}
+
+// 流内 error 事件的嵌套错误对象必须在 "error" 键下：官方 SDK（Claude Code 同款）
+// 只读 body.error.type 判类型，写成 "message" 会让类型识别落空、退化为非流式回退。
+// event 行须为 error（SDK 按 sse.event === 'error' 分支）。锁定事件结构。
+func TestRelayStreamErrorEventShape(t *testing.T) {
+	body := &seqReader{parts: [][]byte{
+		[]byte("data: {\"id\":\"1\"}\n\n"),
+		[]byte("data: {\"id\":\"2\"}\n\n"),
+	}}
+	conv := &fakeConv{failAt: 2, fail: errors.New("字段映射失败")}
+	w, c, resp, wd := streamRelayTestCtx(t, body, conv)
+	defer wd.Stop()
+
+	_, err := relayStream(c, protocol.ProviderAnthropic, resp, conv, wd)
+	var sce *streamCommittedError
+	if !errors.As(err, &sce) {
+		t.Fatalf("提交后错误应包装为 streamCommittedError，实际 %v", err)
+	}
+
+	var payload string
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		if p, ok := parseSSEDataLine(line); ok && strings.Contains(p, `"type":"error"`) {
+			payload = p
+		}
+	}
+	if payload == "" {
+		t.Fatalf("应发出流内 error 事件，实际 body=%q", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "event: error\n") {
+		t.Fatalf("error 事件须带 event: error 行，实际 body=%q", w.Body.String())
+	}
+	var ev struct {
+		Type  string `json:"type"`
+		Error *struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+		Message any `json:"message"`
+	}
+	if jerr := json.Unmarshal([]byte(payload), &ev); jerr != nil {
+		t.Fatalf("error 事件载荷不是合法 JSON: %v, payload=%s", jerr, payload)
+	}
+	if ev.Error == nil {
+		t.Fatalf(`嵌套错误对象应在 "error" 键下，实际 payload=%s`, payload)
+	}
+	if ev.Error.Type != "api_error" {
+		t.Errorf("error.type = %q, want api_error", ev.Error.Type)
+	}
+	if ev.Error.Message == "" {
+		t.Error("error.message 不应为空")
+	}
+	if ev.Message != nil {
+		t.Errorf(`顶层不应有 "message" 键（错误对象错位），实际 payload=%s`, payload)
 	}
 }
 
