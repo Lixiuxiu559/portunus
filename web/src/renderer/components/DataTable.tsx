@@ -129,7 +129,7 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
       )}
 
       <Table variant="secondary" className="h-full grid-rows-[minmax(0,1fr)] text-foreground">
-        <Table.ScrollContainer className="h-full min-h-0 overflow-auto">
+        <Table.ScrollContainer className="h-full min-h-0 overflow-auto no-scrollbar">
           <Table.Content
             aria-label={ariaLabel}
             className="min-w-[600px] px-0"
