@@ -48,7 +48,9 @@ compose 默认只用 `image:`（远程镜像），不触发本地构建；要本
 
 ```bash
 # 构建并推送多架构镜像（amd64 + arm64）
+# 必须显式 --builder multiarch-builder：默认 builder 可能是 orbstack（docker driver，不支持多平台构建）
 HTTPS_PROXY=http://127.0.0.1:7890 docker buildx build \
+  --builder multiarch-builder \
   --platform linux/amd64,linux/arm64 \
   -f Dockerfile -t lijx559/portunus:latest --push .
 ```
