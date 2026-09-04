@@ -259,14 +259,25 @@ func anthropicSystemToText(sys any) string {
 // toolNames 是 assistant.tool_use 的 id→name 映射，用于给 tool 消息补 name 字段。
 func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []ChatMessage {
 	var toolResults []ChatMessage
+	var toolImages []any // tool_result 里的图片，转出后拼进紧随的 user 消息
 	var out ChatMessage
 	out.Role = m.Role
 	var textParts []string
+	// 依原始顺序收集 text / image 内容块：无图时 content 退化为纯文本字符串
+	// （多数 OpenAI 兼容上游对字符串形态最稳），有图才升级为内容块数组。
+	var contentParts []any
+	hasImage := false
 
 	for _, block := range m.Content {
 		switch block.Type {
 		case "text":
 			textParts = append(textParts, block.Text)
+			contentParts = append(contentParts, map[string]any{"type": "text", "text": block.Text})
+		case "image":
+			if part := imageSourceToContentPart(block.Source); part != nil {
+				hasImage = true
+				contentParts = append(contentParts, part)
+			}
 		case "thinking", "redacted_thinking":
 			// 思考内容映射为 OpenAI 的 reasoning_content 扩展字段。
 			// DeepSeek 等兼容方在 thinking 模式下要求多轮对话把上一轮思考内容
@@ -289,29 +300,78 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 			name := toolNames[block.ToolUseID]
 			toolResults = append(toolResults, ChatMessage{
 				Role:       "tool",
-				Content:    anthropicToolResultToContent(block.Content),
+				Content:    anthropicToolResultText(block.Content),
 				ToolCallID: block.ToolUseID,
 				Name:       &name,
 			})
+			// 图片不进 tool 消息：OpenAI 规范 tool content 仅允许文本，
+			// DeepSeek 等严格兼容上游对数组 content 直接 400。挪到紧随其后的
+			// user 消息（见下方 toolResults 收尾），视觉上游仍能看到图。
+			toolImages = append(toolImages, anthropicToolResultImageParts(block.Content)...)
 		}
 	}
 
 	if len(toolResults) > 0 {
+		if len(toolImages) > 0 {
+			toolResults = append(toolResults, ChatMessage{Role: "user", Content: toolImages})
+		}
 		return toolResults
 	}
-	// 既无 text、无 tool_calls、也无思考内容的消息整条丢弃，
+	// 既无 text、无图、无 tool_calls、也无思考内容的消息整条丢弃，
 	// 避免生成空的 assistant 消息导致上游 400。
-	if len(textParts) == 0 && len(out.ToolCalls) == 0 && out.ReasoningContent == "" {
+	if len(textParts) == 0 && !hasImage && len(out.ToolCalls) == 0 && out.ReasoningContent == "" {
 		return nil
 	}
-	if len(textParts) > 0 {
+	if hasImage {
+		out.Content = contentParts
+	} else if len(textParts) > 0 {
 		out.Content = strings.Join(textParts, "")
 	}
 	return []ChatMessage{out}
 }
 
-// anthropicToolResultToContent 把 tool_result 的 content 转为 OpenAI tool 消息 content。
-func anthropicToolResultToContent(c any) any {
+// imageSourceToContentPart 把 Anthropic image 块的 source 转为 OpenAI image_url
+// 内容块：base64 源拼成 data URI（media_type 缺省按 png），url 源直接透传。
+// 无法识别的源返回 nil（跳过该块）。
+func imageSourceToContentPart(src *ImageSource) map[string]any {
+	if src == nil {
+		return nil
+	}
+	url := src.URL
+	if src.Type == "base64" {
+		media := src.MediaType
+		if media == "" {
+			media = "image/png"
+		}
+		url = "data:" + media + ";base64," + src.Data
+	}
+	if url == "" {
+		return nil
+	}
+	return map[string]any{"type": "image_url", "image_url": map[string]any{"url": url}}
+}
+
+// imageSourceFromAny 把 tool_result content 里未经类型化的 image source
+// （解析后的 map[string]any）还原为 ImageSource。
+func imageSourceFromAny(v any) *ImageSource {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil
+	}
+	var src ImageSource
+	if err := json.Unmarshal(b, &src); err != nil {
+		return nil
+	}
+	return &src
+}
+
+// anthropicToolResultText 提取 tool_result content 的纯文本（OpenAI tool 消息
+// content 仅允许文本，图片由 anthropicToolResultImageParts 单独收集）。
+func anthropicToolResultText(c any) string {
 	switch v := c.(type) {
 	case string:
 		return v
@@ -326,6 +386,25 @@ func anthropicToolResultToContent(c any) any {
 		return sb.String()
 	}
 	return ""
+}
+
+// anthropicToolResultImageParts 提取 tool_result content 里的图片，转为 OpenAI
+// image_url 内容块数组（data URI / URL），供拼进紧随 tool 消息之后的 user 消息。
+func anthropicToolResultImageParts(c any) []any {
+	items, ok := c.([]any)
+	if !ok {
+		return nil
+	}
+	var parts []any
+	for _, item := range items {
+		block, _ := item.(map[string]any)
+		if t, _ := block["type"].(string); t == "image" {
+			if part := imageSourceToContentPart(imageSourceFromAny(block["source"])); part != nil {
+				parts = append(parts, part)
+			}
+		}
+	}
+	return parts
 }
 
 // anthropicToolChoiceToOpenAI 将 Anthropic tool_choice 映射为 OpenAI tool_choice。

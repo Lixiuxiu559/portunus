@@ -763,3 +763,165 @@ func assertJSONEqual(t *testing.T, got, want any) {
 		t.Errorf("不匹配:\n got  %s\n want %s", gotJSON, wantJSON)
 	}
 }
+
+// TestConvertRequestAnthropicToOpenAIImage 断言 user 消息里的 image 块被转换为
+// OpenAI image_url 内容块（base64 源拼成 data URI），文本与图片的原始顺序保留。
+// 修复前 image 块被静默丢弃，上游完全看不到图。
+func TestConvertRequestAnthropicToOpenAIImage(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [{
+			"role": "user",
+			"content": [
+				{"type": "text", "text": "这张图里是什么"},
+				{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aGVsbG8="}}
+			]
+		}]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 1 {
+		t.Fatalf("消息数不匹配: %d", len(msgs))
+	}
+	user := msgs[0].(map[string]any)
+	content, ok := user["content"].([]any)
+	if !ok {
+		t.Fatalf("含图消息的 content 应为数组，实际: %v", user["content"])
+	}
+	if len(content) != 2 {
+		t.Fatalf("内容块数不匹配: %d", len(content))
+	}
+	assertJSONEqual(t, content[0], map[string]any{"type": "text", "text": "这张图里是什么"})
+	assertJSONEqual(t, content[1], map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": "data:image/png;base64,aGVsbG8="},
+	})
+}
+
+// TestConvertRequestAnthropicToOpenAIImageURLSource 断言 url 源的 image 块
+// 直接透传 URL；纯图消息（无文本）不应被整条丢弃。
+func TestConvertRequestAnthropicToOpenAIImageURLSource(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [{
+			"role": "user",
+			"content": [{"type": "image", "source": {"type": "url", "url": "https://example.com/cat.png"}}]
+		}]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 1 {
+		t.Fatalf("纯图消息不应被丢弃，消息数: %d", len(msgs))
+	}
+	user := msgs[0].(map[string]any)
+	content, ok := user["content"].([]any)
+	if !ok {
+		t.Fatalf("content 应为数组，实际: %v", user["content"])
+	}
+	assertJSONEqual(t, content[0], map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": "https://example.com/cat.png"},
+	})
+}
+
+// TestConvertRequestAnthropicToOpenAITextOnlyContentStaysString 断言不含图片的
+// user 消息 content 仍为纯文本字符串——多数 OpenAI 兼容上游对字符串形态最稳，
+// 不能为了图片支持把所有消息都变成数组。
+func TestConvertRequestAnthropicToOpenAITextOnlyContentStaysString(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	user := msgs[0].(map[string]any)
+	if user["content"] != "hi" {
+		t.Errorf("纯文本消息 content 应为字符串 \"hi\"，实际: %v", user["content"])
+	}
+}
+
+// TestConvertRequestAnthropicToOpenAIToolResultImage 断言 tool_result 里的 image 块
+// 不进 tool 消息（OpenAI 规范 tool content 仅允许文本，DeepSeek 等严格上游会 400），
+// 而是挪到紧跟其后的一条 user 消息；tool 消息保留纯文本（字符串形态）。
+func TestConvertRequestAnthropicToOpenAIToolResultImage(t *testing.T) {
+	in := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [
+			{"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "read_image", "input": {"path": "a.png"}}]},
+			{"role": "user", "content": [
+				{"type": "tool_result", "tool_use_id": "c1", "content": [
+					{"type": "text", "text": "文件内容如下"},
+					{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "eHg="}}
+				]}
+			]}
+		]
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	// assistant(tool_use) + tool(纯文本) + user(图片) = 3
+	if len(msgs) != 3 {
+		t.Fatalf("消息数不匹配: %d, 输出: %s", len(msgs), out)
+	}
+	tool := msgs[1].(map[string]any)
+	if tool["role"] != "tool" {
+		t.Fatalf("第二条应为 tool 消息: %v", tool)
+	}
+	if tool["content"] != "文件内容如下" {
+		t.Errorf("tool 消息 content 应为纯文本字符串，实际: %v", tool["content"])
+	}
+	user := msgs[2].(map[string]any)
+	if user["role"] != "user" {
+		t.Fatalf("第三条应为承接图片的 user 消息: %v", user)
+	}
+	content, ok := user["content"].([]any)
+	if !ok {
+		t.Fatalf("承接图片的 user 消息 content 应为数组，实际: %v", user["content"])
+	}
+	assertJSONEqual(t, content[0], map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": "data:image/jpeg;base64,eHg="},
+	})
+
+	// 纯文本 tool_result（字符串或块数组形态）不产生多余的 user 消息
+	inText := `{
+		"model": "claude-3",
+		"max_tokens": 100,
+		"messages": [
+			{"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "f", "input": {}}]},
+			{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c1", "content": [{"type": "text", "text": "sunny"}]}]}
+		]
+	}`
+	out2, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(inText))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m2 := unmarshalAny(t, out2)
+	msgs2 := sliceAt(t, m2, "messages")
+	if len(msgs2) != 2 {
+		t.Fatalf("纯文本 tool_result 不应追加 user 消息，消息数: %d", len(msgs2))
+	}
+	tool2 := msgs2[1].(map[string]any)
+	if tool2["content"] != "sunny" {
+		t.Errorf("纯文本 tool_result content 应为字符串，实际: %v", tool2["content"])
+	}
+}
