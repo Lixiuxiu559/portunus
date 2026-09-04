@@ -349,9 +349,49 @@ func TestConvertRequestResponsesToOpenAI(t *testing.T) {
 	}
 }
 
-func TestConvertRequestAnthropicThinkingBlockDropped(t *testing.T) {
+// TestConvertRequestAnthropicThinkingToReasoningContent 断言 Anthropic assistant 的
+// thinking 块被映射为 OpenAI 的 reasoning_content 字段（DeepSeek 等兼容方在 thinking
+// 模式下要求多轮回传上一轮思考内容，否则报 400 "reasoning_content must be passed back"）。
+func TestConvertRequestAnthropicThinkingToReasoningContent(t *testing.T) {
+	// 混合：thinking + text（Claude Code thinking 模式的典型 assistant 消息）
 	in := `{
-		"model": "claude-3",
+		"model": "deepseek-chat",
+		"messages": [
+			{"role":"user","content":[{"type":"text","text":"hi"}]},
+			{"role":"assistant","content":[
+				{"type":"thinking","thinking":"先想一下","signature":"sig"},
+				{"type":"text","text":"答案"}
+			]}
+		],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	if len(msgs) != 2 {
+		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	}
+	assistant := msgs[1].(map[string]any)
+	if got := assistant["reasoning_content"]; got != "先想一下" {
+		t.Errorf("assistant 应带 reasoning_content=%q, 实际 %v", "先想一下", got)
+	}
+	if got := assistant["content"]; got != "答案" {
+		t.Errorf("assistant content 应=答案, 实际 %v", got)
+	}
+	if _, has := assistant["thinking"]; has {
+		t.Errorf("不应透出 Anthropic 专有 thinking 字段: %v", assistant)
+	}
+}
+
+// TestConvertRequestAnthropicPureThinkingKept 断言纯 thinking（无 text 无 tool_calls）
+// 的 assistant 消息不再被整条丢弃，而是保留为仅含 reasoning_content 的消息——
+// DeepSeek 需要它来回传思考内容，否则下一轮报 400。
+func TestConvertRequestAnthropicPureThinkingKept(t *testing.T) {
+	in := `{
+		"model": "deepseek-chat",
 		"messages": [
 			{"role":"user","content":[{"type":"text","text":"hi"}]},
 			{"role":"assistant","content":[{"type":"thinking","thinking":"我在思考","signature":"sig"}]}
@@ -364,12 +404,15 @@ func TestConvertRequestAnthropicThinkingBlockDropped(t *testing.T) {
 	}
 	m := unmarshalAny(t, out)
 	msgs := sliceAt(t, m, "messages")
-	// 纯 thinking 的 assistant 消息应被整条丢弃，只剩 user 消息
-	if len(msgs) != 1 {
-		t.Fatalf("消息数不匹配: %d, 输出=%s", len(msgs), out)
+	if len(msgs) != 2 {
+		t.Fatalf("纯 thinking 的 assistant 消息应被保留，消息数应为 2，实际 %d, 输出=%s", len(msgs), out)
 	}
-	if msgs[0].(map[string]any)["role"] != "user" {
-		t.Errorf("应只剩 user 消息: %v", msgs)
+	assistant := msgs[1].(map[string]any)
+	if assistant["role"] != "assistant" {
+		t.Fatalf("应为 assistant 消息: %v", assistant)
+	}
+	if got := assistant["reasoning_content"]; got != "我在思考" {
+		t.Errorf("assistant 应带 reasoning_content=%q, 实际 %v", "我在思考", got)
 	}
 }
 

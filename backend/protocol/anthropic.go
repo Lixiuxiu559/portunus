@@ -268,7 +268,11 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 		case "text":
 			textParts = append(textParts, block.Text)
 		case "thinking", "redacted_thinking":
-			// 思考块不传给 OpenAI 上游（上游不认思考内容作为输入），直接丢弃。
+			// 思考内容映射为 OpenAI 的 reasoning_content 扩展字段。
+			// DeepSeek 等兼容方在 thinking 模式下要求多轮对话把上一轮思考内容
+			// 原样回传（reasoning_content），直接丢弃会导致上游 400：
+			// "The reasoning_content in the thinking mode must be passed back to the API"。
+			out.ReasoningContent += block.Thinking
 		case "tool_use":
 			args := "{}"
 			if block.Input != nil {
@@ -295,9 +299,9 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 	if len(toolResults) > 0 {
 		return toolResults
 	}
-	// 纯 thinking 等无内容块的消息（既无 text 也无 tool_calls）整条丢弃，
+	// 既无 text、无 tool_calls、也无思考内容的消息整条丢弃，
 	// 避免生成空的 assistant 消息导致上游 400。
-	if len(textParts) == 0 && len(out.ToolCalls) == 0 {
+	if len(textParts) == 0 && len(out.ToolCalls) == 0 && out.ReasoningContent == "" {
 		return nil
 	}
 	if len(textParts) > 0 {

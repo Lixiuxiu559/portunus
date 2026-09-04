@@ -22,11 +22,12 @@ type ChatCompletionRequest struct {
 
 // ChatMessage 是一条对话消息。
 type ChatMessage struct {
-	Role       string     `json:"role"` // system / user / assistant / tool
-	Content    any        `json:"content,omitempty"`
-	Name       *string    `json:"name,omitempty"` // tool 消息的工具名；指针保证空串也输出（DeepSeek 等上游要求字段存在）
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role             string     `json:"role"` // system / user / assistant / tool
+	Content          any        `json:"content,omitempty"`
+	ReasoningContent string     `json:"reasoning_content,omitempty"` // DeepSeek 等兼容方的思考内容（thinking 模式多轮需回传）
+	Name             *string    `json:"name,omitempty"`              // tool 消息的工具名；指针保证空串也输出（DeepSeek 等上游要求字段存在）
+	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string     `json:"tool_call_id,omitempty"`
 }
 
 // ContentPart 是多模态 content 数组的一个单元。
