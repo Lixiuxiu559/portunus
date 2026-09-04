@@ -1,7 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Switch, Typography, Chip, toast, Select, ListBox, TextField, Input } from '@heroui/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Typography, Chip, Card, toast, Select, ListBox, TextField, Input } from '@heroui/react';
 import { Plus, Trash2, RotateCw, X, Search, Pencil } from 'lucide-react';
-import DataTable from '../../components/DataTable';
 import CreateModelModal from './CreateModelModal';
 import EditModelModal from './EditModelModal';
 import DeleteModelModal from './DeleteModelModal';
@@ -14,7 +13,6 @@ export default function Models() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -59,7 +57,7 @@ export default function Models() {
     const params = { page: targetPage, page_size: pageSize };
     if (channel !== 'all') params.channel_id = channel;
     if (name.trim()) params.name = name.trim();
-    // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
+    // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
     const setRefreshState = models.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
@@ -96,22 +94,6 @@ export default function Models() {
     [performSearch, queryChannel, queryName],
   );
 
-  // 刷新按钮的 isPending 状态
-  const isRefreshing = refreshing;
-
-  const handleToggle = async (m) => {
-    setTogglingId(m.id);
-    try {
-      await updateModel(m.id, { enabled: !m.enabled });
-      setModels((prev) => prev.map((x) => (x.id === m.id ? { ...x, enabled: !x.enabled } : x)));
-      toast.success(m.enabled ? '已停用' : '已启用');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setTogglingId(null);
-    }
-  };
-
   const handleCreate = async (data) => {
     await createModel(data);
     toast.success('模型创建成功');
@@ -133,111 +115,9 @@ export default function Models() {
     await performSearch(queryChannel, queryName, nextPage);
   };
 
-  const columns = useMemo(() => [
-    {
-      title: '名称',
-      dataIndex: 'name',
-      key: 'name',
-      isRowHeader: true,
-      render: (val) => (
-        <span className="font-medium">{val}</span>
-      ),
-    },
-    {
-      title: '渠道',
-      dataIndex: 'channel_id',
-      key: 'channel_id',
-      render: (val) => (
-        <Chip variant="soft" size="sm" color="default">
-          {channelMap[val] || val}
-        </Chip>
-      ),
-    },
-    {
-      title: '输入价格',
-      dataIndex: 'input_price',
-      key: 'input_price',
-      width: '110px',
-      render: (val) => (
-        <span className="font-mono">${val ?? '—'}</span>
-      ),
-    },
-    {
-      title: '输出价格',
-      dataIndex: 'output_price',
-      key: 'output_price',
-      width: '110px',
-      render: (val) => (
-        <span className="font-mono">${val ?? '—'}</span>
-      ),
-    },
-    {
-      title: '缓存读取',
-      dataIndex: 'cache_read_price',
-      key: 'cache_read_price',
-      width: '110px',
-      render: (val) => (
-        <span className="font-mono">${val ?? '—'}</span>
-      ),
-    },
-    {
-      title: '缓存写入',
-      dataIndex: 'cache_write_price',
-      key: 'cache_write_price',
-      width: '110px',
-      render: (val) => (
-        <span className="font-mono">${val ?? '—'}</span>
-      ),
-    },
-    {
-      title: '操作',
-      dataIndex: 'id',
-      key: 'action',
-      width: '100px',
-      render: (_, record) => (
-        <div className="flex items-center gap-0.5">
-          <button
-            aria-label={`编辑模型 ${record.name}`}
-            onClick={() => setEditTarget(record)}
-            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer"
-          >
-            <Pencil className="size-4" />
-          </button>
-          <button
-            aria-label={`删除模型 ${record.name}`}
-            onClick={() => setDeleteTarget(record)}
-            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
-          >
-            <Trash2 className="size-4" />
-          </button>
-        </div>
-      ),
-    },
-    {
-      title: '启用',
-      dataIndex: 'enabled',
-      key: 'enabled',
-      width: '80px',
-      render: (val, record) => (
-        <Switch
-          size="sm"
-          isSelected={val}
-          isDisabled={togglingId === record.id}
-          onChange={() => handleToggle(record)}
-        >
-          <Switch.Content>
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-          </Switch.Content>
-        </Switch>
-      ),
-    },
-  ], [channelMap, togglingId]);
-
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <Typography type="h2">模型管理</Typography>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={refreshing}>
@@ -251,7 +131,7 @@ export default function Models() {
       </div>
 
       {/* 筛选区：名称 + 渠道，点击查询按钮后按条件请求后端 */}
-      <div className="model-filters flex items-center gap-2 mb-3">
+      <div className="model-filters flex items-center gap-2 mb-3 shrink-0">
         <TextField
           size="sm"
           value={draftName}
@@ -305,18 +185,75 @@ export default function Models() {
         </Button>
       </div>
 
-      <DataTable
-        dataSource={models}
-        columns={columns}
-        loading={loading}
-        refreshing={refreshing}
-        emptyText={queryName || queryChannel !== 'all'
-          ? '没有符合条件的模型'
-          : '暂无模型，点击右上角「新增模型」创建'}
-      />
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <span className="text-muted">加载中…</span>
+        </div>
+      ) : models.length === 0 ? (
+        <div className="flex justify-center py-16 text-muted">
+          {queryName || queryChannel !== 'all' ? '没有符合条件的模型' : '暂无模型，点击右上角「新增模型」创建'}
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+            {models.map((m) => (
+              <Card key={m.id} className="gap-4 p-5">
+                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                  <Typography className="font-medium text-lg truncate" title={m.name}>
+                    {m.name}
+                  </Typography>
+                  <Chip variant="soft" size="sm" color="default">
+                    {channelMap[m.channel_id] || m.channel_id}
+                  </Chip>
+                </Card.Header>
+
+                <Card.Content className="min-w-0">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-muted mb-0.5">输入价格</div>
+                      <div className="font-mono text-sm">${m.input_price ?? '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted mb-0.5">输出价格</div>
+                      <div className="font-mono text-sm">${m.output_price ?? '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted mb-0.5">缓存读取</div>
+                      <div className="font-mono text-sm">${m.cache_read_price ?? '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted mb-0.5">缓存写入</div>
+                      <div className="font-mono text-sm">${m.cache_write_price ?? '—'}</div>
+                    </div>
+                  </div>
+                </Card.Content>
+
+                <Card.Footer className="shrink-0">
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      aria-label={`编辑模型 ${m.name}`}
+                      onClick={() => setEditTarget(m)}
+                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      aria-label={`删除模型 ${m.name}`}
+                      onClick={() => setDeleteTarget(m)}
+                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </Card.Footer>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 分页 */}
-      <div className="flex items-center justify-between mt-3">
+      <div className="flex items-center justify-between mt-3 shrink-0">
         <Typography type="body-sm" className="text-muted">
           共 {total} 条，第 {page}/{Math.max(1, Math.ceil(total / pageSize))} 页
         </Typography>
