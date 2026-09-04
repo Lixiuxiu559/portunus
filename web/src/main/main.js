@@ -50,6 +50,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Electron 20 起 sandbox 默认 true，会导致 preload 里 require('fs')/require('path')
+      // 失效、整个 preload 执行中断（window.api / window.clientConfig 都无法暴露）。
+      // 显式关闭，让 preload 能访问 Node 内建模块（保持 contextIsolation + 无 nodeIntegration）。
+      sandbox: false,
     },
   });
 
@@ -59,6 +63,14 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
   }
+
+  // 页面加载完成后探测 preload 桥是否注入成功（诊断 window.api / window.clientConfig）
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents
+      .executeJavaScript('({ api: typeof window.api !== "undefined", clientConfig: typeof window.clientConfig !== "undefined" })')
+      .then((r) => console.log('[main] preload 桥探测:', JSON.stringify(r)))
+      .catch((e) => console.warn('[main] preload 桥探测失败:', e.message));
+  });
 
   // 启动自动更新检查（仅生产模式）
   if (!isDev) {
