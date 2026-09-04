@@ -14,6 +14,17 @@ const successOptions = [
   { id: 'false', label: '失败' },
 ];
 
+// 失败类别中文标签（与后端 gateway.classifyErr 的 err_kind 取值对应）
+const errKindLabels = {
+  client_cancel: '用户取消',
+  upstream_error: '上游错误',
+  watchdog_timeout: '流静默超时',
+  stream_interrupted: '流中断',
+  convert_error: '转换失败',
+  network: '网络错误',
+  internal: '内部错误',
+};
+
 export default function Logs() {
   const [logs, setLogs] = useState({ total: 0, data: [] });
   const [stats, setStats] = useState(null);
@@ -95,7 +106,7 @@ export default function Logs() {
         // 缓存命中明细放小字；DB 字段保持计费口径（input_token 为未命中部分）不变。
         const total = val == null ? null : val + cacheRead + cacheWrite;
         return (
-          <span className="block text-left font-mono">
+          <span className="block text-center font-mono">
             {formatNum(total)}
             {cacheRead > 0 && (
               <span className="block text-xs text-muted">缓存读 {formatNum(cacheRead)}</span>
@@ -113,7 +124,7 @@ export default function Logs() {
       key: 'output_token',
       width: '120px',
       render: (val) => (
-        <span className="text-left font-mono block">{formatNum(val)}</span>
+        <span className="text-center font-mono block">{formatNum(val)}</span>
       ),
     },
     {
@@ -146,19 +157,29 @@ export default function Logs() {
       key: 'cost',
       width: '100px',
       render: (val) => (
-        <span className="text-right font-mono block">${Number(val || 0).toFixed(6)}</span>
+        <span className="text-center font-mono block">${Number(val || 0).toFixed(6)}</span>
       ),
     },
     {
       title: '状态',
       dataIndex: 'success',
       key: 'success',
-      width: '80px',
-      render: (val) => (
-        <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-          val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-        }`}>
-          {val ? '成功' : '失败'}
+      width: '110px',
+      render: (val, record) => (
+        <span className="flex flex-col items-start gap-0.5">
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
+            val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+          }`}>
+            {val ? '成功' : '失败'}
+          </span>
+          {!val && record?.err_kind && (
+            <span
+              className="max-w-[100px] truncate text-xs text-muted"
+              title={record?.err_msg || record.err_kind}
+            >
+              {errKindLabels[record.err_kind] || record.err_kind}
+            </span>
+          )}
         </span>
       ),
     },
