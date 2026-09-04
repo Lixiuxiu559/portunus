@@ -23,25 +23,27 @@ type Config struct {
 
 // ProxyConfig 是网关转发层的失败处理配置。
 type ProxyConfig struct {
-	RetryCount              int `json:"retry_count"`                // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
-	ConnectTimeoutSeconds   int `json:"connect_timeout_seconds"`    // 连接超时
-	FirstByteTimeoutSeconds int `json:"first_byte_timeout_seconds"` // 等响应头 / 首包超时
-	NonStreamTimeoutSeconds int `json:"non_stream_timeout_seconds"` // 非流式读完整响应体的总超时
-	CircuitFailureThreshold int `json:"circuit_failure_threshold"`  // 熔断：连续失败 N 次开路
-	CircuitSuccessThreshold int `json:"circuit_success_threshold"`  // 熔断：半开后连续成功 N 次转关闭
-	CircuitResetSeconds     int `json:"circuit_reset_seconds"`      // 熔断：开路冷却时长
+	RetryCount               int `json:"retry_count"`                 // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
+	ConnectTimeoutSeconds    int `json:"connect_timeout_seconds"`     // 连接超时
+	FirstByteTimeoutSeconds  int `json:"first_byte_timeout_seconds"`  // 等响应头 / 流式首包（首个数据事件）超时
+	StreamIdleTimeoutSeconds int `json:"stream_idle_timeout_seconds"` // 流式首包后，上游静默多久掐断（0 禁用）
+	NonStreamTimeoutSeconds  int `json:"non_stream_timeout_seconds"`  // 非流式读完整响应体的总超时
+	CircuitFailureThreshold  int `json:"circuit_failure_threshold"`   // 熔断：连续失败 N 次开路
+	CircuitSuccessThreshold  int `json:"circuit_success_threshold"`   // 熔断：半开后连续成功 N 次转关闭
+	CircuitResetSeconds      int `json:"circuit_reset_seconds"`       // 熔断：开路冷却时长
 }
 
 // DefaultProxyConfig 返回网关转发的默认配置。
 func DefaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
-		RetryCount:              2,
-		ConnectTimeoutSeconds:   30,
-		FirstByteTimeoutSeconds: 60,
-		NonStreamTimeoutSeconds: 600,
-		CircuitFailureThreshold: 4,
-		CircuitSuccessThreshold: 2,
-		CircuitResetSeconds:     60,
+		RetryCount:               2,
+		ConnectTimeoutSeconds:    30,
+		FirstByteTimeoutSeconds:  60,
+		StreamIdleTimeoutSeconds: 120,
+		NonStreamTimeoutSeconds:  600,
+		CircuitFailureThreshold:  4,
+		CircuitSuccessThreshold:  2,
+		CircuitResetSeconds:      60,
 	}
 }
 
@@ -109,6 +111,11 @@ func applyProxyEnv(c *Config) {
 	if v := os.Getenv("PORTUNUS_PROXY_FIRST_BYTE_TIMEOUT_SECONDS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.Proxy.FirstByteTimeoutSeconds = n
+		}
+	}
+	if v := os.Getenv("PORTUNUS_PROXY_STREAM_IDLE_TIMEOUT_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Proxy.StreamIdleTimeoutSeconds = n
 		}
 	}
 	if v := os.Getenv("PORTUNUS_PROXY_NON_STREAM_TIMEOUT_SECONDS"); v != "" {

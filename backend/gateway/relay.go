@@ -32,14 +32,26 @@ type upstreamStatusError struct {
 func (e *upstreamStatusError) Error() string { return "上游返回非 2xx 状态码" }
 
 // isRetryable 判断某次失败是否值得对同一 / 下一上游重试：
-// 5xx 与 429 重试、网络 / 超时错误重试，其余（4xx、协议转换、配置）不重试。
+// 首包前静默超时、5xx 与 429、网络 / 超时错误重试，其余（流已提交、4xx、协议转换、配置）不重试。
 func isRetryable(err error) bool {
+	// 流已提交后的失败（半途断连 / 静默掐断 / 转换错误）一律不可重试：客户端已收到
+	// 部分流，重试只会二次写流。必须放在最前——errors.As 会穿透 Unwrap 命中下层
+	// net.Error 分支（上游半途 connection reset 就是 net.Error），导致误判重试。
+	var sce *streamCommittedError
+	if errors.As(err, &sce) {
+		return false
+	}
 	// 客户端主动取消（context.Canceled）不是上游故障，不重试也不计入熔断。
 	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
 	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度，
 	// 连续几次便使整个渠道熔断开路，导致后续所有请求 503。
 	if errors.Is(err, context.Canceled) {
 		return false
+	}
+	// 首包前静默超时：上游卡死（假流），重试同一 / 下一上游。
+	var ste *streamStallError
+	if errors.As(err, &ste) {
+		return true
 	}
 	var se *upstreamStatusError
 	if errors.As(err, &se) {
@@ -165,11 +177,19 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		return nil, 0, err
 	}
 
+	var wd *streamWatchdog
 	reqCtx := c.Request.Context()
 	if !stream {
 		var cancel context.CancelFunc
 		reqCtx, cancel = context.WithTimeout(reqCtx, time.Duration(proxyCfg.NonStreamTimeoutSeconds)*time.Second)
 		defer cancel()
+	} else {
+		// 流式：看门狗 ctx 贯穿请求与 body 读，触发时掐断读阻塞。
+		// 首包计时在 relayStream 拿到响应头后才开始；等响应头由 Transport 兜底。
+		reqCtx, wd = newStreamWatchdog(reqCtx,
+			time.Duration(proxyCfg.FirstByteTimeoutSeconds)*time.Second,
+			time.Duration(proxyCfg.StreamIdleTimeoutSeconds)*time.Second)
+		defer wd.Stop()
 	}
 
 	resp, err := doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), upstream.ChatHeaders(), upBody)
@@ -198,13 +218,20 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 			}
 		}
 		var streamErr error
-		first, streamErr = relayStream(c, clientProto, resp, conv)
+		first, streamErr = relayStream(c, clientProto, resp, conv, wd)
 		if streamErr != nil {
 			var committed *streamCommittedError
 			if errors.As(streamErr, &committed) {
 				// 已提交，无法 failover；记为失败但不再报错。
 				// 已交付的部分流量仍可能累积了 usage，一并落库，避免费用漏记。
 				usage = conv.Usage()
+				// 除客户端主动断开外，半途失败仍是渠道不健康（假流 / 静默超时 / 断连），
+				// 计入熔断：committed 分支 err 为 nil，不走下方 defer 的熔断记录，
+				// 不补记的话持续假死的渠道永远开不了路，后续请求继续撞墙干等。
+				if !errors.Is(committed.err, context.Canceled) {
+					log.Printf("流已提交后中断: model=%s err=%v", t.Model.Name, committed.err)
+					breakerRecord(t.Channel.ID, true)
+				}
 				return nil, status, nil
 			}
 			// 首包前失败，可重试 / 换家
