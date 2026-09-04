@@ -1,4 +1,8 @@
-# Portunus
+<p align="center">
+  <img src="web/src/renderer/public/logo.png" alt="Portunus Logo" width="180" />
+</p>
+
+<h1 align="center">Portunus</h1>
 
 <p align="center">
   <a href="./README.md">English</a> |
