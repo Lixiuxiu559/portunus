@@ -59,31 +59,48 @@ export default function Logs() {
       title: '时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (val) => (
-        <span className="text-muted font-mono text-xs">
-          {val ? new Date(val).toLocaleString('zh-CN') : '—'}
-        </span>
-      ),
+      render: (val) => {
+        if (!val) return '—';
+        const d = new Date(val);
+        return (
+          <span className="block whitespace-nowrap font-mono text-xs text-muted">
+            {d.toLocaleDateString('zh-CN')}
+            <br />
+            {d.toLocaleTimeString('zh-CN', { hour12: false })}
+          </span>
+        );
+      },
     },
     {
       title: '模型',
       dataIndex: 'model_name',
       key: 'model_name',
-      render: (val) => val || '—',
+      width: '200px',
+      render: (val) => (val ? (
+        <span className="block truncate" title={String(val)}>{val}</span>
+      ) : '—'),
     },
     {
       title: '分组',
       dataIndex: 'group_name',
       key: 'group_name',
-      render: (val) => val || '—',
+      width: '200px',
+      render: (val) => (val ? (
+        <span className="block truncate" title={String(val)}>{val}</span>
+      ) : '—'),
     },
     {
       title: '输入 Tokens',
       dataIndex: 'input_token',
       key: 'input_token',
-      width: '120px',
-      render: (val) => (
-        <span className="text-left font-mono block">{formatNum(val)}</span>
+      width: '140px',
+      render: (val, record) => (
+        <span className="block text-left font-mono">
+          {formatNum(val)}
+          {record?.cache_read_token > 0 && (
+            <span className="block text-xs text-muted">缓存读 {formatNum(record.cache_read_token)}</span>
+          )}
+        </span>
       ),
     },
     {
@@ -96,22 +113,28 @@ export default function Logs() {
       ),
     },
     {
-      title: '缓存读',
-      dataIndex: 'cache_read_token',
-      key: 'cache_read_token',
-      width: '100px',
-      render: (val) => (
-        <span className="text-left font-mono block">{formatNum(val)}</span>
-      ),
-    },
-    {
-      title: '缓存写',
-      dataIndex: 'cache_write_token',
-      key: 'cache_write_token',
-      width: '100px',
-      render: (val) => (
-        <span className="text-left font-mono block">{formatNum(val)}</span>
-      ),
+      title: '耗时 / 首包',
+      dataIndex: 'duration_ms',
+      key: 'duration_ms',
+      width: '200px',
+      render: (val, record) => {
+        const isStream = record?.first_token_ms > 0;
+        return (
+          <span className="flex items-center gap-1">
+            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-primary/15 text-primary">
+              {formatMs(val)}
+            </span>
+            {isStream && (
+              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-cyan-500/15 text-cyan-500">
+                {formatMs(record.first_token_ms)}
+              </span>
+            )}
+            <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-default/15 text-default'}`}>
+              {isStream ? '流' : '非流'}
+            </span>
+          </span>
+        );
+      },
     },
     {
       title: '费用',
@@ -120,24 +143,6 @@ export default function Logs() {
       width: '100px',
       render: (val) => (
         <span className="text-right font-mono block">${Number(val || 0).toFixed(6)}</span>
-      ),
-    },
-    {
-      title: '耗时',
-      dataIndex: 'duration_ms',
-      key: 'duration_ms',
-      width: '90px',
-      render: (val) => (
-        <span className="text-left font-mono block">{formatMs(val)}</span>
-      ),
-    },
-    {
-      title: '首包',
-      dataIndex: 'first_token_ms',
-      key: 'first_token_ms',
-      width: '90px',
-      render: (val) => (
-        <span className="text-left font-mono block">{formatMs(val)}</span>
       ),
     },
     {
