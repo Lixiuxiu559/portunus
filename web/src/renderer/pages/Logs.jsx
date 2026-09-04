@@ -88,14 +88,24 @@ export default function Logs() {
       dataIndex: 'input_token',
       key: 'input_token',
       width: '140px',
-      render: (val, record) => (
-        <span className="block text-left font-mono">
-          {formatNum(val)}
-          {record?.cache_read_token > 0 && (
-            <span className="block text-xs text-muted">缓存读 {formatNum(record.cache_read_token)}</span>
-          )}
-        </span>
-      ),
+      render: (val, record) => {
+        const cacheRead = record?.cache_read_token || 0;
+        const cacheWrite = record?.cache_write_token || 0;
+        // 主数字展示总输入（未命中 + 缓存读 + 缓存写，还原上游 prompt_tokens），
+        // 缓存命中明细放小字；DB 字段保持计费口径（input_token 为未命中部分）不变。
+        const total = val == null ? null : val + cacheRead + cacheWrite;
+        return (
+          <span className="block text-left font-mono">
+            {formatNum(total)}
+            {cacheRead > 0 && (
+              <span className="block text-xs text-muted">缓存读 {formatNum(cacheRead)}</span>
+            )}
+            {cacheWrite > 0 && (
+              <span className="block text-xs text-muted">缓存写 {formatNum(cacheWrite)}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       title: '输出 Tokens',
