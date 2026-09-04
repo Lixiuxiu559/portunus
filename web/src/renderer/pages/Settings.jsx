@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Typography, Button, Card, Spinner, Input, TextField, Switch, toast } from '@heroui/react';
-import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check, Trash2, Plus } from 'lucide-react';
+import { Typography, Button, Card, Spinner, Input, TextField, Modal, toast } from '@heroui/react';
+import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
-import { listAPIKeys, createAPIKey, updateAPIKey, deleteAPIKey } from '../api/apikey';
+import { getAPIKey, regenerateAPIKey } from '../api/apikey';
 
 const APP_VERSION = '0.1.0';
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
@@ -17,45 +17,25 @@ export default function Settings() {
   const [savingInterval, setSavingInterval] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const [apiKeys, setApiKeys] = useState([]);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [creatingKey, setCreatingKey] = useState(false);
-  const [copiedId, setCopiedId] = useState(null);
-  const [busyKeyId, setBusyKeyId] = useState(null);
+  const [apiKey, setApiKey] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
-  const loadAPIKeys = async () => {
+  const loadAPIKey = async () => {
     try {
-      const ks = await listAPIKeys();
-      setApiKeys(Array.isArray(ks) ? ks : []);
+      const k = await getAPIKey();
+      setApiKey(k ?? null);
     } catch {
       // toast 由 request 拦截器统一提示
     }
   };
 
   useEffect(() => {
-    loadAPIKeys();
+    loadAPIKey();
   }, []);
 
-  const handleCreateKey = async () => {
-    const name = newKeyName.trim();
-    if (!name) {
-      toast.error('请输入令牌名称');
-      return;
-    }
-    setCreatingKey(true);
-    try {
-      await createAPIKey(name);
-      setNewKeyName('');
-      toast.success('令牌创建成功');
-      loadAPIKeys();
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setCreatingKey(false);
-    }
-  };
-
-  const handleCopyKey = async (key, id) => {
+  const handleCopyKey = async (key) => {
     try {
       await navigator.clipboard.writeText(key);
     } catch {
@@ -67,33 +47,21 @@ export default function Settings() {
       document.execCommand('copy');
       document.body.removeChild(input);
     }
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleToggleKey = async (k) => {
-    setBusyKeyId(k.id);
+  const handleRegenerate = async () => {
+    setRegenerating(true);
     try {
-      await updateAPIKey(k.id, { enabled: !k.enabled });
-      toast.success(k.enabled ? '令牌已禁用' : '令牌已启用');
-      loadAPIKeys();
+      const k = await regenerateAPIKey();
+      setApiKey(k);
+      setRegenerateOpen(false);
+      toast.success('令牌已重新生成');
     } catch {
       // toast 由 request 拦截器统一提示
     } finally {
-      setBusyKeyId(null);
-    }
-  };
-
-  const handleDeleteKey = async (k) => {
-    setBusyKeyId(k.id);
-    try {
-      await deleteAPIKey(k.id);
-      toast.success('令牌已删除');
-      loadAPIKeys();
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setBusyKeyId(null);
+      setRegenerating(false);
     }
   };
 
@@ -225,86 +193,68 @@ export default function Settings() {
           </Typography>
         </Card.Header>
         <Card.Content className="p-0">
-          <div className="flex flex-col gap-4">
-            {/* 新建令牌 */}
-            <div className="flex items-center gap-2">
-              <TextField
-                size="sm"
-                value={newKeyName}
-                onChange={setNewKeyName}
-                className="flex-1"
-                placeholder="令牌名称，例如：claude-code"
-                aria-label="令牌名称"
-              >
-                <Input />
-              </TextField>
-              <Button variant="secondary" size="sm" onPress={handleCreateKey} isPending={creatingKey}>
-                <Plus className="size-4" />
-                创建
-              </Button>
-            </div>
-
-            {/* 令牌列表 */}
-            {apiKeys.length === 0 ? (
-              <Typography type="body-sm" className="text-muted">
-                暂无令牌
-              </Typography>
-            ) : (
-              <div className="flex flex-col divide-y divide-default-200">
-                {apiKeys.map((k) => (
-                  <div key={k.id} className="flex items-center justify-between py-2">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <Typography className="font-medium truncate">{k.name}</Typography>
-                      <Typography type="body-xs" className="text-muted font-mono">
-                        {maskKey(k.key)}
-                      </Typography>
-                      <Typography type="body-xs" className="text-muted">
-                        创建于 {new Date(k.created_at).toLocaleDateString()}
-                      </Typography>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyKey(k.key, k.id)}
-                        className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
-                        aria-label={`复制令牌 ${k.name}`}
-                      >
-                        {copiedId === k.id ? (
-                          <Check className="size-4 text-success" />
-                        ) : (
-                          <Copy className="size-4" />
-                        )}
-                      </button>
-                      <Switch
-                        size="sm"
-                        isSelected={k.enabled}
-                        isDisabled={busyKeyId === k.id}
-                        onChange={() => handleToggleKey(k)}
-                        aria-label={`切换令牌 ${k.name}`}
-                      >
-                        <Switch.Content>
-                          <Switch.Control>
-                            <Switch.Thumb />
-                          </Switch.Control>
-                        </Switch.Content>
-                      </Switch>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteKey(k)}
-                        disabled={busyKeyId === k.id}
-                        className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer disabled:opacity-50"
-                        aria-label={`删除令牌 ${k.name}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
+          <div className="flex flex-col gap-3">
+            {apiKey ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <Typography type="body-xs" className="text-muted font-mono">
+                      {maskKey(apiKey.key)}
+                    </Typography>
+                    <Typography type="body-xs" className="text-muted">
+                      创建于 {new Date(apiKey.created_at).toLocaleDateString()}
+                    </Typography>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyKey(apiKey.key)}
+                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
+                      aria-label="复制令牌"
+                    >
+                      {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                    </button>
+                    <Button variant="secondary" size="sm" onPress={() => setRegenerateOpen(true)}>
+                      <RefreshCw className="size-4" />
+                      重新生成
+                    </Button>
+                  </div>
+                </div>
+                <Typography type="body-xs" className="text-muted">
+                  重新生成后旧令牌立即失效，已配置的客户端需重新写入。
+                </Typography>
+              </>
+            ) : (
+              <Typography type="body-sm" className="text-muted">加载中…</Typography>
             )}
           </div>
         </Card.Content>
       </Card>
+
+      {/* 重新生成确认弹窗 */}
+      <Modal.Backdrop isOpen={regenerateOpen} onOpenChange={setRegenerateOpen}>
+        <Modal.Container size="sm">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>重新生成令牌</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <Typography color="muted">
+                重新生成后旧令牌立即失效，已配置的 Claude Code / Codex 客户端需重新写入，是否继续？
+              </Typography>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                取消
+              </Button>
+              <Button variant="danger" isPending={regenerating} onPress={handleRegenerate}>
+                {regenerating ? '生成中…' : '重新生成'}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
 
       {/* 版本信息 */}
       <Card className="gap-4 p-5">

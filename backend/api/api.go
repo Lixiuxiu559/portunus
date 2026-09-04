@@ -22,7 +22,7 @@ func Register(r *gin.RouterGroup) {
 	registerModelRoutes(r)   // 模型 CRUD
 	registerGroupRoutes(r)   // 分组 CRUD
 	registerSettingRoutes(r) // 全局设置
-	registerAPIKeyRoutes(r)  // API Key CRUD
+	registerAPIKeyRoutes(r)  // API Key（单 key：读 + 重新生成）
 	registerLogRoutes(r)     // 日志查询与统计
 }
 

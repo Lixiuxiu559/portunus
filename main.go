@@ -41,6 +41,9 @@ func main() {
 	if err := shared.EnsureDefaultSettings(); err != nil {
 		log.Fatalf("初始化默认设置失败: %v", err)
 	}
+	if _, err := shared.EnsureDefaultAPIKey(); err != nil {
+		log.Fatalf("初始化默认 API Key 失败: %v", err)
+	}
 
 	gateway.Configure(cfg.Proxy) // 注入网关转发配置（重试/超时/熔断）
 

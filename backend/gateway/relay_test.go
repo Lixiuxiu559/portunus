@@ -54,7 +54,7 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 	if err := shared.DB.Create(&ch).Error; err != nil {
 		t.Fatalf("建渠道失败: %v", err)
 	}
-	m := model.Model{ChannelID: ch.ID, Name: "upstream-model", Enabled: true}
+	m := model.Model{ChannelID: ch.ID, Name: "upstream-model"}
 	if err := shared.DB.Create(&m).Error; err != nil {
 		t.Fatalf("建模型失败: %v", err)
 	}
@@ -66,7 +66,7 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 		t.Fatalf("建分组项失败: %v", err)
 	}
 
-	k := shared.APIKey{Name: "test", Key: "test-key", Enabled: true}
+	k := shared.APIKey{Key: "test-key"}
 	if err := shared.DB.Create(&k).Error; err != nil {
 		t.Fatalf("建 APIKey 失败: %v", err)
 	}

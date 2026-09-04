@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Typography, Button, Card, TextField, Input, Select, ListBox, toast } from '@heroui/react';
+import { Typography, Button, Card, TextField, Input, toast } from '@heroui/react';
 import { RefreshCw, Save, FolderInput, Info } from 'lucide-react';
-import { listAPIKeys } from '../api/apikey';
+import { getAPIKey } from '../api/apikey';
 
 // 是否在 Electron 桌面端（有 preload 注入 clientConfig 桥）；纯浏览器开发时不存在。
 const hasElectron = typeof window !== 'undefined' && !!window.clientConfig;
@@ -25,9 +25,7 @@ function ClientSection({
   baseUrl,
   baseUrlNote,
   onBaseUrlChange,
-  keyId,
-  onKeyIdChange,
-  apiKeys,
+  apiKey,
   onWrite,
   onRead,
   writing,
@@ -71,32 +69,13 @@ function ClientSection({
           </TextField>
           <Typography type="body-xs" className="text-muted -mt-3">{baseUrlNote}</Typography>
 
-          {/* 令牌选择 */}
-          <Select
-            size="sm"
-            label="令牌"
-            placeholder={apiKeys.length ? '请选择令牌' : '暂无令牌，请先到「设置」创建'}
-            selectedKey={keyId}
-            onSelectionChange={onKeyIdChange}
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {apiKeys.map((k) => (
-                  <ListBox.Item key={String(k.id)} id={String(k.id)} textValue={k.name}>
-                    <div className="flex items-center justify-between gap-2 w-full">
-                      <span>{k.name}</span>
-                      <span className="text-muted font-mono text-xs">{maskToken(k.key)}</span>
-                    </div>
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          {/* 令牌：唯一 key，自动使用 */}
+          <div className="flex flex-col gap-1">
+            <Typography type="body-xs" className="text-muted">令牌</Typography>
+            <Typography type="body-xs" className="font-mono">
+              {apiKey ? maskToken(apiKey) : '暂无令牌，请先到「设置」生成'}
+            </Typography>
+          </div>
 
           <Button variant="primary" size="sm" onPress={onWrite} isPending={writing}>
             <Save className="size-4" />
@@ -112,12 +91,10 @@ export default function Clients() {
   const serverUrl = window.api?.getServerUrl?.() || 'http://localhost:3061';
 
   const [paths, setPaths] = useState({ claude: '', codex: '' });
-  const [apiKeys, setApiKeys] = useState([]);
+  const [apiKey, setApiKey] = useState(null);
 
   const [claudeBaseUrl, setClaudeBaseUrl] = useState(serverUrl);
   const [codexBaseUrl, setCodexBaseUrl] = useState(`${serverUrl.replace(/\/+$/, '')}/v1`);
-  const [claudeKeyId, setClaudeKeyId] = useState(null);
-  const [codexKeyId, setCodexKeyId] = useState(null);
 
   const [claudeLive, setClaudeLive] = useState(null);
   const [codexLive, setCodexLive] = useState(null);
@@ -138,18 +115,17 @@ export default function Clients() {
     window.clientConfig.getPaths().then((r) => {
       if (r.ok) setPaths(r.data);
     });
-    listAPIKeys()
-      .then((ks) => setApiKeys(Array.isArray(ks) ? ks : []))
+    getAPIKey()
+      .then((k) => setApiKey(k?.key ?? null))
       .catch(() => {});
     loadLive();
   }, []);
 
   const handleWrite = async (which) => {
-    const keyId = which === 'claude' ? claudeKeyId : codexKeyId;
     const baseUrl = which === 'claude' ? claudeBaseUrl : codexBaseUrl;
-    const key = apiKeys.find((k) => String(k.id) === String(keyId));
+    const key = apiKey;
     if (!key) {
-      toast.error('请先选择令牌');
+      toast.error('暂无令牌，请先到「设置」生成');
       return;
     }
     if (!baseUrl?.trim()) {
@@ -159,7 +135,7 @@ export default function Clients() {
     setWriting((s) => ({ ...s, [which]: true }));
     try {
       const fn = which === 'claude' ? window.clientConfig.writeClaude : window.clientConfig.writeCodex;
-      const r = await fn({ baseUrl: baseUrl.trim(), apiKey: key.key });
+      const r = await fn({ baseUrl: baseUrl.trim(), apiKey: key });
       if (r.ok) {
         toast.success('配置已写入');
         await loadLive();
@@ -206,9 +182,7 @@ export default function Clients() {
         baseUrl={claudeBaseUrl}
         baseUrlNote="指向 Portunus 根地址（不带 /v1），Claude Code 会自动拼 /v1/messages。"
         onBaseUrlChange={setClaudeBaseUrl}
-        keyId={claudeKeyId}
-        onKeyIdChange={setClaudeKeyId}
-        apiKeys={apiKeys}
+        apiKey={apiKey}
         onWrite={() => handleWrite('claude')}
         onRead={loadLive}
         writing={writing.claude}
@@ -222,9 +196,7 @@ export default function Clients() {
         baseUrl={codexBaseUrl}
         baseUrlNote="指向 Portunus 的 /v1（带 /v1），Codex Responses API 会自动拼 /responses。"
         onBaseUrlChange={setCodexBaseUrl}
-        keyId={codexKeyId}
-        onKeyIdChange={setCodexKeyId}
-        apiKeys={apiKeys}
+        apiKey={apiKey}
         onWrite={() => handleWrite('codex')}
         onRead={loadLive}
         writing={writing.codex}

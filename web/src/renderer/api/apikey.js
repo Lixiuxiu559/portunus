@@ -2,25 +2,15 @@ import request from './request';
 
 /**
  * API Key：对外 /v1 接口鉴权凭据
- * 创建时返回完整 key（仅此一次）；列表/更新返回脱敏 key。
+ * 单 key 场景：仅「读」与「重新生成」两个动作，返回完整 key 便于复制。
  */
 
-/** API Key 列表（key 脱敏） */
-export function listAPIKeys() {
-  return request.get('/apikeys');
+/** 获取唯一 API Key */
+export function getAPIKey() {
+  return request.get('/apikey');
 }
 
-/** 创建 API Key { name }，返回完整 key */
-export function createAPIKey(name) {
-  return request.post('/apikeys', { name });
-}
-
-/** 更新 API Key { name?, enabled? } */
-export function updateAPIKey(id, data) {
-  return request.put(`/apikeys/${id}`, data);
-}
-
-/** 删除 API Key */
-export function deleteAPIKey(id) {
-  return request.delete(`/apikeys/${id}`);
+/** 重新生成 API Key，返回新 key 完整明文 */
+export function regenerateAPIKey() {
+  return request.post('/apikey/regenerate');
 }

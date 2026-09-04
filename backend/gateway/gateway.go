@@ -36,7 +36,7 @@ func authMiddleware() gin.HandlerFunc {
 		}
 
 		var k shared.APIKey
-		if err := shared.DB.Where("key = ? AND enabled = ?", key, true).First(&k).Error; err != nil {
+		if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
 			return
 		}

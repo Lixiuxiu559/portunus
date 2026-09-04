@@ -54,43 +54,85 @@ func TestMaskAPIKey(t *testing.T) {
 	}
 }
 
-func TestAPIKeyCRUD(t *testing.T) {
+func TestEnsureDefaultAPIKey(t *testing.T) {
 	setupAPIKeyTest(t)
 
-	k, err := CreateAPIKey("my-key")
+	// 空库 → 自动生成一把
+	k, err := EnsureDefaultAPIKey()
 	if err != nil {
-		t.Fatalf("创建失败: %v", err)
+		t.Fatalf("EnsureDefaultAPIKey 失败: %v", err)
 	}
 	if k.Key == "" || k.Key[:3] != "sk-" {
-		t.Errorf("创建后应有完整 key: %q", k.Key)
-	}
-	if !k.Enabled {
-		t.Errorf("新 key 应默认启用")
+		t.Errorf("自动生成的 key 异常: %q", k.Key)
 	}
 
-	ks, err := ListAPIKeys()
-	if err != nil || len(ks) != 1 {
-		t.Fatalf("list 失败: %v, len=%d", err, len(ks))
-	}
-
-	newName := "renamed"
-	disabled := false
-	k2, err := UpdateAPIKey(k.ID, &newName, &disabled)
+	// 再调一次 → 仍是同一把，不重复建
+	k2, err := EnsureDefaultAPIKey()
 	if err != nil {
-		t.Fatalf("更新失败: %v", err)
+		t.Fatalf("二次 Ensure 失败: %v", err)
 	}
-	if k2.Name != "renamed" || k2.Enabled {
-		t.Errorf("更新结果不对: %+v", k2)
-	}
-
-	if _, err := CreateAPIKey(""); err != ErrAPIKeyInvalid {
-		t.Errorf("空名称应返回 ErrAPIKeyInvalid, got %v", err)
+	if k2.ID != k.ID || k2.Key != k.Key {
+		t.Errorf("已有一把时不应重建: id %d/%d key %q/%q", k2.ID, k.ID, k2.Key, k.Key)
 	}
 
-	if err := DeleteAPIKey(k.ID); err != nil {
-		t.Fatalf("删除失败: %v", err)
+	// 手动多插两把 → 保留最早、删除其余
+	if _, err := newAPIKey(); err != nil {
+		t.Fatalf("建 extra1 失败: %v", err)
 	}
-	if _, err := GetAPIKey(k.ID); err == nil {
-		t.Errorf("删除后 Get 应报错")
+	if _, err := newAPIKey(); err != nil {
+		t.Fatalf("建 extra2 失败: %v", err)
+	}
+	k3, err := EnsureDefaultAPIKey()
+	if err != nil {
+		t.Fatalf("清理后 Ensure 失败: %v", err)
+	}
+	if k3.ID != k.ID {
+		t.Errorf("应保留最早那把 id=%d, got %d", k.ID, k3.ID)
+	}
+	var count int64
+	if err := DB.Model(&APIKey{}).Count(&count).Error; err != nil {
+		t.Fatalf("计数失败: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("清理后应只剩一把, count=%d", count)
+	}
+}
+
+func TestRegenerateAPIKey(t *testing.T) {
+	setupAPIKeyTest(t)
+	k, err := EnsureDefaultAPIKey()
+	if err != nil {
+		t.Fatalf("EnsureDefaultAPIKey 失败: %v", err)
+	}
+	oldID, oldKey := k.ID, k.Key
+
+	k2, err := RegenerateAPIKey()
+	if err != nil {
+		t.Fatalf("RegenerateAPIKey 失败: %v", err)
+	}
+	if k2.ID != oldID {
+		t.Errorf("重新生成应保持 id 不变: %d -> %d", oldID, k2.ID)
+	}
+	if k2.Key == oldKey {
+		t.Errorf("重新生成应产出新 key")
+	}
+	if k2.Key[:3] != "sk-" {
+		t.Errorf("新 key 格式异常: %q", k2.Key)
+	}
+
+	// 库里应仍只有一把
+	var count int64
+	if err := DB.Model(&APIKey{}).Count(&count).Error; err != nil {
+		t.Fatalf("计数失败: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("重新生成后应仍只有一把, count=%d", count)
+	}
+}
+
+func TestGetAPIKeyEmpty(t *testing.T) {
+	setupAPIKeyTest(t)
+	if _, err := GetAPIKey(); err == nil {
+		t.Errorf("空库下 GetAPIKey 应报错")
 	}
 }
