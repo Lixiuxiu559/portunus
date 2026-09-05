@@ -105,6 +105,7 @@ export default function Logs() {
       dataIndex: 'input_token',
       key: 'input_token',
       width: '140px',
+      align: 'center',
       render: (val, record) => {
         const cacheRead = record?.cache_read_token || 0;
         const cacheWrite = record?.cache_write_token || 0;
@@ -129,6 +130,7 @@ export default function Logs() {
       dataIndex: 'output_token',
       key: 'output_token',
       width: '120px',
+      align: 'center',
       render: (val) => (
         <span className="text-center font-mono block">{formatNum(val)}</span>
       ),
@@ -166,6 +168,7 @@ export default function Logs() {
       dataIndex: 'cost',
       key: 'cost',
       width: '100px',
+      align: 'center',
       render: (val) => (
         <span className="text-center font-mono block">${Number(val || 0).toFixed(6)}</span>
       ),
