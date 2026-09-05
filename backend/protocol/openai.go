@@ -1,7 +1,5 @@
 package protocol
 
-import "encoding/json"
-
 // 本文件定义 OpenAI Chat Completions 的请求 / 响应 / 流式 chunk 结构，
 // 作为协议转换模块的内部规范格式（canonical）。其余协议均先转到该结构再转出。
 
@@ -100,39 +98,7 @@ type ChatChoice struct {
 	FinishReason string      `json:"finish_reason,omitempty"`
 }
 
-// Usage 是统一 token 用量，供日志 / 计费使用。
-// PromptTokens 表示非缓存的输入 token；缓存命中的输入单独记在 CacheReadTokens。
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-	CacheReadTokens  int `json:"cache_read_tokens,omitempty"`
-	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
-}
-
-// UnmarshalJSON 解析 OpenAI 规范的 usage，把 prompt_tokens_details.cached_tokens
-// 归一化为 CacheReadTokens、cache_creation_tokens 归一化为 CacheWriteTokens
-// （并从 PromptTokens 中扣除，得到非缓存输入）。
-func (u *Usage) UnmarshalJSON(data []byte) error {
-	var aux struct {
-		PromptTokens        int `json:"prompt_tokens"`
-		CompletionTokens    int `json:"completion_tokens"`
-		TotalTokens         int `json:"total_tokens"`
-		PromptTokensDetails struct {
-			CachedTokens        int `json:"cached_tokens"`
-			CacheCreationTokens int `json:"cache_creation_tokens"`
-		} `json:"prompt_tokens_details"`
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	u.PromptTokens = aux.PromptTokens - aux.PromptTokensDetails.CachedTokens - aux.PromptTokensDetails.CacheCreationTokens
-	u.CompletionTokens = aux.CompletionTokens
-	u.TotalTokens = aux.TotalTokens
-	u.CacheReadTokens = aux.PromptTokensDetails.CachedTokens
-	u.CacheWriteTokens = aux.PromptTokensDetails.CacheCreationTokens
-	return nil
-}
+// Usage 及其归一化解析见 usage.go——「X → canonical Usage」的唯一数学归宿。
 
 // ChatCompletionChunk 是 OpenAI Chat Completions 流式 chunk。
 type ChatCompletionChunk struct {

@@ -90,11 +90,8 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		if ev.Message != nil {
 			a.st.setMeta(ev.Message.ID, ev.Message.Model)
 			if ev.Message.Usage != nil {
-				a.st.usage = &Usage{
-					PromptTokens:     ev.Message.Usage.InputTokens - ev.Message.Usage.CacheCreationInputTokens - ev.Message.Usage.CacheReadInputTokens,
-					CacheReadTokens:  ev.Message.Usage.CacheReadInputTokens,
-					CacheWriteTokens: ev.Message.Usage.CacheCreationInputTokens,
-				}
+				u := usageFromAnthropic(*ev.Message.Usage)
+				a.st.usage = &u
 			}
 			if b := a.st.emitRole("assistant"); b != nil {
 				out = append(out, b)

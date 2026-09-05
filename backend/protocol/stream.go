@@ -44,72 +44,24 @@ func NewStreamConverter(from, to Provider) (StreamConverter, error) {
 	return &chainedStreamConverter{first: first, second: second}, nil
 }
 
-// protocolAwarePassthrough 同协议直通，按源协议从原始流事件中累积 usage。
+// protocolAwarePassthrough 同协议直通：usage 提取委托给源协议注册的能力项
+// newUsageExtractor（usage.go），本结构只是薄壳——没有能力项就取不到 usage，
+// 新协议漏提取的问题在注册表编译期就会暴露，而不是流式日志静默丢 token。
 type protocolAwarePassthrough struct {
-	extract func(payload []byte)
+	extract func(payload []byte) *Usage
 	usage   *Usage
 }
 
 func newProtocolAwarePassthrough(p Provider) *protocolAwarePassthrough {
-	pt := &protocolAwarePassthrough{}
-	switch p {
-	case ProviderOpenAI:
-		pt.extract = func(payload []byte) {
-			var chunk ChatCompletionChunk
-			if json.Unmarshal(payload, &chunk) == nil && chunk.Usage != nil {
-				pt.usage = chunk.Usage
-			}
-		}
-	case ProviderAnthropic:
-		pt.extract = func(payload []byte) {
-			var ev MessagesStreamEvent
-			if json.Unmarshal(payload, &ev) != nil {
-				return
-			}
-			switch ev.Type {
-			case "message_start":
-				if ev.Message != nil && ev.Message.Usage != nil {
-					u := ev.Message.Usage
-					pt.usage = &Usage{
-						PromptTokens:     u.InputTokens - u.CacheCreationInputTokens - u.CacheReadInputTokens,
-						CacheReadTokens:  u.CacheReadInputTokens,
-						CacheWriteTokens: u.CacheCreationInputTokens,
-						TotalTokens:      u.InputTokens + u.OutputTokens,
-					}
-				}
-			case "message_delta":
-				if ev.Usage != nil {
-					if pt.usage == nil {
-						pt.usage = &Usage{}
-					}
-					pt.usage.CompletionTokens = ev.Usage.OutputTokens
-					pt.usage.TotalTokens = pt.usage.PromptTokens + pt.usage.CompletionTokens + pt.usage.CacheReadTokens + pt.usage.CacheWriteTokens
-				}
-			}
-		}
-	case ProviderOpenAIResponses:
-		pt.extract = func(payload []byte) {
-			var ev ResponsesStreamEvent
-			if json.Unmarshal(payload, &ev) != nil {
-				return
-			}
-			if ev.Type == "response.completed" && ev.Response != nil && ev.Response.Usage != nil {
-				u := ev.Response.Usage
-				pt.usage = &Usage{
-					PromptTokens:     u.InputTokens - u.InputTokensDetails.CachedTokens,
-					CompletionTokens: u.OutputTokens,
-					TotalTokens:      u.TotalTokens,
-					CacheReadTokens:  u.InputTokensDetails.CachedTokens,
-				}
-			}
-		}
+	if impl, ok := implFor(p); ok {
+		return &protocolAwarePassthrough{extract: impl.newUsageExtractor()}
 	}
-	return pt
+	return &protocolAwarePassthrough{}
 }
 
 func (p *protocolAwarePassthrough) Convert(payload []byte) ([][]byte, error) {
-	if p.extract != nil {
-		p.extract(payload)
+	if u := p.extract(payload); u != nil {
+		p.usage = u
 	}
 	return [][]byte{payload}, nil
 }
@@ -138,7 +90,7 @@ func newFromOpenAIStream(to Provider) StreamConverter {
 }
 
 // identityStream OpenAI 协议段的直通转换器，用于跨协议链路里的 OpenAI 端点
-//（from==to 的同协议直通走 protocolAwarePassthrough）。仍解析每一个 chunk 累积
+// （from==to 的同协议直通走 protocolAwarePassthrough）。仍解析每一个 chunk 累积
 // usage：否则 OpenAI 端点返回的 usage 会在日志落库时丢失（chain 的 Usage() 只取第一段）。
 type identityStream struct {
 	usage *Usage

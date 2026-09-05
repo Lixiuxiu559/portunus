@@ -371,12 +371,8 @@ func geminiResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		out.Choices[0].FinishReason = geminiFinishToOpenAI(cand.FinishReason)
 	}
 	if resp.UsageMetadata != nil {
-		out.Usage = &Usage{
-			PromptTokens:     resp.UsageMetadata.PromptTokenCount - resp.UsageMetadata.CachedContentTokenCount,
-			CompletionTokens: resp.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      resp.UsageMetadata.TotalTokenCount,
-			CacheReadTokens:  resp.UsageMetadata.CachedContentTokenCount,
-		}
+		u := usageFromGemini(*resp.UsageMetadata)
+		out.Usage = &u
 	}
 	return out, nil
 }
@@ -466,11 +462,11 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	}
 	var out [][]byte
 	if resp.UsageMetadata != nil {
-		g.st.usage = &Usage{
-			PromptTokens:     resp.UsageMetadata.PromptTokenCount,
-			CompletionTokens: resp.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      resp.UsageMetadata.TotalTokenCount,
-		}
+		// 每条 chunk 的 usageMetadata 均为累积值，最后一条生效。经 usageFromGemini
+		// 归一：扣缓存并记 CacheRead，与非流式口径一致——此前流式不扣缓存也不记
+		// CacheRead，缓存段被按全价 input 计费。
+		u := usageFromGemini(*resp.UsageMetadata)
+		g.st.usage = &u
 	}
 	if len(resp.Candidates) == 0 {
 		return out, nil

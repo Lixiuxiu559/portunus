@@ -648,13 +648,8 @@ func anthropicResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		}},
 	}
 	if resp.Usage != nil {
-		out.Usage = &Usage{
-			PromptTokens:     resp.Usage.InputTokens - resp.Usage.CacheCreationInputTokens - resp.Usage.CacheReadInputTokens,
-			CompletionTokens: resp.Usage.OutputTokens,
-			TotalTokens:      resp.Usage.InputTokens + resp.Usage.OutputTokens,
-			CacheReadTokens:  resp.Usage.CacheReadInputTokens,
-			CacheWriteTokens: resp.Usage.CacheCreationInputTokens,
-		}
+		u := usageFromAnthropic(*resp.Usage)
+		out.Usage = &u
 	}
 	return out, nil
 }

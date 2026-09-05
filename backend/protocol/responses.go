@@ -321,12 +321,8 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 	out.Choices[0].FinishReason = finish
 
 	if resp.Usage != nil {
-		out.Usage = &Usage{
-			PromptTokens:     resp.Usage.InputTokens - resp.Usage.InputTokensDetails.CachedTokens,
-			CompletionTokens: resp.Usage.OutputTokens,
-			TotalTokens:      resp.Usage.TotalTokens,
-			CacheReadTokens:  resp.Usage.InputTokensDetails.CachedTokens,
-		}
+		u := usageFromResponses(*resp.Usage)
+		out.Usage = &u
 	}
 	return out, nil
 }
@@ -431,12 +427,8 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		if ev.Response != nil {
 			r.st.setMeta(ev.Response.ID, ev.Response.Model)
 			if ev.Response.Usage != nil {
-				r.st.usage = &Usage{
-					PromptTokens:     ev.Response.Usage.InputTokens - ev.Response.Usage.InputTokensDetails.CachedTokens,
-					CompletionTokens: ev.Response.Usage.OutputTokens,
-					TotalTokens:      ev.Response.Usage.TotalTokens,
-					CacheReadTokens:  ev.Response.Usage.InputTokensDetails.CachedTokens,
-				}
+				u := usageFromResponses(*ev.Response.Usage)
+				r.st.usage = &u
 			}
 			// finish_reason 取决于流式过程中是否出现过 function_call（更可靠，
 			// 因为部分上游的 completed.response.output 可能为空或只带精简项）；
