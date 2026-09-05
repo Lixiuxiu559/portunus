@@ -163,7 +163,8 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-6">
       <Typography type="h2">系统设置</Typography>
 
       {/* 渠道同步 */}
@@ -410,6 +411,7 @@ export default function Settings() {
           </div>
         )}
       </Card>
+      </div>
     </div>
   );
 }
