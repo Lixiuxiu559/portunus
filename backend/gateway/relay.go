@@ -102,6 +102,12 @@ func isStall(err error) bool {
 	return errors.As(err, &hte)
 }
 
+// thinkingSuffix 是「可控思考开关」的模型名后缀约定：对外模型名（分组名）带
+// -thinking 表示本次调用要开思考。参考 new-api 的同名方案——开关跟随模型名走，
+// 比全局转发 thinking 参数安全得多：不接受该参数的模型（glm-5.3 报 "cannot be
+// disabled"、o 系列用 reasoning.effort）不带后缀即完全不受影响。
+const thinkingSuffix = "-thinking"
+
 // handleRelay 返回一个 relay handler，客户端协议由 clientProto 固定。
 // 按分组策略遍历目标（外层），每个目标失败后按配置先重试 N 次（内层），
 // 耗尽才换下一个目标；熔断开路的模型会被跳过。
@@ -119,13 +125,20 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			return
 		}
 
+		// -thinking 后缀：剥掉后解析分组，注入与否由 relayToTarget 按上游协议决定
+		groupName := meta.Model
+		thinkingRequested := strings.HasSuffix(groupName, thinkingSuffix)
+		if thinkingRequested {
+			groupName = strings.TrimSuffix(groupName, thinkingSuffix)
+		}
+
 		requestID := newRequestID()
 		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位
 		c.Writer.Header().Set("X-Request-Id", requestID)
 
-		g, err := group.GetByName(meta.Model)
+		g, err := group.GetByName(groupName)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "分组不存在: " + meta.Model})
+			c.JSON(http.StatusNotFound, gin.H{"error": "分组不存在: " + groupName})
 			return
 		}
 
@@ -147,7 +160,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			}
 			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID)
+				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, thinkingRequested)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -210,7 +223,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string) (out []byte, status int, err error) {
+func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, thinkingRequested bool) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -251,6 +264,14 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	upBody, err := protocol.ConvertRequest(clientProto, t.Channel.Type, reqBody)
 	if err != nil {
 		return nil, 0, &convertError{err}
+	}
+
+	// -thinking 后缀注入思考开关：仅 OpenAI 兼容上游（thinking 是 DeepSeek/GLM 等
+	// 沿用 Anthropic 形状的扩展字段；其余协议上游的思考开关形态各异，按需扩展）。
+	if thinkingRequested && t.Channel.Type == protocol.ProviderOpenAI {
+		if upBody, err = injectThinkingParam(upBody, originalBody, clientProto); err != nil {
+			return nil, 0, &convertError{fmt.Errorf("注入 thinking 参数失败: %w", err)}
+		}
 	}
 
 	upstream, err := protocol.NewUpstream(t.Channel.Type, t.Channel.BaseURL, t.Channel.Key)
@@ -348,5 +369,28 @@ func rewriteModel(body []byte, modelName string) ([]byte, error) {
 		return nil, err
 	}
 	m["model"] = modelName
+	return json.Marshal(m)
+}
+
+// injectThinkingParam 向 OpenAI 兼容上游请求体注入 thinking 开关（-thinking 后缀
+// 约定的执行端）。客户端是 Anthropic 协议且自带 thinking 配置时沿用其 budget_tokens
+// （Claude Code 的 effort 等级就映射在这里），否则只发 type=enabled——budget 是可选
+// 字段，缺省走上游默认。经 map 往返以保留转换产物中的其余字段。
+func injectThinkingParam(body, clientBody []byte, clientProto protocol.Provider) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, err
+	}
+	thinking := map[string]any{"type": "enabled"}
+	if clientProto == protocol.ProviderAnthropic {
+		// 只探 thinking 一个字段，避免对可能数 MB 的消息体做全量反序列化
+		var probe struct {
+			Thinking *protocol.ThinkingConfig `json:"thinking"`
+		}
+		if json.Unmarshal(clientBody, &probe) == nil && probe.Thinking != nil && probe.Thinking.BudgetTokens > 0 {
+			thinking["budget_tokens"] = probe.Thinking.BudgetTokens
+		}
+	}
+	m["thinking"] = thinking
 	return json.Marshal(m)
 }

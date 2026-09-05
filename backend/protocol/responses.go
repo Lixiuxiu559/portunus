@@ -64,6 +64,7 @@ type OutputItem struct {
 	ID        string             `json:"id,omitempty"`
 	Role      string             `json:"role,omitempty"`
 	Content   []ResponsesContent `json:"content,omitempty"`
+	Summary   []ResponsesContent `json:"summary,omitempty"` // reasoning item 的思考摘要（summary_text 段）
 	Name      string             `json:"name,omitempty"`
 	Arguments string             `json:"arguments,omitempty"`
 	CallID    string             `json:"call_id,omitempty"`
@@ -300,7 +301,21 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 				finish = "tool_calls"
 			}
 		case "reasoning":
-			// 忽略 reasoning item，暂不映射到 content
+			// 思考摘要映射为 reasoning_content（DeepSeek 同款扩展字段），经下游转换
+			// 链透出（如转 Anthropic thinking 块）。官方 item 摘要在 summary[]；个别
+			// 上游放 content[]（reasoning_text 段），summary 为空时兜底取 content。
+			for _, s := range item.Summary {
+				if s.Text != "" {
+					out.Choices[0].Message.ReasoningContent += s.Text
+				}
+			}
+			if out.Choices[0].Message.ReasoningContent == "" {
+				for _, s := range item.Content {
+					if s.Text != "" {
+						out.Choices[0].Message.ReasoningContent += s.Text
+					}
+				}
+			}
 		}
 	}
 	out.Choices[0].FinishReason = finish
@@ -383,6 +398,15 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		}
 		r.st.text.WriteString(ev.Delta)
 		out = append(out, r.st.emitChunk(ChunkDelta{Content: ev.Delta}, ""))
+	case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
+		// 思考摘要 / 思考正文增量 → reasoning_content（DeepSeek 同款形状），先于正文流出
+		if ev.Delta == "" {
+			break
+		}
+		if b := r.st.emitRole("assistant"); b != nil {
+			out = append(out, b)
+		}
+		out = append(out, r.st.emitChunk(ChunkDelta{ReasoningContent: ev.Delta}, ""))
 	case "response.output_item.added":
 		// Responses 的工具调用以 function_call item 形式流式给出：开场即带 call_id / name，
 		// 后续参数增量走 function_call_arguments.delta。映射为 OpenAI tool_calls 开场 chunk。

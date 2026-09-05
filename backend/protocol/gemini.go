@@ -26,6 +26,7 @@ type GeminiContent struct {
 // GeminiPart 是 content 的一个 part。
 type GeminiPart struct {
 	Text             string                  `json:"text,omitempty"`
+	Thought          bool                    `json:"thought,omitempty"` // 思考摘要（Gemini 2.5+ thought summaries），text 携带思考内容
 	InlineData       *InlineData             `json:"inlineData,omitempty"`
 	FunctionCall     *GeminiFunctionCall     `json:"functionCall,omitempty"`
 	FunctionResponse *GeminiFunctionResponse `json:"functionResponse,omitempty"`
@@ -158,6 +159,10 @@ func geminiContentToChat(c GeminiContent) ChatMessage {
 	var textParts []string
 	for _, p := range c.Parts {
 		switch {
+		case p.Thought && p.Text != "":
+			// 思考摘要映射为 OpenAI 的 reasoning_content 扩展字段（DeepSeek 同款形状），
+			// 经下游转换链透出（如转 Anthropic thinking 块）；不进正文 text。
+			out.ReasoningContent += p.Text
 		case p.Text != "":
 			textParts = append(textParts, p.Text)
 		case p.FunctionCall != nil:
@@ -478,6 +483,12 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			}
 			if b := g.st.emitRole("assistant"); b != nil {
 				out = append(out, b)
+			}
+			if p.Thought {
+				// 思考摘要增量 → reasoning_content（与 DeepSeek 流式同形状），
+				// 不计入正文 text，下游转 thinking 块
+				out = append(out, g.st.emitChunk(ChunkDelta{ReasoningContent: p.Text}, ""))
+				continue
 			}
 			g.st.text.WriteString(p.Text)
 			out = append(out, g.st.emitChunk(ChunkDelta{Content: p.Text}, ""))
