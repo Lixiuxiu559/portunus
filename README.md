@@ -25,53 +25,20 @@ Portunus is a lightweight LLM API aggregation service: connect multiple upstream
 
 ## 🚀 Quick Start
 
-### Docker Compose (Recommended)
+### Desktop App (Electron)
 
-Create a directory with a `docker-compose.yml`:
+Portunus ships as a self-contained Electron desktop app: the Go backend is bundled as a sidecar process, so one installer is all a customer needs — no separate deployment.
 
-```yaml
-services:
-  portunus:
-    image: lijx559/portunus:latest
-    container_name: portunus
-    restart: unless-stopped
-    ports:
-      - "3060:80"
-    volumes:
-      - ./data:/app/data
-```
+Build installers locally:
 
 ```bash
-docker compose up -d
+cd web
+pnpm install
+pnpm run build:mac   # macOS DMG / ZIP (arm64)
+pnpm run build:win   # Windows NSIS (x64)
 ```
 
-Then open `http://localhost:3060`:
-
-| Path | Description |
-|---|---|
-| `http://localhost:3060/` | Web management UI |
-| `http://localhost:3060/api/*` | Management API (same origin as the UI, no CORS needed) |
-| `http://localhost:3060/v1/*` | LLM gateway (set base_url to `http://localhost:3060` for Claude Code / Codex) |
-
-**Custom data directory**: the SQLite database lands in `./data` next to the compose file by default. Change the host-side path in volumes to move it anywhere:
-
-```yaml
-    volumes:
-      - /your/custom/path:/app/data
-```
-
-> ⚠️ The database path is fixed to `/app/data/portunus.db` inside the image, so only change the host-side path (left side of the colon); keep the container-side path (`/app/data`) unchanged.
-
-### Docker Run
-
-```bash
-docker run -d --name portunus \
-  -p 3060:80 \
-  -v /path/to/data:/app/data \
-  lijx559/portunus:latest
-```
-
-The image is multi-arch (linux/amd64 + linux/arm64) and contains both the Web management UI (nginx) and the Go backend in a single container.
+Artifacts land in `web/dist-electron/`. Pushing a `v*` tag triggers GitHub Actions, which builds both platforms and uploads a **draft** GitHub Release — review it, then publish manually.
 
 ### Run from Source
 
@@ -86,7 +53,7 @@ go run .
 
 Listens on `0.0.0.0:3061` by default. Database: `data/portunus.db` (SQLite).
 
-### Frontend (Management UI)
+### Development (Management UI)
 
 The management UI lives in `web/` (Electron + React + Vite). The dev server proxies `/api` and `/v1` to the backend at `localhost:3061`, so start the backend first (`go run .`).
 
@@ -95,7 +62,6 @@ cd web
 pnpm install        # install dependencies
 pnpm run dev:web    # start Vite and open http://localhost:5173
 pnpm run dev        # start Vite + Electron desktop window
-pnpm run build      # build renderer and package the desktop app
 ```
 
 ## 📝 Configuration

@@ -5,8 +5,8 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // 构建到 nginx 根路径时必须是 '/'，否则子路由（/channels 等）资源路径会 404。
-  // Electron 打包（file:// 协议）通过 VITE_BASE=./ 覆盖。
+  // 默认 '/' 供 Vite 开发服务器使用；Electron 打包（file:// 协议）必须以 VITE_BASE=./ 覆盖，
+  // 否则根绝对路径的静态资源在 file:// 下会 404。
   base: process.env.VITE_BASE ?? '/',
   root: 'src/renderer',
   resolve: {

@@ -25,53 +25,20 @@ Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，�
 
 ## 🚀 快速开始
 
-### Docker Compose（推荐）
+### 桌面应用（Electron）
 
-新建一个目录和 `docker-compose.yml`：
+Portunus 以自包含的 Electron 桌面应用交付：Go 后端作为 sidecar 子进程打进安装包，客户装一个应用即可使用，无需另行部署。
 
-```yaml
-services:
-  portunus:
-    image: lijx559/portunus:latest
-    container_name: portunus
-    restart: unless-stopped
-    ports:
-      - "3060:80"
-    volumes:
-      - ./data:/app/data
-```
+本地构建安装包：
 
 ```bash
-docker compose up -d
+cd web
+pnpm install
+pnpm run build:mac   # macOS DMG / ZIP（arm64）
+pnpm run build:win   # Windows NSIS（x64）
 ```
 
-启动后访问 `http://localhost:3060`：
-
-| 路径 | 说明 |
-|---|---|
-| `http://localhost:3060/` | Web 管理后台 |
-| `http://localhost:3060/api/*` | 管理 API（后台同源，无需 CORS） |
-| `http://localhost:3060/v1/*` | LLM 网关（Claude Code / Codex 的 base_url 填 `http://localhost:3060`） |
-
-**自定义数据目录**：SQLite 数据库默认落在 compose 文件同级的 `./data`，改 volumes 左侧宿主机路径即可换到任意位置：
-
-```yaml
-    volumes:
-      - /your/custom/path:/app/data
-```
-
-> ⚠️ 镜像内已固定数据库路径为 `/app/data/portunus.db`，因此只需换左侧宿主机路径，右侧保持 `/app/data` 不变。
-
-### Docker Run
-
-```bash
-docker run -d --name portunus \
-  -p 3060:80 \
-  -v /path/to/data:/app/data \
-  lijx559/portunus:latest
-```
-
-镜像为多架构（linux/amd64 + linux/arm64），单镜像内含 Web 管理后台（nginx）+ Go 后端。
+产物在 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions 矩阵构建两个平台，并上传 **draft** 草稿 Release —— 人工确认后手动发布。
 
 ### 从源码运行
 
@@ -86,7 +53,7 @@ go run .
 
 服务默认监听 `0.0.0.0:3061`，数据库文件 `data/portunus.db`。
 
-### 前端（管理后台）
+### 开发（管理后台）
 
 管理后台位于 `web/`（Electron + React + Vite）。开发服务器会把 `/api`、`/v1` 代理到后端 `localhost:3061`，因此需先启动后端（`go run .`）。
 
@@ -95,7 +62,6 @@ cd web
 pnpm install        # 安装依赖
 pnpm run dev:web    # 启动 Vite 并打开 http://localhost:5173
 pnpm run dev        # 同时启动 Vite + Electron 桌面窗口
-pnpm run build      # 构建渲染层并打包桌面应用
 ```
 
 ## 📝 配置

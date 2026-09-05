@@ -32,35 +32,6 @@ GOPROXY=https://goproxy.cn,direct go mod tidy
 
 运行时会在项目根生成 `data/`（SQLite）和 `config.json`，两者均已被 `.gitignore` 忽略。
 
-## Docker
-
-单镜像：前端（nginx 托管 + 反代）和后端（Go 二进制，同容器监听 127.0.0.1:3060）打包为一个镜像。
-
-```bash
-docker compose up -d    # 纯拉 Docker Hub 镜像直接起，对外 3060
-```
-
-compose 默认只用 `image:`（远程镜像），不触发本地构建；要本地构建时取消 compose 里 `build:` 段注释（build 优先于 image）。
-
-宿主机 3060 端口三用 —— `http://localhost:3060/` Web 管理后台、`/api/*` 管理 API（nginx 反代）、`/v1/*` LLM 网关（nginx 反代，已为 SSE 关缓冲放宽超时）。
-
-发布镜像（需先 `HTTPS_PROXY=http://127.0.0.1:7890 docker login`；直连 auth.docker.io 被墙，必须走代理）：
-
-```bash
-# 构建并推送多架构镜像（amd64 + arm64）
-# 必须显式 --builder multiarch-builder：默认 builder 可能是 orbstack（docker driver，不支持多平台构建）
-HTTPS_PROXY=http://127.0.0.1:7890 docker buildx build \
-  --builder multiarch-builder \
-  --platform linux/amd64,linux/arm64 \
-  -f Dockerfile -t lijx559/portunus:latest --push .
-```
-
-推送后 `HTTPS_PROXY=http://127.0.0.1:7890 docker compose pull && docker compose up -d` 更新本地。
-
-注意：macOS 系统代理（如未启动的 clash 127.0.0.1:7890）会被自动注入为 build-arg 且 ENV 无法覆盖，Dockerfile 已在各联网 RUN 前 unset 处理；基础镜像默认走 DaoCloud 国内加速（`--build-arg BASE_REGISTRY=library` 切回官方源）。
-
-代理约定：`~/.docker/config.json` 已删除 `proxies` 段，Docker CLI 默认**不再自动走代理**（也避免把 `127.0.0.1:7890` 注入容器导致上游调用 connection refused）。因此所有访问 Docker Hub 的命令（`docker login` / `docker pull` / `docker compose pull` / `docker buildx push` 等）都需手动加 `HTTPS_PROXY=http://127.0.0.1:7890` 前缀；纯本地操作（`docker compose up -d` 启动已缓存镜像、`docker build` 本地构建）无需代理。原配置备份在 `~/.docker/config.json.bak`。
-
 ## 架构
 
 代码集中在 `backend/` 目录，按功能模块分包，依赖方向单向：
