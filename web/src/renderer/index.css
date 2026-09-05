@@ -252,3 +252,77 @@ header a,
 header input {
   -webkit-app-region: no-drag;
 }
+
+/* ============================================================
+   客户端配置编辑器（复刻 client-config-editor.html，类名加 cc- 前缀）
+   ============================================================ */
+:root {
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --cc-editor-fs: 13px;
+  --cc-editor-lh: 20px;
+}
+
+/* 语法高亮 token（configHighlight.js 输出 .tk-*） */
+.tk-com { color: var(--muted); font-style: italic; }
+.tk-sec { color: var(--warning); font-weight: 600; }
+.tk-key { color: var(--foreground); }
+.tk-str { color: var(--success); }
+.tk-num { color: var(--warning); }
+.tk-kw  { color: var(--muted); font-weight: 600; }
+
+/* 状态徽标 */
+.cc-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); }
+.cc-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.cc-chip.ok   { color: var(--success); background: color-mix(in oklch, var(--success) 12%, transparent); border-color: color-mix(in oklch, var(--success) 30%, transparent); }
+.cc-chip.warn { color: var(--warning); background: color-mix(in oklch, var(--warning) 12%, transparent); border-color: color-mix(in oklch, var(--warning) 30%, transparent); }
+.cc-chip.mute { color: var(--muted); background: var(--surface-secondary); }
+
+/* 模型映射表 */
+.cc-mm-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 0.625rem; overflow: hidden; }
+.cc-mm-row { display: grid; grid-template-columns: 180px 180px minmax(0, 1fr) 96px; gap: 12px; align-items: center; padding: 10px 14px; }
+.cc-mm-row--fallback { grid-template-columns: 180px minmax(0, 1fr) 96px; }
+.cc-mm-row + .cc-mm-row { border-top: 1px solid var(--separator); }
+.cc-mm-head { display: grid; grid-template-columns: 180px 180px minmax(0, 1fr) 96px; gap: 12px; align-items: center; padding: 8px 14px; font-size: 11.5px; color: var(--muted); background: var(--surface-secondary); }
+.cc-mm-head > span:last-child { justify-self: end; }
+.cc-mm-slot { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cc-mm-label { font-size: 13.5px; font-weight: 600; color: var(--foreground); }
+.cc-mm-key { font-family: var(--font-mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+.cc-mm-select, .cc-mm-input { width: 100%; height: 32px; padding: 0 10px; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--field-background); color: var(--foreground); font-size: 13px; }
+.cc-mm-select:focus, .cc-mm-input:focus { border-color: var(--accent); outline: none; }
+.cc-mm-input:disabled { opacity: 0.55; cursor: not-allowed; }
+.cc-mm-1m { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; justify-self: end; }
+.cc-mm-1m input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.cc-mm-1m input:checked + span { color: var(--foreground); }
+
+/* 编辑器叠层：textarea（透明文字）盖在 pre 高亮层上，左 grep gutter 行号 */
+.cc-editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; }
+.cc-editor.dirty { border-color: color-mix(in oklch, var(--warning) 55%, transparent); }
+.cc-editor-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--separator); font-size: 12px; }
+.cc-editor-head .lang { font-family: var(--font-mono); color: var(--muted); }
+.cc-editor-stat { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.cc-editor-stat.ok { color: var(--success); }
+.cc-editor-stat.err { color: var(--danger); }
+.cc-editor-body { position: relative; height: 300px; overflow: hidden; }
+.cc-editor-body textarea {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  padding: 12px 16px 12px 60px; border: none; outline: none; resize: none;
+  background: transparent; color: transparent; caret-color: var(--accent);
+  -webkit-text-fill-color: transparent; white-space: pre; overflow: auto;
+  font-family: var(--font-mono); font-size: var(--cc-editor-fs); line-height: var(--cc-editor-lh);
+}
+.cc-editor-body .cc-gutter {
+  position: absolute; left: 0; top: 0; width: 48px; padding: 12px 10px 12px 0;
+  text-align: right; color: var(--muted); pointer-events: none; will-change: transform;
+  font-family: var(--font-mono); font-size: var(--cc-editor-fs); line-height: var(--cc-editor-lh);
+}
+.cc-editor-body .cc-gutter div { height: var(--cc-editor-lh); }
+.cc-editor-body .cc-code-wrap { position: absolute; left: 48px; top: 0; right: 0; bottom: 0; will-change: transform; pointer-events: none; }
+.cc-editor-body pre {
+  margin: 0; padding: 12px 16px 12px 12px; white-space: pre; overflow: visible;
+  font-family: var(--font-mono); font-size: var(--cc-editor-fs); line-height: var(--cc-editor-lh);
+  color: var(--foreground);
+}
+.cc-editor-foot { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--separator); }
+.cc-editor-foot .savetime { margin-left: auto; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.cc-editor-foot .unsaved { color: var(--warning); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.cc-editor-foot .unsaved .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); }

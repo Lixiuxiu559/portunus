@@ -109,9 +109,11 @@ function wrapClientConfig(fn) {
 
 ipcMain.handle('client-config:paths', wrapClientConfig(() => clientConfig.getPaths()));
 ipcMain.handle('client-config:read-claude', wrapClientConfig(() => clientConfig.readClaude()));
-ipcMain.handle('client-config:write-claude', wrapClientConfig((cfg) => clientConfig.writeClaude(cfg)));
 ipcMain.handle('client-config:read-codex', wrapClientConfig(() => clientConfig.readCodex()));
-ipcMain.handle('client-config:write-codex', wrapClientConfig((cfg) => clientConfig.writeCodex(cfg)));
+ipcMain.handle('client-config:save-claude', wrapClientConfig((t) => clientConfig.saveClaude(t)));
+ipcMain.handle('client-config:save-codex', wrapClientConfig((t) => clientConfig.saveCodex(t)));
+ipcMain.handle('client-config:rollback-claude', wrapClientConfig(() => clientConfig.rollbackClaude()));
+ipcMain.handle('client-config:rollback-codex', wrapClientConfig(() => clientConfig.rollbackCodex()));
 
 app.whenReady().then(() => {
   ensureConfig();

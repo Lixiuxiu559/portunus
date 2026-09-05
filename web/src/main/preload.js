@@ -49,7 +49,9 @@ contextBridge.exposeInMainWorld('api', {
 contextBridge.exposeInMainWorld('clientConfig', {
   getPaths: () => ipcRenderer.invoke('client-config:paths'),
   readClaude: () => ipcRenderer.invoke('client-config:read-claude'),
-  writeClaude: (cfg) => ipcRenderer.invoke('client-config:write-claude', cfg),
   readCodex: () => ipcRenderer.invoke('client-config:read-codex'),
-  writeCodex: (cfg) => ipcRenderer.invoke('client-config:write-codex', cfg),
+  saveClaude: (text) => ipcRenderer.invoke('client-config:save-claude', text),
+  saveCodex: (text) => ipcRenderer.invoke('client-config:save-codex', text),
+  rollbackClaude: () => ipcRenderer.invoke('client-config:rollback-claude'),
+  rollbackCodex: () => ipcRenderer.invoke('client-config:rollback-codex'),
 });
