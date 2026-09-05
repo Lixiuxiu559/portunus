@@ -266,7 +266,7 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
       <div className="mm-row" key={slot.id}>
         <div className="mm-slot">
           <span className="mm-label">{slot.label}</span>
-          <span className="mm-key">{slot.key}</span>
+          <span className="mm-key" title={slot.key}>{slot.key}</span>
         </div>
         {slot.keyName ? (
           <input
@@ -279,7 +279,7 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
             spellCheck={false}
           />
         ) : slot.nameDash ? (
-          <input className="mm-input" type="text" value="—" disabled aria-label={`${slot.label} 无显示名`} />
+          <span className="mm-na" aria-hidden="true">—</span>
         ) : (
           <span />
         )}
@@ -551,7 +551,8 @@ export default function Clients() {
             <Tabs.ListContainer>
               <Tabs.List aria-label="客户端">
                 {panels.map((p) => (
-                  <Tabs.Tab id={p.id} key={p.id}>
+                  <Tabs.Tab id={p.id} key={p.id} className="gap-1.5">
+                    {p.icon}
                     {p.id === 'claude' ? 'Claude Code' : 'Codex'}
                     <Tabs.Indicator />
                   </Tabs.Tab>
