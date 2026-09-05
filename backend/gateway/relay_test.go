@@ -50,7 +50,7 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 	srv := httptest.NewServer(upstream)
 	t.Cleanup(srv.Close)
 
-	ch := channel.Channel{Name: "mock", Type: chType, BaseURL: srv.URL, Key: "sk-test", Enabled: true}
+	ch := channel.Channel{Name: "mock", Type: chType, BaseURL: srv.URL, Key: "sk-test"}
 	if err := shared.DB.Create(&ch).Error; err != nil {
 		t.Fatalf("建渠道失败: %v", err)
 	}

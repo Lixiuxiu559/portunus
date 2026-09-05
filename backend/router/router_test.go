@@ -34,7 +34,7 @@ func setupRouter(t *testing.T) *group.Group {
 		}
 	})
 
-	ch := channel.Channel{Name: "c1", Type: protocol.ProviderOpenAI, BaseURL: "http://x", Key: "k", Enabled: true}
+	ch := channel.Channel{Name: "c1", Type: protocol.ProviderOpenAI, BaseURL: "http://x", Key: "k"}
 	if err := shared.DB.Create(&ch).Error; err != nil {
 		t.Fatalf("建渠道失败: %v", err)
 	}

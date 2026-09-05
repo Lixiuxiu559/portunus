@@ -3,7 +3,7 @@ import request from './request';
 /**
  * 渠道：上游供应商连接配置
  * 创建/更新字段：name, type(openai/openai_responses/anthropic/gemini),
- *   base_url, key, enabled?, auto_sync?
+ *   base_url, key, auto_sync?
  * 响应中 key 已脱敏（仅创建时返回明文）。
  */
 

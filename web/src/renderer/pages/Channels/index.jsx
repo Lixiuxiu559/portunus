@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Button, Switch, Typography, Card, Chip, toast } from '@heroui/react';
+import { Button, Typography, Card, Chip, Spinner, toast } from '@heroui/react';
 import { Plus, Trash2, RefreshCw, Pencil, RotateCw } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
 import EditChannelModal from './EditChannelModal';
 import ProviderIcon from '../../components/ProviderIcon';
 import IconButton from '../../components/IconButton';
-import { listChannels, updateChannel, syncChannel } from '../../api';
+import { listChannels, syncChannel } from '../../api';
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [togglingId, setTogglingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
+  // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
+  const [loadError, setLoadError] = useState(false);
 
   const fetchChannels = async (isRefresh = false) => {
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
@@ -24,8 +25,10 @@ export default function Channels() {
     setRefreshState(true);
     try {
       setChannels(await listChannels());
+      setLoadError(false);
     } catch {
-      setChannels([]);
+      // 无数据时进入错误态而非伪造空态；已有数据时保留旧列表（toast 由拦截器提示）
+      if (channels.length === 0) setLoadError(true);
     } finally {
       setRefreshState(false);
     }
@@ -34,20 +37,6 @@ export default function Channels() {
   useEffect(() => {
     fetchChannels();
   }, []);
-
-  const handleToggle = async (ch) => {
-    setTogglingId(ch.id);
-    try {
-      await updateChannel(ch.id, { enabled: !ch.enabled });
-      setChannels((prev) =>
-        prev.map((c) => (c.id === ch.id ? { ...c, enabled: !c.enabled } : c)),
-      );
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setTogglingId(null);
-    }
-  };
 
   const handleSync = async (ch) => {
     setSyncingId(ch.id);
@@ -69,6 +58,7 @@ export default function Channels() {
           <Button
             variant="secondary"
             size="md"
+            aria-label="刷新渠道列表"
             onPress={() => fetchChannels(true)}
             isPending={refreshing}
           >
@@ -83,11 +73,22 @@ export default function Channels() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <span className="text-muted">加载中…</span>
+          <Spinner size="sm" />
+        </div>
+      ) : loadError && channels.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-muted">
+          <span>渠道加载失败，请检查后端服务后重试</span>
+          <Button variant="secondary" size="sm" onPress={() => fetchChannels()}>
+            重试
+          </Button>
         </div>
       ) : channels.length === 0 ? (
-        <div className="flex justify-center py-16 text-muted">
-          暂无渠道，点击右上角「新增渠道」创建
+        <div className="flex flex-col items-center gap-3 py-16 text-muted">
+          <span>暂无渠道</span>
+          <Button variant="primary" size="sm" onPress={() => setIsOpen(true)}>
+            <Plus className="size-4" />
+            新增渠道
+          </Button>
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
@@ -101,18 +102,6 @@ export default function Channels() {
                       {ch.name}
                     </Typography>
                   </div>
-                  <Switch
-                    size="sm"
-                    isSelected={ch.enabled}
-                    isDisabled={togglingId === ch.id}
-                    onChange={() => handleToggle(ch)}
-                  >
-                    <Switch.Content>
-                      <Switch.Control>
-                        <Switch.Thumb />
-                      </Switch.Control>
-                    </Switch.Content>
-                  </Switch>
                 </Card.Header>
 
                 <Card.Content className="min-w-0">

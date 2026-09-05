@@ -24,7 +24,6 @@ const emptyForm = {
   type: 'openai',
   base_url: '',
   key: '',
-  enabled: true,
   auto_sync: true,
 };
 
@@ -80,7 +79,6 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
         type: form.type,
         base_url: form.base_url.trim(),
         key: form.key.trim(),
-        enabled: form.enabled,
         auto_sync: form.auto_sync,
       });
       setForm(emptyForm);
@@ -172,9 +170,9 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
               </div>
 
               {/* 模型列表 */}
-              <div className="border-t border-default-200 pt-4">
+              <div className="border-t border-separator pt-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <Typography type="body-sm" className="text-default-500">
+                  <Typography type="body-sm" className="text-muted">
                     模型列表
                   </Typography>
                   <Button
@@ -190,7 +188,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                   </Button>
                 </div>
                 {models.length === 0 ? (
-                  <Typography type="body-sm" className="text-default-400">
+                  <Typography type="body-sm" className="text-muted">
                     暂无模型
                   </Typography>
                 ) : (

@@ -18,7 +18,6 @@ type CreateRequest struct {
 	Type     protocol.Provider `json:"type" binding:"required"`
 	BaseURL  string            `json:"base_url" binding:"required"`
 	Key      string            `json:"key" binding:"required"`
-	Enabled  *bool             `json:"enabled"`
 	AutoSync *bool             `json:"auto_sync"`
 }
 
@@ -28,7 +27,6 @@ type UpdateRequest struct {
 	Type     *protocol.Provider `json:"type"`
 	BaseURL  *string            `json:"base_url"`
 	Key      *string            `json:"key"`
-	Enabled  *bool              `json:"enabled"`
 	AutoSync *bool              `json:"auto_sync"`
 }
 
@@ -39,7 +37,6 @@ type Response struct {
 	Type      protocol.Provider `json:"type"`
 	BaseURL   string            `json:"base_url"`
 	Key       string            `json:"key"`
-	Enabled   bool              `json:"enabled"`
 	AutoSync  bool              `json:"auto_sync"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
@@ -53,7 +50,6 @@ func (c *Channel) ToResponse() Response {
 		Type:      c.Type,
 		BaseURL:   c.BaseURL,
 		Key:       maskKey(c.Key),
-		Enabled:   c.Enabled,
 		AutoSync:  c.AutoSync,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
@@ -101,11 +97,7 @@ func Create(req CreateRequest) (*Channel, error) {
 		Type:     req.Type,
 		BaseURL:  req.BaseURL,
 		Key:      req.Key,
-		Enabled:  true,
 		AutoSync: true,
-	}
-	if req.Enabled != nil {
-		c.Enabled = *req.Enabled
 	}
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync
@@ -136,9 +128,6 @@ func Update(id int64, req UpdateRequest) (*Channel, error) {
 	}
 	if req.Key != nil {
 		c.Key = *req.Key
-	}
-	if req.Enabled != nil {
-		c.Enabled = *req.Enabled
 	}
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync

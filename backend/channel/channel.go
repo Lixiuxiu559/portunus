@@ -13,7 +13,6 @@ type Channel struct {
 	Type      protocol.Provider `json:"type"`
 	BaseURL   string            `json:"base_url"` // 仅基础地址，具体路径由协议层补全
 	Key       string            `json:"key"`      // 上游访问凭据
-	Enabled   bool              `gorm:"default:true" json:"enabled"`
 	AutoSync  bool              `gorm:"default:true" json:"auto_sync"` // 是否参与自动模型同步
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
