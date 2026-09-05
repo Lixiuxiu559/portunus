@@ -68,7 +68,7 @@ func TestLogCallErrorAttribution(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logCall(1, g, tt, 0, false, nil, 1, 0, c.err)
+			logCall(1, g, tt, 0, false, true, nil, 1, 0, "req-attr-1", c.err)
 			var entry shared.Log
 			if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
 				t.Fatalf("查日志失败: %v", err)
@@ -79,17 +79,29 @@ func TestLogCallErrorAttribution(t *testing.T) {
 			if entry.ErrMsg == "" {
 				t.Errorf("err_msg 不应为空")
 			}
+			if !entry.Stream {
+				t.Errorf("stream 标记应落库（该调用按流式传入）")
+			}
+			if entry.RequestID != "req-attr-1" {
+				t.Errorf("request_id = %q, want req-attr-1", entry.RequestID)
+			}
 		})
 	}
 
-	// 成功调用不带归因字段
-	logCall(1, g, tt, 200, true, nil, 1, 0, nil)
+	// 成功调用不带归因字段；非流式 stream=false，request_id 照常落库
+	logCall(1, g, tt, 200, true, false, nil, 1, 0, "req-attr-2", nil)
 	var entry shared.Log
 	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
 		t.Fatalf("查日志失败: %v", err)
 	}
 	if entry.ErrKind != "" || entry.ErrMsg != "" {
 		t.Errorf("成功调用 err_kind/err_msg 应为空，实际: %q/%q", entry.ErrKind, entry.ErrMsg)
+	}
+	if entry.Stream {
+		t.Errorf("非流式调用 stream 应为 false")
+	}
+	if entry.RequestID != "req-attr-2" {
+		t.Errorf("request_id = %q, want req-attr-2", entry.RequestID)
 	}
 }
 

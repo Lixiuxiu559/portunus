@@ -28,7 +28,7 @@ const (
 // logCall 写一条调用日志。callErr 非 nil 时把失败归因（类别 + 截断原文）一并落库，
 // 让 status=0 / success=0 的日志能区分「用户取消」与「真故障」。
 // 暂为同步写入（单条 SQLite insert 开销极小）；后续若成为瓶颈可改为队列异步落库。
-func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success bool, usage *protocol.Usage, durationMs, firstTokenMs int64, callErr error) {
+func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
 	entry := shared.Log{
 		APIKeyID:     apiKeyID,
 		GroupName:    g.Name,
@@ -36,6 +36,8 @@ func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, succes
 		ModelName:    t.Model.Name,
 		Status:       status,
 		Success:      success,
+		Stream:       stream,
+		RequestID:    requestID,
 		DurationMs:   durationMs,
 		FirstTokenMs: firstTokenMs,
 	}

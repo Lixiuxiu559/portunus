@@ -15,6 +15,8 @@ type Log struct {
 	ModelName       string    `gorm:"index" json:"model_name"`
 	Status          int       `json:"status"` // 上游返回的 HTTP 状态码
 	Success         bool      `gorm:"index" json:"success"`
+	Stream          bool      `gorm:"index" json:"stream"`                                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
+	RequestID       string    `gorm:"size:32;index" json:"request_id,omitempty"`                 // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
 	InputToken      int64     `json:"input_token"`
 	OutputToken     int64     `json:"output_token"`
 	CacheReadToken  int64     `json:"cache_read_token"`

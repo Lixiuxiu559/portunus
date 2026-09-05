@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -78,6 +80,28 @@ func isRetryable(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded)
 }
 
+// newRequestID 生成一次客户端请求的关联 ID：同一次请求对各上游的所有尝试共用，
+// 落库 shared.Log.RequestID 并以 X-Request-Id 透传上游——lejurobot 这类中转上游
+// 自身也带调用日志，两边按此 ID 对齐，排障不再两头靠时间戳猜。
+func newRequestID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("%016x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// isStall 上游迟迟不吐响应头（Transport 层等头超时）。连响应头都不给的目标，
+// 在一个超时窗口内自愈的概率极低：同目标重试只会再等满一轮超时（3 次重试就是
+// 3 分钟起），连续出现更说明该模型路由已坏——因此 relay 对它跳过同目标重试直接
+// 换下一家，并按更低的阈值快速熔断（stallOpenThreshold）。
+// 注意与看门狗首包超时（streamStallError）区分：后者响应头已到，保留原有的
+// 同目标重试语义（见 TestRelayStreamPrimeTimeoutRetries）。
+func isStall(err error) bool {
+	var hte *upstreamHeaderTimeoutError
+	return errors.As(err, &hte)
+}
+
 // handleRelay 返回一个 relay handler，客户端协议由 clientProto 固定。
 // 按分组策略遍历目标（外层），每个目标失败后按配置先重试 N 次（内层），
 // 耗尽才换下一个目标；熔断开路的模型会被跳过。
@@ -94,6 +118,10 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 model 字段"})
 			return
 		}
+
+		requestID := newRequestID()
+		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位
+		c.Writer.Header().Set("X-Request-Id", requestID)
 
 		g, err := group.GetByName(meta.Model)
 		if err != nil {
@@ -119,7 +147,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			}
 			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID)
+				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -131,6 +159,9 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 				lastErr = err
 				if !isRetryable(err) {
 					break // 不可重试，放弃该目标
+				}
+				if isStall(err) {
+					break // 假死目标不重试：再等一轮超时大概率还是超时，直接换下一家
 				}
 			}
 		}
@@ -145,6 +176,8 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 				GroupName: g.Name,
 				Status:    http.StatusServiceUnavailable,
 				Success:   false,
+				Stream:    meta.Stream,
+				RequestID: requestID,
 				ErrKind:   errKindCircuitOpen,
 				ErrMsg:    truncateErr(detail, 256),
 			})
@@ -177,7 +210,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64) (out []byte, status int, err error) {
+func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -192,7 +225,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if logErr == nil {
 			logErr = failReason
 		}
-		logCall(apiKeyID, g, t, status, success, usage, time.Since(start).Milliseconds(), firstTokenMs, logErr)
+		logCall(apiKeyID, g, t, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
 		if !success {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
@@ -202,7 +235,11 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if success {
 			breakerRecord(t.Model.ID, false)
 		} else if err != nil && isRetryable(err) {
-			breakerRecord(t.Model.ID, true)
+			if isStall(err) {
+				breakerRecordStall(t.Model.ID) // 假死按更低阈值快速开路，别让死模型拖垮每一轮请求
+			} else {
+				breakerRecord(t.Model.ID, true)
+			}
 		}
 	}()
 
@@ -236,7 +273,9 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		defer wd.Stop()
 	}
 
-	resp, err := doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), upstream.ChatHeaders(), upBody)
+	headers := upstream.ChatHeaders()
+	headers.Set("X-Request-Id", requestID)
+	resp, err := doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody)
 	if err != nil {
 		return nil, 0, err
 	}

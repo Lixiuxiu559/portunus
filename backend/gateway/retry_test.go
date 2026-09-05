@@ -119,16 +119,19 @@ func TestRelay4xxNoRetry(t *testing.T) {
 	}
 }
 
-func TestRelayTimeoutTriggersRetry(t *testing.T) {
+// TestRelayHeaderTimeoutSkipsRetry 锁定假死快速通道：上游迟迟不返回响应头（不吐
+// 首字节）时，同目标重试只会再等满一轮超时——应放弃该目标直接失败，而不是把
+// RetryCount 次超时全烧完（旧行为 3 次 × 60s = 3 分钟才换家）。
+func TestRelayHeaderTimeoutSkipsRetry(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
-	pc.RetryCount = 1
+	pc.RetryCount = 2 // 旧行为会把 3 次尝试全烧在假死目标上
 	setProxyConfigForTest(t, pc)
 	setResponseHeaderTimeout(t, 50*time.Millisecond)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond) // 不吐响应头，触发等头超时
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"1"}`))
 	})
@@ -137,10 +140,76 @@ func TestRelayTimeoutTriggersRetry(t *testing.T) {
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != http.StatusBadGateway {
-		t.Fatalf("超时耗尽应返回 502，实际 %d, body=%s", w.Code, w.Body.String())
+		t.Fatalf("假死目标应直接放弃，实际 %d, body=%s", w.Code, w.Body.String())
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
-		t.Errorf("超时应触发重试，上游应被调用 2 次，实际 %d", got)
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Errorf("不吐响应头的目标不应同目标重试，上游应被调用 1 次，实际 %d", got)
+	}
+}
+
+// TestRelayStallFailoverFastToNextTarget 锁定假死 failover 快速通道的换家路径：
+// 首选目标不吐响应头，只尝试 1 次就换下一家接住流量；且上游请求必须带 X-Request-Id
+// （跨网关对账凭据）。
+func TestRelayStallFailoverFastToNextTarget(t *testing.T) {
+	pc := shared.DefaultProxyConfig()
+	pc.RetryCount = 2
+	setProxyConfigForTest(t, pc)
+	setResponseHeaderTimeout(t, 50*time.Millisecond)
+
+	var stallCalls, okCalls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req struct {
+			Model string `json:"model"`
+		}
+		json.Unmarshal(body, &req)
+		if req.Model == "bad-model" {
+			atomic.AddInt32(&stallCalls, 1)
+			if r.Header.Get("X-Request-Id") == "" {
+				t.Error("上游请求应携带 X-Request-Id")
+			}
+			time.Sleep(200 * time.Millisecond) // 不吐响应头，触发等头超时
+			return
+		}
+		atomic.AddInt32(&okCalls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"good-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	})
+
+	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	// 同渠道再种 bad-model，并把它插为分组首选（priority 0），原模型降为 priority 1
+	var ch channel.Channel
+	if err := shared.DB.First(&ch).Error; err != nil {
+		t.Fatalf("查询渠道失败: %v", err)
+	}
+	bad := model.Model{ChannelID: ch.ID, Name: "bad-model"}
+	if err := shared.DB.Create(&bad).Error; err != nil {
+		t.Fatalf("建 bad-model 失败: %v", err)
+	}
+	var g group.Group
+	if err := shared.DB.Where("name = ?", "my-model").First(&g).Error; err != nil {
+		t.Fatalf("查询分组失败: %v", err)
+	}
+	var firstItem group.GroupItem
+	if err := shared.DB.Where("group_id = ?", g.ID).First(&firstItem).Error; err != nil {
+		t.Fatalf("查询分组项失败: %v", err)
+	}
+	if err := shared.DB.Model(&firstItem).Update("priority", 1).Error; err != nil {
+		t.Fatalf("降级原分组项失败: %v", err)
+	}
+	if err := shared.DB.Create(&group.GroupItem{GroupID: g.ID, ModelID: bad.ID, Priority: 0}).Error; err != nil {
+		t.Fatalf("建 bad-model 分组项失败: %v", err)
+	}
+
+	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
+	if w.Code != 200 {
+		t.Fatalf("假死目标应被快速跳过并 failover 成功，实际 %d, body=%s", w.Code, w.Body.String())
+	}
+	if got := atomic.LoadInt32(&stallCalls); got != 1 {
+		t.Errorf("假死目标只应被尝试 1 次（不重试），实际 %d", got)
+	}
+	if got := atomic.LoadInt32(&okCalls); got != 1 {
+		t.Errorf("下一家应接住流量，实际调用 %d 次", got)
 	}
 }
 
@@ -210,6 +279,45 @@ func TestCircuitBreakerOpenAndRecover(t *testing.T) {
 	b2, _ := breakers.Load(id)
 	if b2.(*circuitBreaker).state != stateClosed {
 		t.Errorf("半开连续成功应转关闭，实际 state=%d", b2.(*circuitBreaker).state)
+	}
+}
+
+// TestCircuitBreakerStallFastOpen 锁定假死快速熔断：连响应头都不吐的目标
+// 连续 2 次即开路（普通阈值 4 次要拖垮两轮完整请求）；普通失败不清假死趋势，
+// 成功才清零。
+func TestCircuitBreakerStallFastOpen(t *testing.T) {
+	setProxyConfigForTest(t, shared.DefaultProxyConfig()) // 普通阈值 CircuitFailureThreshold=4
+
+	// 连续两次假死 → 快速开路
+	id := int64(888)
+	breakerRecordStall(id)
+	if allow, _ := breakerAllow(id); !allow {
+		t.Fatal("单次假死不应开路")
+	}
+	breakerRecordStall(id)
+	if allow, _ := breakerAllow(id); allow {
+		t.Fatal("连续两次假死应按 stallOpenThreshold 快速开路")
+	}
+
+	// 假死与普通失败混发：普通失败（5xx，上游有回话）不清零假死计数
+	id2 := int64(889)
+	breakerRecordStall(id2)
+	breakerRecord(id2, true)
+	if allow, _ := breakerAllow(id2); !allow {
+		t.Fatal("一次假死 + 一次普通失败不应达到快速开路条件")
+	}
+	breakerRecordStall(id2)
+	if allow, _ := breakerAllow(id2); allow {
+		t.Fatal("第二次假死应开路（假死计数不被普通失败清零）")
+	}
+
+	// 成功清零：假死 → 成功 → 孤立假死，仍是单次计数不开路
+	id3 := int64(890)
+	breakerRecordStall(id3)
+	breakerRecord(id3, false)
+	breakerRecordStall(id3)
+	if allow, _ := breakerAllow(id3); !allow {
+		t.Fatal("成功应清零假死计数，第二次孤立假死不应开路")
 	}
 }
 
