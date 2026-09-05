@@ -283,29 +283,31 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
         ) : (
           <span />
         )}
-        <select
-          className="mm-select"
-          aria-label={`${slot.label} 请求模型`}
-          value={m.base}
-          onChange={(e) => {
-            const v = e.target.value;
-            // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
-            setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
-          }}
-        >
-          <option value="">— 不映射 —</option>
-          {opts.map((o) => (
-            <option key={o.id} value={o.id}>{o.label}</option>
-          ))}
-        </select>
-        {slot.has1m !== false ? (
-          <label className="mm-1m">
-            <input type="checkbox" checked={m.onem} onChange={(e) => setSlot(slot.id, { onem: e.target.checked })} />
-            <span>1M</span>
-          </label>
-        ) : (
-          <span />
-        )}
+        <div className="mm-model">
+          <div className="mm-select-wrap">
+            <select
+              className="mm-select"
+              aria-label={`${slot.label} 请求模型`}
+              value={m.base}
+              onChange={(e) => {
+                const v = e.target.value;
+                // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
+                setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
+              }}
+            >
+              <option value="">— 不映射 —</option>
+              {opts.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          {slot.has1m !== false ? (
+            <label className="mm-1m">
+              <input type="checkbox" checked={m.onem} onChange={(e) => setSlot(slot.id, { onem: e.target.checked })} />
+              <span>1M</span>
+            </label>
+          ) : null}
+        </div>
       </div>
     );
   };
@@ -406,7 +408,6 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
                   <span>角色</span>
                   <span>显示名</span>
                   <span>请求模型</span>
-                  <span>声明 1M</span>
                 </div>
                 {modelSlots.map(renderSlot)}
               </div>
