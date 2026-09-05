@@ -5,7 +5,8 @@ import { highlight, validate, format } from '../utils/configHighlight';
 
 /**
  * 源码编辑器：textarea（透明文字）叠在 pre 高亮层上，左列行号。
- * 高度随内容自适应（无内部滚动条），支持「当前 / 备份」查看与格式化。
+ * 高度随内容自适应（无内部滚动条），横向超宽时 textarea 自身滚动并把
+ * scrollLeft 同步给高亮层；支持「当前 / 备份」查看与格式化。
  */
 export default function CodeEditor({
   lang,
@@ -16,6 +17,7 @@ export default function CodeEditor({
   dirty,
   savedAt,
   canRollback,
+  active = true,
   onSave,
   onRollback,
   onReread,
@@ -23,6 +25,7 @@ export default function CodeEditor({
 }) {
   const [view, setView] = useState('current');
   const taRef = useRef(null);
+  const codeWrapRef = useRef(null);
 
   const hasBackup = backupText != null && backupText !== '';
   const isBackup = view === 'backup';
@@ -32,13 +35,19 @@ export default function CodeEditor({
   const v = useMemo(() => validate(displayText, lang), [displayText, lang]);
   const lineCount = displayText.split('\n').length;
 
-  // textarea 高度自适应内容（无内部滚动）
+  // textarea 高度自适应内容（无内部滚动）；active 用于隐藏面板恢复显示时重算
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
-  }, [displayText]);
+  }, [displayText, active]);
+
+  // 横向滚动时把 scrollLeft 同步给高亮层，保持文字与光标对齐
+  const handleScroll = () => {
+    const ta = taRef.current;
+    if (ta && codeWrapRef.current) codeWrapRef.current.scrollLeft = ta.scrollLeft;
+  };
 
   const onChange = (e) => {
     if (isBackup) return;
@@ -108,7 +117,7 @@ export default function CodeEditor({
               <div key={i}>{i + 1}</div>
             ))}
           </div>
-          <div className="code-wrap">
+          <div className="code-wrap" ref={codeWrapRef}>
             <pre dangerouslySetInnerHTML={{ __html: html + '\n' }} />
           </div>
           <textarea
@@ -116,6 +125,7 @@ export default function CodeEditor({
             value={displayText}
             onChange={onChange}
             onKeyDown={onKeyDown}
+            onScroll={handleScroll}
             readOnly={isBackup}
             spellCheck={false}
             autoCapitalize="off"
@@ -159,7 +169,7 @@ export default function CodeEditor({
           格式化
         </Button>
         <span className="text-xs text-muted ml-auto">⌘ / Ctrl + S</span>
-        <Button variant="primary" size="sm" onPress={onSave} isDisabled={saving || isBackup}>
+        <Button variant="primary" size="sm" onPress={onSave} isPending={saving} isDisabled={isBackup}>
           <Save className="size-4" />
           保存
         </Button>

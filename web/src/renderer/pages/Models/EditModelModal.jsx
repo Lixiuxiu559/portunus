@@ -37,7 +37,7 @@ export default function EditModelModal({ model, channels, isOpen, onOpenChange, 
       await onSubmit(model.id, data);
       onOpenChange(false);
     } catch (e) {
-      toast.error(e.message || '保存失败');
+      toast.danger(e.message || '保存失败');
     } finally {
       setSaving(false);
     }

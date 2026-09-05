@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw, FolderInput, Info, Terminal, Braces } from 'lucide-react';
-import { Button, Card, Chip, Input, Label, Tabs, TextField, Typography, toast } from '@heroui/react';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'lucide-react';
+import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -59,17 +59,20 @@ function readCodexToken(t) {
   return m ? m[1] : '';
 }
 
-// 把表单的 base/token 写回源码（正则点改，保留其余内容）
-function applyConn(t, lang, baseUrl, token) {
-  let out = t;
+// 把 base_url 写回源码（正则点改，保留其余内容）
+function applyBaseUrl(t, lang, baseUrl) {
   if (lang === 'json') {
-    out = out.replace(/("ANTHROPIC_BASE_URL"\s*:\s*)"[^"]*"/, `$1"${esc(baseUrl)}"`);
-    if (token) out = out.replace(/("ANTHROPIC_AUTH_TOKEN"\s*:\s*)"[^"]*"/, `$1"${esc(token)}"`);
-  } else {
-    out = out.replace(/^(\s*base_url\s*=\s*)"[^"]*"/m, `$1"${esc(baseUrl)}"`);
-    if (token) out = out.replace(/^(\s*experimental_bearer_token\s*=\s*)"[^"]*"/m, `$1"${esc(token)}"`);
+    return t.replace(/("ANTHROPIC_BASE_URL"\s*:\s*)"[^"]*"/, `$1"${esc(baseUrl)}"`);
   }
-  return out;
+  return t.replace(/^(\s*base_url\s*=\s*)"[^"]*"/m, `$1"${esc(baseUrl)}"`);
+}
+
+// 把令牌写回源码（支持显式清空）
+function applyToken(t, lang, token) {
+  if (lang === 'json') {
+    return t.replace(/("ANTHROPIC_AUTH_TOKEN"\s*:\s*)"[^"]*"/, `$1"${esc(token)}"`);
+  }
+  return t.replace(/^(\s*experimental_bearer_token\s*=\s*)"[^"]*"/m, `$1"${esc(token)}"`);
 }
 
 // 把模型映射写回源码 env（JSON round-trip）
@@ -96,7 +99,7 @@ function applyModels(t, models) {
   return JSON.stringify(obj, null, 2);
 }
 
-function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultBase, icon, hint }) {
+function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultBase, icon, hint, active = true }) {
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
   const [savedAt, setSavedAt] = useState('');
@@ -108,6 +111,11 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
   const [backupText, setBackupText] = useState(null);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState(false);
+
+  // 源码 → 表单反解析的防抖计时器
+  const parseTimer = useRef(null);
 
   const dirty = text !== savedText;
 
@@ -126,6 +134,19 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
       setBaseUrl(readCodexBase(t));
       setToken(readCodexToken(t));
     }
+  };
+
+  // 表单 → 源码写回：立即生效并取消未决的反解析，保证源码是唯一真相
+  const writeText = (updater) => {
+    clearTimeout(parseTimer.current);
+    setText(updater);
+  };
+
+  // 编辑器 → 表单同步：立即更新 text，停顿后把表单重解析为源码的投影
+  const handleTextChange = (t) => {
+    setText(t);
+    clearTimeout(parseTimer.current);
+    parseTimer.current = setTimeout(() => parseForm(t), 300);
   };
 
   const load = async () => {
@@ -149,32 +170,45 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
     }
   };
 
+  // 获取分组列表作为模型映射选项；返回是否成功（挂载时静默调用，失败不打扰）
+  const fetchModels = async () => {
+    try {
+      const gs = await listGroups();
+      setModelOptions((Array.isArray(gs) ? gs : []).map((g) => ({ id: g.name, label: g.name })));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   useEffect(() => {
-    if (hasElectron) load();
+    if (hasElectron) {
+      load();
+      if (modelSlots) fetchModels();
+    }
+    return () => clearTimeout(parseTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {
-    let t = applyConn(text, lang, baseUrl.trim(), token.trim());
-    if (modelSlots) t = applyModels(t, models);
-    setText(t);
     setSaving(true);
-    const r = await config.save(t);
+    const r = await config.save(text);
     setSaving(false);
     if (r && r.ok) {
-      setSavedText(t);
+      setSavedText(text);
       setSavedAt(rightNow());
       setBackupExists(!!(r.data && r.data.backupExists));
       toast.success('配置已原子写入');
-      parseForm(t);
+      parseForm(text);
     } else {
       toast.danger((r && r.error) || '保存失败');
     }
   };
 
-  const handleRollback = async () => {
+  const performRollback = async () => {
     const r = await config.rollback();
     if (r && r.ok) {
+      setConfirmRollback(false);
       toast.success('已从 .portunus.bak 回滚到接入前配置');
       await load();
     } else {
@@ -189,7 +223,7 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
 
   const handleFillUrl = () => {
     setBaseUrl(defaultBase);
-    setText((prev) => applyConn(prev, lang, defaultBase, token));
+    writeText((prev) => applyBaseUrl(prev, lang, defaultBase));
     toast.success('已填写 Portunus URL');
   };
 
@@ -197,11 +231,11 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
     try {
       const k = await getAPIKey();
       if (!k || !k.key) {
-        toast.error('暂无令牌，请先到「设置」获取');
+        toast.danger('暂无令牌，请先到「设置」获取');
         return;
       }
       setToken(k.key);
-      setText((prev) => applyConn(prev, lang, baseUrl, k.key));
+      writeText((prev) => applyToken(prev, lang, k.key));
       toast.success('已导入 Portunus 令牌');
     } catch {
       // toast 由 request 拦截器统一提示
@@ -210,19 +244,16 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
 
   const handleFetchModels = async () => {
     setFetching(true);
-    try {
-      const gs = await listGroups();
-      setModelOptions((Array.isArray(gs) ? gs : []).map((g) => ({ id: g.name, label: g.name })));
-      toast.success('已获取模型列表');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setFetching(false);
-    }
+    const ok = await fetchModels();
+    if (ok) toast.success('已获取模型列表');
+    setFetching(false);
   };
 
   const setSlot = (slotId, patch) => {
-    setModels((m) => ({ ...m, [slotId]: { ...(m[slotId] || { base: '', onem: false, name: '' }), ...patch } }));
+    const next = { ...models, [slotId]: { ...(models[slotId] || { base: '', onem: false, name: '' }), ...patch } };
+    setModels(next);
+    // 模型映射即改即写回源码，编辑器所见即所存
+    if (modelSlots) writeText((prev) => applyModels(prev, next));
   };
 
   const renderSlot = (slot) => {
@@ -242,19 +273,25 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
             className="mm-input"
             type="text"
             placeholder="显示名"
+            aria-label={`${slot.label} 显示名`}
             value={m.name}
             onChange={(e) => setSlot(slot.id, { name: e.target.value })}
             spellCheck={false}
           />
         ) : slot.nameDash ? (
-          <input className="mm-input" type="text" value="—" disabled />
+          <input className="mm-input" type="text" value="—" disabled aria-label={`${slot.label} 无显示名`} />
         ) : (
           <span />
         )}
         <select
           className="mm-select"
+          aria-label={`${slot.label} 请求模型`}
           value={m.base}
-          onChange={(e) => setSlot(slot.id, { base: e.target.value, name: e.target.value })}
+          onChange={(e) => {
+            const v = e.target.value;
+            // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
+            setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
+          }}
         >
           <option value="">— 不映射 —</option>
           {opts.map((o) => (
@@ -273,9 +310,10 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
     );
   };
 
+  const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
   const status = dirty
     ? { color: 'warning', label: '有未保存改动' }
-    : /3061|portunus/i.test(text)
+    : /3061|portunus/i.test(curBase)
       ? { color: 'success', label: '已指向 Portunus' }
       : { color: 'default', label: '未指向 Portunus' };
 
@@ -311,17 +349,42 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
         <Typography type="body-sm" className="text-muted">连接</Typography>
         <div className="flex flex-col gap-3">
           <div className="flex items-end gap-2">
-            <TextField value={baseUrl} onChange={setBaseUrl} className="flex-1">
+            <TextField
+              value={baseUrl}
+              onChange={(v) => {
+                setBaseUrl(v);
+                writeText((prev) => applyBaseUrl(prev, lang, v));
+              }}
+              className="flex-1"
+            >
               <Label>base_url</Label>
               <Input spellCheck={false} />
             </TextField>
             <Button variant="secondary" onPress={handleFillUrl} className="shrink-0">同步 Portunus</Button>
           </div>
           <div className="flex items-end gap-2">
-            <TextField type="password" value={token} onChange={setToken} autoComplete="off" className="flex-1">
+            <TextField
+              type={showToken ? 'text' : 'password'}
+              value={token}
+              onChange={(v) => {
+                setToken(v);
+                writeText((prev) => applyToken(prev, lang, v));
+              }}
+              autoComplete="off"
+              className="flex-1"
+            >
               <Label>令牌</Label>
-              <Input />
+              <Input spellCheck={false} />
             </TextField>
+            <Button
+              variant="secondary"
+              onPress={() => setShowToken((v) => !v)}
+              className="shrink-0"
+              aria-label={showToken ? '隐藏令牌' : '显示令牌'}
+              title={showToken ? '隐藏令牌' : '显示令牌'}
+            >
+              {showToken ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </Button>
             <Button variant="secondary" onPress={handleImportToken} className="shrink-0">从 Portunus 导入</Button>
           </div>
           <Typography type="body-sm" className="text-muted">{hint}</Typography>
@@ -361,16 +424,43 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
           fileName={fileName}
           text={text}
           backupText={backupText}
-          onTextChange={setText}
+          onTextChange={handleTextChange}
           dirty={dirty}
           savedAt={savedAt}
           canRollback={backupExists}
+          active={active}
           onSave={handleSave}
-          onRollback={handleRollback}
+          onRollback={() => setConfirmRollback(true)}
           onReread={handleReread}
           saving={saving}
         />
       </Card.Content>
+
+      {/* 回滚二次确认 */}
+      <Modal.Backdrop isOpen={confirmRollback} onOpenChange={setConfirmRollback}>
+        <Modal.Container size="sm">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>从备份回滚</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <Typography color="muted">
+                {dirty ? '当前有未保存改动，回滚后将一并丢弃。' : ''}
+                确定把配置恢复为接入 Portunus 之前的备份（.portunus.bak）吗？
+              </Typography>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                取消
+              </Button>
+              <Button variant="danger" onPress={performRollback}>
+                回滚
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Card>
   );
 }
@@ -470,11 +560,12 @@ export default function Clients() {
             </Tabs.ListContainer>
           </Tabs>
 
-          {panels
-            .filter((p) => p.id === client)
-            .map((p) => (
-              <ClientPanel key={p.id} {...p} />
-            ))}
+          {/* 双面板常驻：切换 Tab 不卸载，未保存改动得以保留 */}
+          {panels.map((p) => (
+            <div key={p.id} className={p.id === client ? '' : 'hidden'} aria-hidden={p.id !== client}>
+              <ClientPanel {...p} active={p.id === client} />
+            </div>
+          ))}
         </div>
       </div>
     </div>

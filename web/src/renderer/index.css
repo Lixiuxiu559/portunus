@@ -507,17 +507,18 @@ header .theme-switch {
 /* 模型映射表 */
 .models-pane { display: flex; flex-direction: column; gap: 0.9rem; }
 .mm-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 0.625rem; overflow: hidden; }
-.mm-row { display: grid; grid-template-columns: 200px 200px minmax(0, 1fr) 100px; gap: 12px; align-items: center; padding: 10px 14px; }
-.mm-row--fallback { grid-template-columns: 200px minmax(0, 1fr) 100px; }
+.mm-row { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr) minmax(72px, 100px); gap: 12px; align-items: center; padding: 10px 14px; }
+.mm-row--fallback { grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(72px, 100px); }
 .mm-row + .mm-row { border-top: 1px solid var(--separator); }
-.mm-head { display: grid; grid-template-columns: 200px 200px minmax(0, 1fr) 100px; gap: 12px; align-items: center; padding: 8px 14px; font-size: 11.5px; color: var(--muted); background: var(--surface-2); }
+.mm-head { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr) minmax(72px, 100px); gap: 12px; align-items: center; padding: 8px 14px; font-size: 12px; color: var(--muted); background: var(--surface-2); }
 .mm-head > span:last-child { justify-self: end; }
 .mm-slot { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mm-label { font-size: 13.5px; font-weight: 600; color: var(--fg); }
-.mm-key { font-family: var(--font-mono); font-size: 11px; color: var(--muted); word-break: break-all; font-feature-settings: "tnum"; }
+.mm-key { font-family: var(--font-mono); font-size: 12px; color: var(--muted); word-break: break-all; font-feature-settings: "tnum"; }
 .mm-select { width: 100%; min-width: 0; height: 36px; padding: 0 10px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; }
 .mm-input { width: 100%; height: 36px; padding: 0 10px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; }
 .mm-select:focus, .mm-input:focus { border-color: var(--accent); outline: none; }
+.mm-select:focus-visible, .mm-input:focus-visible, .view-tab:focus-visible, .mm-1m input:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: transparent; }
 .mm-input:disabled { opacity: .55; cursor: not-allowed; }
 .mm-1m { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; justify-self: end; min-width: 44px; }
 .mm-1m input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
@@ -525,6 +526,7 @@ header .theme-switch {
 
 /* 编辑器叠层 */
 .editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; transition: border-color .15s; }
+.editor:focus-within { border-color: var(--accent); }
 .editor.dirty { border-color: color-mix(in oklch, var(--warning) 55%, transparent); }
 .editor-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--separator); font-size: 12px; }
 .editor-head .lang { font-family: var(--font-mono); color: var(--muted); }
@@ -536,9 +538,11 @@ header .theme-switch {
   position: relative; width: 100%; min-height: 120px; margin: 0; display: block;
   padding: 12px 16px 12px 60px; border: none; outline: none; resize: none;
   background: transparent; color: transparent; caret-color: var(--accent);
-  -webkit-text-fill-color: transparent; white-space: pre; overflow: hidden;
+  -webkit-text-fill-color: transparent; white-space: pre; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
   font-family: var(--font-mono); font-size: var(--editor-fs); line-height: var(--editor-lh);
 }
+.editor-body textarea::-webkit-scrollbar { display: none; }
 .editor-body .gutter {
   position: absolute; left: 0; top: 0; width: 48px; padding: 12px 10px 12px 0;
   text-align: right; color: var(--muted); pointer-events: none;

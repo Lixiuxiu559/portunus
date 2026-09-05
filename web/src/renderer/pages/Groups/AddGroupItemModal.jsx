@@ -63,7 +63,7 @@ export default function AddGroupItemModal({ group, models, channels, isOpen, onO
       onAdded?.();
       toast.success('模型已添加到分组');
     } catch (e) {
-      toast.error(e.message || '添加失败');
+      toast.danger(e.message || '添加失败');
     } finally {
       setSaving(false);
     }

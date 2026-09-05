@@ -77,7 +77,7 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
       onCreated?.();
       toast.success('分组创建成功');
     } catch (e) {
-      toast.error(e.message || '创建失败');
+      toast.danger(e.message || '创建失败');
     } finally {
       setSaving(false);
     }

@@ -49,7 +49,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
       const all = Array.isArray(ms?.data) ? ms.data : [];
       setModels(all);
     } catch (e) {
-      toast.error(e.message || '同步失败');
+      toast.danger(e.message || '同步失败');
     } finally {
       setSyncing(false);
     }
@@ -84,7 +84,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
       onUpdated?.();
       toast.success('渠道更新成功');
     } catch (e) {
-      toast.error(e.message || '更新失败');
+      toast.danger(e.message || '更新失败');
     } finally {
       setSaving(false);
     }

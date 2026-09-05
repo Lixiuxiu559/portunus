@@ -42,7 +42,7 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
       setForm(emptyForm);
       onOpenChange(false);
     } catch (e) {
-      toast.error(e.message || '创建失败');
+      toast.danger(e.message || '创建失败');
     } finally {
       setSaving(false);
     }

@@ -60,7 +60,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
       setModels(Array.isArray(res.models) ? res.models : []);
       toast.success(`获取到 ${(res.models || []).length} 个模型`);
     } catch (e) {
-      toast.error(e.message || '获取模型失败');
+      toast.danger(e.message || '获取模型失败');
     } finally {
       setSyncing(false);
     }
@@ -88,7 +88,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
       onCreated?.();
       toast.success('渠道创建成功');
     } catch (e) {
-      toast.error(e.message || '创建失败');
+      toast.danger(e.message || '创建失败');
     } finally {
       setSaving(false);
     }

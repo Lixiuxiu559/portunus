@@ -31,7 +31,7 @@ export default function EditGroupModal({ group, isOpen, onOpenChange, onUpdated 
       onUpdated?.();
       toast.success('分组更新成功');
     } catch (e) {
-      toast.error(e.message || '更新失败');
+      toast.danger(e.message || '更新失败');
     } finally {
       setSaving(false);
     }

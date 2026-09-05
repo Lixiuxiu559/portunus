@@ -101,7 +101,7 @@ export default function Settings() {
   const handleSaveInterval = async () => {
     const minutes = parseInt(syncInterval, 10);
     if (Number.isNaN(minutes) || minutes < 0) {
-      toast.error('请输入非负整数分钟数');
+      toast.danger('请输入非负整数分钟数');
       return;
     }
     setSavingInterval(true);
@@ -156,7 +156,7 @@ export default function Settings() {
       setNetworkModeState(res?.networkMode ?? mode);
       toast.success(res?.restarted ? '已保存，后端已自动重启' : '已保存');
     } catch (err) {
-      toast.error(`保存失败：${err?.message ?? ''}`);
+      toast.danger(`保存失败：${err?.message ?? ''}`);
     } finally {
       setSavingMode(false);
     }
