@@ -3,27 +3,11 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
-)
-
-// relayErrorKind 是客户端协议无关的错误类别。writeRelayError 按客户端协议把它
-// 映射为具体错误类型字符串与响应体形状，让 claude code / codex 等客户端拿到
-// 协议正确的错误——客户端 SDK 靠错误类型与状态码归类重试，笼统的
-// {"error":"..."} 只能显示无意义的报错文案。
-type relayErrorKind int
-
-const (
-	relayErrInvalidRequest relayErrorKind = iota // 400 请求体不合法 / 分组解析失败
-	relayErrNotFound                             // 404 分组不存在
-	relayErrAuth                                 // 401 鉴权失败
-	relayErrRateLimit                            // 429 上游限流
-	relayErrOverloaded                           // 503 分组全部目标熔断开路
-	relayErrAPI                                  // 其余 5xx 上游 / 网关故障
 )
 
 // writeRelayError 按客户端协议输出协议形状错误体并结束请求：
@@ -71,19 +55,6 @@ func openAIErrorType(kind relayErrorKind) string {
 		return "rate_limit_error"
 	default:
 		return "server_error"
-	}
-}
-
-// relayErrorKindByStatus 把非 2xx 的上游状态码映射为错误类别：429 限流、
-// 5xx 上游 / 网关故障、其余 4xx 按请求问题归类。
-func relayErrorKindByStatus(status int) relayErrorKind {
-	switch {
-	case status == http.StatusTooManyRequests:
-		return relayErrRateLimit
-	case status >= 500:
-		return relayErrAPI
-	default:
-		return relayErrInvalidRequest
 	}
 }
 

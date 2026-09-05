@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,23 +15,6 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 )
-
-// streamCommittedError 表示流已提交（已写 200 头 + SSE 头），之后的失败无法 failover。
-type streamCommittedError struct{ err error }
-
-func (e *streamCommittedError) Error() string { return e.err.Error() }
-func (e *streamCommittedError) Unwrap() error { return e.err }
-
-// streamStallError 上游流静默超时：等首个有效事件（首包）或两次数据之间的静默
-// 超过看门狗时限。首包前是可重试失败（换家）；首包后由 streamCommittedError 包装，只能掐断。
-type streamStallError struct {
-	stage string        // 触发阶段："首包" / "静默"
-	wait  time.Duration // 触发时的静默时限
-}
-
-func (e *streamStallError) Error() string {
-	return fmt.Sprintf("流式响应%s超时: %ds（上游无新数据）", e.stage, int(e.wait.Seconds()))
-}
 
 // streamWatchdog 挂在上游流式请求上的静默看门狗：首包前按首包时限、提交后按静默时限，
 // 每收到一段上游数据就重排续命；超时即取消请求 ctx 掐断 body 读阻塞。
@@ -202,11 +184,13 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 //
 // Anthropic 流式协议的 error 是终止事件，形如 {"type":"error","error":{"type":...,
 // "message":...}}——嵌套错误对象必须在 "error" 键下（官方 SDK 只读 body.error.type
-// 判类型，写别的键名客户端识别不了，只能退化为非流式回退）。Claude Code 收到后：
-// 已有部分内容时按「Server error mid-response」把已有部分定稿收尾；无内容时
-// overloaded_error 触发流式重试（配合本网关熔断换渠道），api_error 走非流式回退。
-// 分类：静默掐断 / 上游断连 → overloaded_error（过载重试语义）；转换失败 →
-// api_error（由调用方传入）。
+// 判类型，写别的键名客户端识别不了，只能退化为非流式回退）。Claude Code v2.1.260
+// 实测（/tmp 实验室复现，2026-09）：收到流内 error 后——已有文本内容时静默把残缺
+// 内容定稿为完整回答（无警告；工具调用等无法定稿时才显示「Server error
+// mid-response」）；无内容时显示重试横幅（错误原文可见）重试 2 次，耗尽后自动降级
+// 为非流式请求重发——用户视角即「卡住 → 重试 → 报检查网关/网络」，流已被掐断这件
+// 事客户端不会明说。分类：静默掐断 / 上游断连 →
+// overloaded_error（过载重试语义）；转换失败 → api_error（由调用方传入）。
 // OpenAI / Responses 客户端无对应的流内错误标准形式，保持截断，由客户端按断流处理。
 // 客户端主动断连（context.Canceled）不发事件——连接已亡，写了无意义。
 func failCommittedStream(c *gin.Context, clientProto protocol.Provider, committed bool, err error, anthropicType string) error {

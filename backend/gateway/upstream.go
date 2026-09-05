@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -25,19 +24,6 @@ func newHTTPClient(pc shared.ProxyConfig) *http.Client {
 	transport.ResponseHeaderTimeout = time.Duration(pc.FirstByteTimeoutSeconds) * time.Second
 	return &http.Client{Transport: transport}
 }
-
-// upstreamHeaderTimeoutError 上游在 FirstByteTimeoutSeconds 内未返回响应头。
-// 实现 net.Error（Timeout / Temporary）以保持 isRetryable 的可重试分类不变，
-// 只把 Transport 原生晦涩文案（net/http: timeout awaiting response headers）换成可读错误。
-type upstreamHeaderTimeoutError struct {
-	seconds int
-}
-
-func (e *upstreamHeaderTimeoutError) Error() string {
-	return fmt.Sprintf("上游 %ds 未返回响应头", e.seconds)
-}
-func (*upstreamHeaderTimeoutError) Timeout() bool   { return true }
-func (*upstreamHeaderTimeoutError) Temporary() bool { return true }
 
 // doRequest 发送上游 POST 请求，返回响应（body 由调用方负责关闭与读取）。
 // 端点与鉴权头由 protocol.Upstream 提供。

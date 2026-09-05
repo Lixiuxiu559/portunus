@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,59 +28,6 @@ type relayMeta struct {
 	Stream bool   `json:"stream"`
 }
 
-// upstreamStatusError 表示上游返回非 2xx，携带状态码与响应体供上层透出。
-type upstreamStatusError struct {
-	status     int
-	body       []byte
-	retryAfter string // 上游 Retry-After 头原值（429 / 503 常见），透传给客户端安排重试节奏
-}
-
-func (e *upstreamStatusError) Error() string {
-	// err_msg 会落库：带上状态码与响应体片段，否则最高频的 upstream_error
-	// 类失败全是同一句无信息量文案，无法区分限流与上游内部错误。
-	return fmt.Sprintf("上游返回 %d: %s", e.status, truncateErr(string(e.body), 200))
-}
-
-// convertError 标记请求 / 响应协议转换阶段的失败（客户端请求体或渠道配置问题），
-// 与上游 / 网络故障区分开，供日志归因与排障。
-type convertError struct{ err error }
-
-func (e *convertError) Error() string { return e.err.Error() }
-func (e *convertError) Unwrap() error { return e.err }
-
-// isRetryable 判断某次失败是否值得对同一 / 下一上游重试：
-// 首包前静默超时、5xx 与 429、网络 / 超时错误重试，其余（流已提交、4xx、协议转换、配置）不重试。
-func isRetryable(err error) bool {
-	// 流已提交后的失败（半途断连 / 静默掐断 / 转换错误）一律不可重试：客户端已收到
-	// 部分流，重试只会二次写流。必须放在最前——errors.As 会穿透 Unwrap 命中下层
-	// net.Error 分支（上游半途 connection reset 就是 net.Error），导致误判重试。
-	var sce *streamCommittedError
-	if errors.As(err, &sce) {
-		return false
-	}
-	// 客户端主动取消（context.Canceled）不是上游故障，不重试也不计入熔断。
-	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
-	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度，
-	// 连续几次便使该模型熔断开路，导致所有请求 503。
-	if errors.Is(err, context.Canceled) {
-		return false
-	}
-	// 首包前静默超时：上游卡死（假流），重试同一 / 下一上游。
-	var ste *streamStallError
-	if errors.As(err, &ste) {
-		return true
-	}
-	var se *upstreamStatusError
-	if errors.As(err, &se) {
-		return se.status >= 500 || se.status == 429
-	}
-	var ne net.Error
-	if errors.As(err, &ne) {
-		return true
-	}
-	return errors.Is(err, context.DeadlineExceeded)
-}
-
 // newRequestID 生成一次客户端请求的关联 ID：同一次请求对各上游的所有尝试共用，
 // 落库 shared.Log.RequestID 并以 X-Request-Id 透传上游——lejurobot 这类中转上游
 // 自身也带调用日志，两边按此 ID 对齐，排障不再两头靠时间戳猜。
@@ -91,17 +37,6 @@ func newRequestID() string {
 		return fmt.Sprintf("%016x", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b[:])
-}
-
-// isStall 上游迟迟不吐响应头（Transport 层等头超时）。连响应头都不给的目标，
-// 在一个超时窗口内自愈的概率极低：同目标重试只会再等满一轮超时（3 次重试就是
-// 3 分钟起），连续出现更说明该模型路由已坏——因此 relay 对它跳过同目标重试直接
-// 换下一家，并按更低的阈值快速熔断（stallOpenThreshold）。
-// 注意与看门狗首包超时（streamStallError）区分：后者响应头已到，保留原有的
-// 同目标重试语义（见 TestRelayStreamPrimeTimeoutRetries）。
-func isStall(err error) bool {
-	var hte *upstreamHeaderTimeoutError
-	return errors.As(err, &hte)
 }
 
 // thinkingSuffix 是「可控思考开关」的模型名后缀约定：对外模型名（分组名）带
@@ -173,11 +108,9 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 					return
 				}
 				lastErr = err
-				if !isRetryable(err) {
-					break // 不可重试，放弃该目标
-				}
-				if isStall(err) {
-					break // 假死目标不重试：再等一轮超时大概率还是超时，直接换下一家
+				d := failSpec(err)
+				if !d.Retryable || d.StallNoHeader {
+					break // 不可重试，或等头假死不重试：再等一轮超时大概率还是超时，直接换下一家
 				}
 			}
 		}
@@ -212,20 +145,13 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			return
 		}
 
-		status := http.StatusBadGateway
-		var se *upstreamStatusError
-		if errors.As(lastErr, &se) {
-			status = se.status
-			if se.retryAfter != "" {
-				// 上游限流 / 过载给出的重试节奏原样透传
-				c.Writer.Header().Set("Retry-After", se.retryAfter)
-			}
-		}
-		// 等响应头 / 首包 / 非流式总超时是「上游超时未就绪」，用 504 与上游明确拒绝区分，
-		// 客户端可据此与 502（网关侧连不上）区分对待。
-		var ste *streamStallError
-		if errors.As(lastErr, &ste) || isStall(lastErr) || errors.Is(lastErr, context.DeadlineExceeded) {
-			status = http.StatusGatewayTimeout
+		// 失败语义统一出自 failSpec：状态码、错误类别、上游 Retry-After 透传。
+		// （等响应头 / 首包 / 非流式总超时是「上游超时未就绪」，failSpec 已裁为 504，
+		// 与上游明确拒绝、网关侧连不上的 502 区分。）
+		d := failSpec(lastErr)
+		if d.RetryAfter != "" {
+			// 上游限流 / 过载给出的重试节奏原样透传
+			c.Writer.Header().Set("Retry-After", d.RetryAfter)
 		}
 		log.Printf("relay 失败: model=%s err=%v", meta.Model, lastErr)
 		if len(skipped) > 0 {
@@ -235,15 +161,14 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		}
 		// 上游有回话的失败取其错误原文，跨协议按客户端形状重组（原始体已落库不丢）；
 		// 网关自身故障（超时 / 网络）用通用文案，不向客户端暴露内部细节。
-		kind := relayErrAPI
 		message := "上游调用失败"
-		if se != nil {
-			kind = relayErrorKindByStatus(se.status)
+		var se *upstreamStatusError
+		if errors.As(lastErr, &se) {
 			if m := upstreamErrorMessage(se.body); m != "" {
 				message = m
 			}
 		}
-		writeRelayError(c, clientProto, status, kind, message)
+		writeRelayError(c, clientProto, d.Status, d.RelayKind, message)
 	}
 }
 
@@ -265,18 +190,19 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		if logErr == nil {
 			logErr = failReason
 		}
+		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
 		logCall(apiKeyID, g, t, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
 		if !success {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
 			log.Printf("relay 尝试失败: group=%s model=%s channel=%s kind=%s err=%v",
-				g.Name, t.Model.Name, t.Channel.Name, classifyErr(logErr), logErr)
+				g.Name, t.Model.Name, t.Channel.Name, d.ErrKind, logErr)
 		}
 		if success {
 			breakerRecord(t.Model.ID, false)
-		} else if err != nil && isRetryable(err) {
-			if isStall(err) {
-				breakerRecordStall(t.Model.ID) // 假死按更低阈值快速开路，别让死模型拖垮每一轮请求
+		} else if d.BreakerFail {
+			if d.StallNoHeader {
+				breakerRecordStall(t.Model.ID) // 等头假死按更低阈值快速开路，别让死模型拖垮每一轮请求
 			} else {
 				breakerRecord(t.Model.ID, true)
 			}
@@ -356,17 +282,14 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 				// 已提交，无法 failover；记为失败但不再报错。
 				// 已交付的部分流量仍可能累积了 usage，一并落库，避免费用漏记。
 				usage = conv.Usage()
-				// 存包装体而非解包的内层错误：classifyErr 靠 errors.As 命中
+				// 存包装体而非解包的内层错误：failSpec 靠 errors.As 命中
 				// streamCommittedError 才能归为 stream_interrupted，存内层会让
 				// 该类别在生产路径不可达（Unwrap 已保证取消仍归 client_cancel）。
 				failReason = committed
-				// 除客户端主动断开外，半途失败仍是模型不健康（假流 / 静默超时 / 断连），
-				// 计入熔断：committed 分支 err 为 nil，不走下方 defer 的熔断记录，
-				// 不补记的话持续假死的模型永远开不了路，后续请求继续撞墙干等。
+				// 熔断记账由 defer 统一处理：failSpec(committed) 对非取消的半途失败
+				// 给出 BreakerFail=true（普通阈值计数），取消不计——不补记的话
+				// 持续假死的模型永远开不了路，后续请求继续撞墙干等。
 				// 失败明细由 defer 的「relay 尝试失败」统一留痕（kind=stream_interrupted）。
-				if !errors.Is(committed.err, context.Canceled) {
-					breakerRecord(t.Model.ID, true)
-				}
 				return nil, status, nil
 			}
 			// 首包前失败，可重试 / 换家
