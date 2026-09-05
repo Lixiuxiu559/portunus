@@ -5,6 +5,8 @@
 .github/copilot-instructions.md
 .mcp.json
 .claude/settings.local.json
+# 技能评估工作区（演练报告/评分数据，非技能本体）
+.claude/skills/release-workspace/
 
 # 运行时数据（本地数据库、配置）
 # 只忽略根目录的 data/（SQLite），避免误伤 .claude/skills 下各技能的 data/ 参考资料
