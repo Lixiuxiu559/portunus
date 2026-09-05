@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'lucide-react';
 import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
+import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
 
@@ -501,6 +502,8 @@ export default function Clients() {
     {
       id: 'claude',
       title: 'Claude Code CLI',
+      tabLabel: 'claude-cli',
+      mark: <ClaudeMark className="size-3.5" />,
       fileName: 'settings.json',
       lang: 'json',
       path: '~/.claude/settings.json',
@@ -524,6 +527,8 @@ export default function Clients() {
     {
       id: 'codex',
       title: 'Codex',
+      tabLabel: 'codex-cli',
+      mark: <OpenAIMark className="size-3.5" />,
       fileName: 'config.toml',
       lang: 'toml',
       path: '~/.codex/config.toml',
@@ -580,8 +585,8 @@ export default function Clients() {
               <Tabs.List aria-label="客户端">
                 {panels.map((p) => (
                   <Tabs.Tab id={p.id} key={p.id} className="gap-1.5">
-                    {p.icon}
-                    {p.id === 'claude' ? 'Claude Code' : 'Codex'}
+                    {p.mark}
+                    {p.tabLabel}
                     <Tabs.Indicator />
                   </Tabs.Tab>
                 ))}
