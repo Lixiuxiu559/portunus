@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -41,6 +42,78 @@ func ConvertResponse(from, to Provider, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	return renderResponseFromOpenAI(to, resp)
+}
+
+// UpstreamRequest 是装配上游请求时的覆盖项。零值字段表示「不覆盖」。
+type UpstreamRequest struct {
+	Model    string          // 上游模型名（渠道侧命名）；空 = 不替换
+	Thinking *ThinkingConfig // -thinking 后缀驱动的思考开关意图；仅 openai 兼容上游消费
+}
+
+// ComposeUpstreamRequest 把客户端请求体装配为发往指定上游的请求体：
+// 协议转换（from != to 经 canonical 中转）+ 上游模型名替换 + thinking 注入。
+// gateway 不再自行改写请求体——模型名与思考开关落在哪个字段是协议知识，
+// 归各协议自己：openai / anthropic / responses 在顶层 model 字段，gemini
+// 在 URL（body 无模型字段，替换为 no-op）；thinking 仅 openai 兼容上游消费
+// （DeepSeek/GLM 形状扩展），anthropic 上游靠客户端自带配置透传，gemini
+// 上游无此形状。只写出显式请求的意图、不做任何默认开启——无条件转发
+// thinking 曾导致部分上游 400（见 9a8e785）。
+func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) ([]byte, error) {
+	if !from.Valid() {
+		return nil, fmt.Errorf("未知的源协议: %s", from)
+	}
+	if !to.Valid() {
+		return nil, fmt.Errorf("未知的目标协议: %s", to)
+	}
+	if from == to {
+		return rewriteSameProtocol(to, body, up)
+	}
+	req, err := parseRequestToOpenAI(from, body)
+	if err != nil {
+		return nil, err
+	}
+	applyUpstreamRequest(req, up)
+	return renderRequestFromOpenAI(to, req)
+}
+
+// applyUpstreamRequest 把覆盖项写进 canonical 请求。Thinking 是否落进目标
+// 请求体由各协议渲染决定（当前仅 openai 渲染经 canonical 字段带出）。
+func applyUpstreamRequest(req *ChatCompletionRequest, up UpstreamRequest) {
+	if up.Model != "" {
+		req.Model = up.Model
+	}
+	if up.Thinking != nil {
+		req.Thinking = up.Thinking
+	}
+}
+
+// rewriteSameProtocol 同协议直通的顶层覆盖：model / thinking 的外科手术式
+// 替换（map 往返）。不走 canonical 往返——客户端请求体里 canonical 之外的
+// 未知字段原样保留，与 ConvertRequest 的直通语义（原样返回）保持同等保真度。
+// gemini 请求体不含模型字段（在 URL），model 覆盖为 no-op；thinking 仅
+// openai 形状存在，其余协议忽略。
+func rewriteSameProtocol(p Provider, body []byte, up UpstreamRequest) ([]byte, error) {
+	if up.Model == "" && up.Thinking == nil {
+		return body, nil
+	}
+	if p == ProviderGemini {
+		return body, nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, fmt.Errorf("解析 %s 请求失败: %w", p, err)
+	}
+	if up.Model != "" {
+		m["model"] = up.Model
+	}
+	if up.Thinking != nil && p == ProviderOpenAI {
+		thinking := map[string]any{"type": up.Thinking.Type}
+		if up.Thinking.BudgetTokens > 0 {
+			thinking["budget_tokens"] = up.Thinking.BudgetTokens
+		}
+		m["thinking"] = thinking
+	}
+	return json.Marshal(m)
 }
 
 // parseRequestToOpenAI 按 from 协议解析请求体为 OpenAI 规范请求。

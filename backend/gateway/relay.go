@@ -22,10 +22,13 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
-// relayMeta 是三种客户端协议请求体的最小公共字段。
+// relayMeta 是三种客户端协议请求体的最小公共字段。thinking 为 anthropic 与
+// DeepSeek 等兼容方共用的顶层形状，随首次解码一并取出，供 -thinking 后缀复用
+// budget_tokens（省去对请求体的第二次探测解码）。
 type relayMeta struct {
-	Model  string `json:"model"`
-	Stream bool   `json:"stream"`
+	Model    string                   `json:"model"`
+	Stream   bool                     `json:"stream"`
+	Thinking *protocol.ThinkingConfig `json:"thinking,omitempty"`
 }
 
 // newRequestID 生成一次客户端请求的关联 ID：同一次请求对各上游的所有尝试共用，
@@ -67,11 +70,18 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			return
 		}
 
-		// -thinking 后缀：剥掉后解析分组，注入与否由 relayToTarget 按上游协议决定
+		// -thinking 后缀：剥掉后解析分组。思考开关意图（复用 anthropic 客户端
+		// 自带的 budget_tokens，Claude Code 的 effort 就映射在这里）在此打包成
+		// UpstreamRequest，是否写入上游请求体由 protocol 按上游协议决定——
+		// gateway 不再触碰协议知识。
 		groupName := meta.Model
-		thinkingRequested := strings.HasSuffix(groupName, thinkingSuffix)
-		if thinkingRequested {
+		var upThinking *protocol.ThinkingConfig
+		if strings.HasSuffix(groupName, thinkingSuffix) {
 			groupName = strings.TrimSuffix(groupName, thinkingSuffix)
+			upThinking = &protocol.ThinkingConfig{Type: "enabled"}
+			if clientProto == protocol.ProviderAnthropic && meta.Thinking != nil && meta.Thinking.BudgetTokens > 0 {
+				upThinking.BudgetTokens = meta.Thinking.BudgetTokens
+			}
 		}
 
 		g, err := group.GetByName(groupName)
@@ -98,7 +108,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			}
 			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, thinkingRequested)
+				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -175,7 +185,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, thinkingRequested bool) (out []byte, status int, err error) {
+func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -209,22 +219,12 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		}
 	}()
 
-	reqBody, err := rewriteModel(originalBody, t.Model.Name)
+	// 装配上游请求：协议转换 + 模型名替换 + thinking 注入都在 protocol 内完成
+	// （模型名落哪个字段、thinking 哪个上游消费，是协议知识，归 protocol）。
+	upBody, err := protocol.ComposeUpstreamRequest(clientProto, t.Channel.Type, originalBody,
+		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking})
 	if err != nil {
 		return nil, 0, &convertError{err}
-	}
-
-	upBody, err := protocol.ConvertRequest(clientProto, t.Channel.Type, reqBody)
-	if err != nil {
-		return nil, 0, &convertError{err}
-	}
-
-	// -thinking 后缀注入思考开关：仅 OpenAI 兼容上游（thinking 是 DeepSeek/GLM 等
-	// 沿用 Anthropic 形状的扩展字段；其余协议上游的思考开关形态各异，按需扩展）。
-	if thinkingRequested && t.Channel.Type == protocol.ProviderOpenAI {
-		if upBody, err = injectThinkingParam(upBody, originalBody, clientProto); err != nil {
-			return nil, 0, &convertError{fmt.Errorf("注入 thinking 参数失败: %w", err)}
-		}
 	}
 
 	upstream, err := protocol.NewUpstream(t.Channel.Type, t.Channel.BaseURL, t.Channel.Key)
@@ -271,7 +271,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 		// 上游流式可能不返回 usage，先按客户端原始请求体估一个值兜底。
 		if clientProto == protocol.ProviderAnthropic {
 			if es, ok := conv.(protocol.EstimateSetter); ok {
-				es.SetEstimateInputTokens(protocol.EstimateRequestTokens(clientProto, reqBody))
+				es.SetEstimateInputTokens(protocol.EstimateRequestTokens(clientProto, originalBody))
 			}
 		}
 		var streamErr error
@@ -310,37 +310,4 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 
 	success = true
 	return out, status, nil
-}
-
-// rewriteModel 把请求体顶层 model 改写为上游模型名。
-func rewriteModel(body []byte, modelName string) ([]byte, error) {
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, err
-	}
-	m["model"] = modelName
-	return json.Marshal(m)
-}
-
-// injectThinkingParam 向 OpenAI 兼容上游请求体注入 thinking 开关（-thinking 后缀
-// 约定的执行端）。客户端是 Anthropic 协议且自带 thinking 配置时沿用其 budget_tokens
-// （Claude Code 的 effort 等级就映射在这里），否则只发 type=enabled——budget 是可选
-// 字段，缺省走上游默认。经 map 往返以保留转换产物中的其余字段。
-func injectThinkingParam(body, clientBody []byte, clientProto protocol.Provider) ([]byte, error) {
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, err
-	}
-	thinking := map[string]any{"type": "enabled"}
-	if clientProto == protocol.ProviderAnthropic {
-		// 只探 thinking 一个字段，避免对可能数 MB 的消息体做全量反序列化
-		var probe struct {
-			Thinking *protocol.ThinkingConfig `json:"thinking"`
-		}
-		if json.Unmarshal(clientBody, &probe) == nil && probe.Thinking != nil && probe.Thinking.BudgetTokens > 0 {
-			thinking["budget_tokens"] = probe.Thinking.BudgetTokens
-		}
-	}
-	m["thinking"] = thinking
-	return json.Marshal(m)
 }

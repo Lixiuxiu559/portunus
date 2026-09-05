@@ -16,9 +16,10 @@ type ChatCompletionRequest struct {
 	Tools               []Tool         `json:"tools,omitempty"`
 	ToolChoice          any            `json:"tool_choice,omitempty"`
 	StreamOptions       *StreamOptions `json:"stream_options,omitempty"`
-	// Thinking 是思考模式开关，DeepSeek 等兼容方沿用 Anthropic 的 {type,budget_tokens}
-	// 形状。请求侧需要原样转发：否则 deepseek-chat 这类需显式开思考的模型不会进入
-	// thinking 模式（deepseek-reasoner 等始终思考的模型不受影响）。
+	// Thinking 是思考开关意图（-thinking 后缀驱动，经 ComposeUpstreamRequest 的
+	// UpstreamRequest.Thinking 显式设置），DeepSeek 等兼容方沿用 Anthropic 的
+	// {type,budget_tokens} 形状。仅 openai 渲染把它写进上游请求体，不做任何
+	// 默认开启——无条件转发曾导致部分上游 400（见 9a8e785）。
 	Thinking *ThinkingConfig `json:"thinking,omitempty"`
 }
 
