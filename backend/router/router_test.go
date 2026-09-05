@@ -107,19 +107,23 @@ func TestResolveRoundRobin(t *testing.T) {
 	g.Strategy = group.StrategyRoundRobin
 	g.ID = 88888 // 独立游标，避免测试间污染
 
+	// 返回自游标起的完整环形：首个目标轮流分布，其余目标殿后供失败顺延
 	seen := map[string]bool{}
 	for i := 0; i < 4; i++ {
 		targets, err := Resolve(g)
 		if err != nil {
 			t.Fatalf("Resolve 失败: %v", err)
 		}
-		if len(targets) != 1 {
-			t.Fatalf("round_robin 应返回 1 个 target, got %d", len(targets))
+		if len(targets) != 2 {
+			t.Fatalf("round_robin 应返回完整环形 2 个 target, got %d", len(targets))
+		}
+		if targets[0].Model.Name == targets[1].Model.Name {
+			t.Errorf("环形目标不应重复: %s, %s", targets[0].Model.Name, targets[1].Model.Name)
 		}
 		seen[targets[0].Model.Name] = true
 	}
 	if !seen["m1"] || !seen["m2"] {
-		t.Errorf("round_robin 应轮流命中 m1/m2: %v", seen)
+		t.Errorf("round_robin 首个目标应轮流命中 m1/m2: %v", seen)
 	}
 }
 

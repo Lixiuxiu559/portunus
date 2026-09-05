@@ -26,7 +26,8 @@ var ErrEmptyGroup = errors.New("分组没有可用模型")
 var roundRobinCounters sync.Map // groupID(int64) -> *atomic.Uint64
 
 // Resolve 按分组策略返回有序目标列表。
-// manual / round_robin 返回单个目标；failover 返回全部目标（按 priority 升序）。
+// manual 返回单个目标；round_robin 返回自轮询游标起的完整环形（失败顺延下一家）；
+// failover 返回全部目标（按 priority 升序）。
 func Resolve(g *group.Group) ([]Target, error) {
 	if len(g.Items) == 0 {
 		return nil, ErrEmptyGroup
@@ -44,12 +45,18 @@ func Resolve(g *group.Group) ([]Target, error) {
 		}
 		return nil, ErrNoActiveItem
 	case group.StrategyRoundRobin:
+		// 从本轮游标开始返回完整环形目标：首个仍是轮询选中项（轮流分布不变），
+		// 其余按序殿后——选中项失败 / 熔断时顺延下一家，而不是整请求失败。
 		idx := nextRoundRobin(g.ID, len(g.Items))
-		t, err := resolveTarget(g.Items[idx])
-		if err != nil {
-			return nil, err
+		targets := make([]Target, 0, len(g.Items))
+		for k := 0; k < len(g.Items); k++ {
+			t, err := resolveTarget(g.Items[(idx+k)%len(g.Items)])
+			if err != nil {
+				return nil, err
+			}
+			targets = append(targets, t)
 		}
-		return []Target{t}, nil
+		return targets, nil
 	case group.StrategyFailover:
 		targets := make([]Target, 0, len(g.Items))
 		for _, it := range g.Items {

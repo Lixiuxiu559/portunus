@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,8 +31,9 @@ type relayMeta struct {
 
 // upstreamStatusError 表示上游返回非 2xx，携带状态码与响应体供上层透出。
 type upstreamStatusError struct {
-	status int
-	body   []byte
+	status     int
+	body       []byte
+	retryAfter string // 上游 Retry-After 头原值（429 / 503 常见），透传给客户端安排重试节奏
 }
 
 func (e *upstreamStatusError) Error() string {
@@ -113,15 +115,20 @@ const thinkingSuffix = "-thinking"
 // 耗尽才换下一个目标；熔断开路的模型会被跳过。
 func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID := newRequestID()
+		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位。
+		// 放在最早处，让 400 参数错这类失败也带得上 request id。
+		c.Writer.Header().Set("X-Request-Id", requestID)
+
 		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "读取请求体失败"})
+			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, "读取请求体失败")
 			return
 		}
 
 		var meta relayMeta
 		if err := json.Unmarshal(body, &meta); err != nil || meta.Model == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 model 字段"})
+			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, "缺少 model 字段")
 			return
 		}
 
@@ -132,19 +139,15 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			groupName = strings.TrimSuffix(groupName, thinkingSuffix)
 		}
 
-		requestID := newRequestID()
-		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位
-		c.Writer.Header().Set("X-Request-Id", requestID)
-
 		g, err := group.GetByName(groupName)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "分组不存在: " + groupName})
+			writeRelayError(c, clientProto, http.StatusNotFound, relayErrNotFound, "分组不存在: "+groupName)
 			return
 		}
 
 		targets, err := router.Resolve(g)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, err.Error())
 			return
 		}
 
@@ -194,7 +197,18 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 				ErrKind:   errKindCircuitOpen,
 				ErrMsg:    truncateErr(detail, 256),
 			})
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "所有渠道暂不可用"})
+			// Retry-After 取各开路目标剩余冷却的最小值：最早冷却结束的那个即值得重试，
+			// 客户端不必立刻重试撞墙，也不必盲等固定时长。
+			retryAfter := 0
+			for _, t := range targets {
+				if s := breakerCooldownSeconds(t.Model.ID); s > 0 && (retryAfter == 0 || s < retryAfter) {
+					retryAfter = s
+				}
+			}
+			if retryAfter > 0 {
+				c.Writer.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			}
+			writeRelayError(c, clientProto, http.StatusServiceUnavailable, relayErrOverloaded, "所有渠道暂不可用")
 			return
 		}
 
@@ -202,13 +216,16 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		var se *upstreamStatusError
 		if errors.As(lastErr, &se) {
 			status = se.status
-			// 上游 JSON 错误体原样透传，非 JSON 才用通用错误包装
-			if json.Valid(se.body) {
-				c.Writer.Header().Set("Content-Type", "application/json")
-				c.Writer.WriteHeader(status)
-				c.Writer.Write(se.body)
-				return
+			if se.retryAfter != "" {
+				// 上游限流 / 过载给出的重试节奏原样透传
+				c.Writer.Header().Set("Retry-After", se.retryAfter)
 			}
+		}
+		// 等响应头 / 首包 / 非流式总超时是「上游超时未就绪」，用 504 与上游明确拒绝区分，
+		// 客户端可据此与 502（网关侧连不上）区分对待。
+		var ste *streamStallError
+		if errors.As(lastErr, &ste) || isStall(lastErr) || errors.Is(lastErr, context.DeadlineExceeded) {
+			status = http.StatusGatewayTimeout
 		}
 		log.Printf("relay 失败: model=%s err=%v", meta.Model, lastErr)
 		if len(skipped) > 0 {
@@ -216,7 +233,17 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			// failover 候选实际少了谁。
 			log.Printf("relay 失败: 另有 %d 个目标被熔断跳过: %s", len(skipped), strings.Join(skipped, "; "))
 		}
-		c.JSON(status, gin.H{"error": "上游调用失败"})
+		// 上游有回话的失败取其错误原文，跨协议按客户端形状重组（原始体已落库不丢）；
+		// 网关自身故障（超时 / 网络）用通用文案，不向客户端暴露内部细节。
+		kind := relayErrAPI
+		message := "上游调用失败"
+		if se != nil {
+			kind = relayErrorKindByStatus(se.status)
+			if m := upstreamErrorMessage(se.body); m != "" {
+				message = m
+			}
+		}
+		writeRelayError(c, clientProto, status, kind, message)
 	}
 }
 
@@ -306,7 +333,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		errBody, _ := io.ReadAll(resp.Body)
 		log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
-		return nil, status, &upstreamStatusError{status: status, body: errBody}
+		return nil, status, &upstreamStatusError{status: status, body: errBody, retryAfter: resp.Header.Get("Retry-After")}
 	}
 
 	if stream {

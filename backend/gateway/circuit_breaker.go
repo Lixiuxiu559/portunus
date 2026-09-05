@@ -62,6 +62,27 @@ func breakerAllow(modelID int64) (bool, string) {
 	return true, ""
 }
 
+// breakerCooldownSeconds 返回某模型熔断开路的剩余冷却秒数；未开路返回 0。
+// 供 relay 在全目标 503 时设置 Retry-After：告诉客户端最早何时值得重试，
+// 而不是立刻重试撞墙或盲等固定时长。
+func breakerCooldownSeconds(modelID int64) int {
+	v, ok := breakers.Load(modelID)
+	if !ok {
+		return 0
+	}
+	b := v.(*circuitBreaker)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.state != stateOpen {
+		return 0
+	}
+	remain := time.Duration(proxyCfg.CircuitResetSeconds)*time.Second - time.Since(b.openedAt)
+	if remain <= 0 {
+		return 0
+	}
+	return int(remain.Seconds()) + 1
+}
+
 // breakerRecord 记录一次尝试的结果：retryableFailure 为 true 表示一次可重试类失败，
 // 否则视为成功。仅可重试失败计入熔断（不可重试的客户端错误不污染健康度）。
 // 假死失败走 breakerRecordStall；这里的普通失败（5xx / 429 等上游有回话的失败）

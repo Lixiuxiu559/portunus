@@ -38,7 +38,11 @@ func DefaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
 		RetryCount:               2,
 		ConnectTimeoutSeconds:    30,
-		FirstByteTimeoutSeconds:  20,
+		// 等响应头 / 流式首包时限。曾试过 20s：高峰期中转上游排队时正常请求的
+		// 首包也会超 20s（30s~2min 的成功 200 大量存在），20s 误杀慢而正常的请求，
+		// 反而制造额外失败与客户端指数退避，故定 60s（见 gateway/client_wait_test.go
+		// 头注释）。配合假死目标跳过同目标重试 + 熔断快速开路，客户端最多等一个窗口。
+		FirstByteTimeoutSeconds:  60,
 		StreamIdleTimeoutSeconds: 120,
 		NonStreamTimeoutSeconds:  600,
 		CircuitFailureThreshold:  4,

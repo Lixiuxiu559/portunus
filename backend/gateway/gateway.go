@@ -30,14 +30,17 @@ func authMiddleware() gin.HandlerFunc {
 		if key == "" {
 			key = c.GetHeader("x-api-key")
 		}
+		proto := clientProtoFromPath(c.Request.URL.Path)
 		if key == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing api key"})
+			writeRelayError(c, proto, http.StatusUnauthorized, relayErrAuth, "missing api key")
+			c.Abort()
 			return
 		}
 
 		var k shared.APIKey
 		if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
+			writeRelayError(c, proto, http.StatusUnauthorized, relayErrAuth, "invalid api key")
+			c.Abort()
 			return
 		}
 

@@ -182,7 +182,7 @@ func writeStalledSSE(t *testing.T, w http.ResponseWriter, r *http.Request, emitF
 }
 
 // 场景：上游回完响应头后始终不发数据（层-2 prime 阶段静默）。
-// 首包超时应可重试：RetryCount=1 时上游被调 2 次，耗尽后客户端拿到 502。
+// 首包超时应可重试：RetryCount=1 时上游被调 2 次，耗尽后客户端拿到 504（上游超时未就绪语义）。
 func TestRelayStreamPrimeTimeoutRetries(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 1
@@ -201,8 +201,8 @@ func TestRelayStreamPrimeTimeoutRetries(t *testing.T) {
 	if got := atomic.LoadInt32(&calls); got != 2 {
 		t.Errorf("首包超时应触发重试，上游应被调用 2 次，实际 %d", got)
 	}
-	if w.Code != http.StatusBadGateway {
-		t.Fatalf("耗尽后应返回 502，实际 %d, body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusGatewayTimeout {
+		t.Fatalf("耗尽后应返回 504，实际 %d, body=%s", w.Code, w.Body.String())
 	}
 }
 

@@ -7,7 +7,7 @@ type Strategy string
 
 const (
 	StrategyManual     Strategy = "manual"      // 手动指定：只打激活项
-	StrategyRoundRobin Strategy = "round_robin" // 轮询：组内轮流
+	StrategyRoundRobin Strategy = "round_robin" // 轮询：组内轮流，失败顺延下一家
 	StrategyFailover   Strategy = "failover"    // 故障转移：按 priority 顺序，失败换下一个
 )
 

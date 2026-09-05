@@ -44,8 +44,8 @@ func TestClientWaitHeaderTimeoutSingleWindow(t *testing.T) {
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":16,"messages":[{"role":"user","content":"hi"}],"stream":true}`, key)
 	elapsed := time.Since(start)
 
-	if w.Code != http.StatusBadGateway {
-		t.Fatalf("假死目标应直接放弃并返回 502，实际 %d, body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusGatewayTimeout {
+		t.Fatalf("假死目标应直接放弃并返回 504 上游超时语义，实际 %d, body=%s", w.Code, w.Body.String())
 	}
 	if got := atomic.LoadInt32(&calls); got != 1 {
 		t.Errorf("不吐响应头的目标不应同目标重试，上游应被调用 1 次，实际 %d", got)
