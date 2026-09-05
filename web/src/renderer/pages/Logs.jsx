@@ -105,7 +105,6 @@ export default function Logs() {
       dataIndex: 'input_token',
       key: 'input_token',
       width: '140px',
-      align: 'center',
       render: (val, record) => {
         const cacheRead = record?.cache_read_token || 0;
         const cacheWrite = record?.cache_write_token || 0;
@@ -130,7 +129,6 @@ export default function Logs() {
       dataIndex: 'output_token',
       key: 'output_token',
       width: '120px',
-      align: 'center',
       render: (val) => (
         <span className="text-center font-mono block">{formatNum(val)}</span>
       ),
@@ -144,7 +142,7 @@ export default function Logs() {
         // stream 字段由后端按客户端请求记录；旧数据（迁移前）回退按首包推断
         const isStream = record?.stream || record?.first_token_ms > 0;
         return (
-          <span className="flex items-center gap-1">
+          <span className="flex items-center justify-center gap-1">
             <span
               className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-accent/15 text-accent"
               title={record?.request_id ? `req ${record.request_id}` : undefined}
@@ -168,7 +166,6 @@ export default function Logs() {
       dataIndex: 'cost',
       key: 'cost',
       width: '100px',
-      align: 'center',
       render: (val) => (
         <span className="text-center font-mono block">${Number(val || 0).toFixed(6)}</span>
       ),
@@ -179,7 +176,7 @@ export default function Logs() {
       key: 'success',
       width: '110px',
       render: (val, record) => (
-        <span className="flex flex-col items-start gap-0.5">
+        <span className="flex flex-col items-center gap-0.5">
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
             val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
           }`}>

@@ -26,8 +26,6 @@ export interface ColumnType<T = Record<string, unknown>> {
   width?: string;
   /** 是否为行标题列 */
   isRowHeader?: boolean;
-  /** 列对齐：表头跟随数据对齐（默认 left），避免表头居中悬在左对齐数据上方造成错位感 */
-  align?: 'left' | 'center' | 'right';
   /** 是否显示复制按钮（hover 可见，点击复制单元格文本） */
   copy?: boolean;
 }
@@ -152,19 +150,15 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
             aria-hidden={false}
           >
             <Table.Header className="sticky top-0 z-10 shadow-[0_1px_0_var(--border)]">
-              {columns.map((col) => {
-                const alignClass =
-                  col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left';
-                return (
-                  <Table.Column
-                    key={col.key || col.dataIndex}
-                    isRowHeader={col.isRowHeader}
-                    style={col.width ? { width: col.width } : undefined}
-                  >
-                    <span className={`block w-full ${alignClass}`}>{col.title}</span>
-                  </Table.Column>
-                );
-              })}
+              {columns.map((col) => (
+                <Table.Column
+                  key={col.key || col.dataIndex}
+                  isRowHeader={col.isRowHeader}
+                  style={col.width ? { width: col.width } : undefined}
+                >
+                  <span className="block w-full text-center">{col.title}</span>
+                </Table.Column>
+              ))}
             </Table.Header>
             <Table.Body>
               {dataSource.map((row, rowIndex) => (
