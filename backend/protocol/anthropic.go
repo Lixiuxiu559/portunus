@@ -187,7 +187,6 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		MaxTokens:   intPtr(req.MaxTokens),
 		Stop:        req.StopSequences,
 		Stream:      req.Stream,
-		Thinking:    req.Thinking,
 	}
 
 	// system：string 直接拼成一条 system 消息；[]ContentBlock 则把 text 块拼起来
@@ -470,7 +469,6 @@ func anthropicRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		Stream:        req.Stream,
 		Temperature:   req.Temperature,
 		TopP:          req.TopP,
-		Thinking:      req.Thinking,
 	}
 	if req.MaxTokens != nil {
 		out.MaxTokens = *req.MaxTokens
