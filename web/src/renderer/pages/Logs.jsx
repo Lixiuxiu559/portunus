@@ -77,7 +77,7 @@ export default function Logs() {
       dataIndex: 'created_at',
       key: 'created_at',
       render: (val) => (
-        <span className="whitespace-nowrap font-mono text-xs text-muted">
+        <span className="block whitespace-nowrap text-center font-mono text-xs text-muted">
           {val ? new Date(val).toLocaleString('zh-CN') : '—'}
         </span>
       ),
@@ -88,7 +88,7 @@ export default function Logs() {
       key: 'model_name',
       width: '200px',
       render: (val) => (val ? (
-        <span className="block truncate" title={String(val)}>{val}</span>
+        <span className="block truncate text-center" title={String(val)}>{val}</span>
       ) : '—'),
     },
     {
@@ -97,7 +97,7 @@ export default function Logs() {
       key: 'group_name',
       width: '200px',
       render: (val) => (val ? (
-        <span className="block truncate" title={String(val)}>{val}</span>
+        <span className="block truncate text-center" title={String(val)}>{val}</span>
       ) : '—'),
     },
     {
