@@ -358,11 +358,7 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		}
 	}
 	if resp.Usage != nil {
-		out.Usage = &ResponsesUsage{
-			InputTokens:  resp.Usage.PromptTokens,
-			OutputTokens: resp.Usage.CompletionTokens,
-			TotalTokens:  resp.Usage.TotalTokens,
-		}
+		out.Usage = toResponsesUsage(resp.Usage)
 	}
 	return json.Marshal(out)
 }
@@ -466,64 +462,86 @@ func (r *responsesToOpenAIStream) Usage() *Usage { return r.st.usage }
 
 // ===== 流式：openai → responses =====
 
-// openAIToResponsesStream 把 OpenAI chunk 逐条映射为 Responses 流事件。
-type openAIToResponsesStream struct {
-	id      string
-	model   string
-	started bool
-	usage   *ResponsesUsage
+// responsesBlockSink 把块生命周期回调映射为 Responses 流事件（由
+// fromOpenAISkeleton 驱动）。工具调用映射为 output_item.added（item 携带
+// call_id / name，output_index 沿用 openai 的 tool_calls index）+ 参数增量事件；
+// 思考增量映射为 reasoning_summary_text.delta（与 responses→openai 方向的
+// 解析对称）。旧实现只透文本，tool_calls / reasoning 被静默丢弃。
+func newResponsesFromOpenAI() StreamConverter {
+	return newFromOpenAISkeleton(&responsesBlockSink{})
 }
 
-func newOpenAIToResponsesStream() StreamConverter { return &openAIToResponsesStream{} }
+type responsesBlockSink struct {
+	id, model string
+	started   bool
+}
 
-func (o *openAIToResponsesStream) ev(typ string, resp *ResponsesResponse, delta string) []byte {
-	b, _ := json.Marshal(ResponsesStreamEvent{Type: typ, Response: resp, Delta: delta})
+// ev 序列化一个流事件。
+func (r *responsesBlockSink) ev(e ResponsesStreamEvent) []byte {
+	b, _ := json.Marshal(e)
 	return b
 }
 
-func (o *openAIToResponsesStream) Convert(payload []byte) ([][]byte, error) {
-	var chunk ChatCompletionChunk
-	if err := json.Unmarshal(payload, &chunk); err != nil {
-		return nil, fmt.Errorf("解析 openai chunk 失败: %w", err)
-	}
-	o.id = firstNonEmpty(o.id, chunk.ID)
-	o.model = firstNonEmpty(o.model, chunk.Model)
-	if chunk.Usage != nil {
-		o.usage = &ResponsesUsage{
-			InputTokens:  chunk.Usage.PromptTokens,
-			OutputTokens: chunk.Usage.CompletionTokens,
-			TotalTokens:  chunk.Usage.TotalTokens,
-		}
-	}
-
-	var out [][]byte
-	if !o.started {
-		o.started = true
-		out = append(out, o.ev("response.created", &ResponsesResponse{
-			ID: o.id, Object: "response", Status: "in_progress", Model: o.model,
-		}, ""))
-	}
-	if len(chunk.Choices) == 0 {
-		return out, nil
-	}
-	if delta := chunk.Choices[0].Delta.Content; delta != "" {
-		out = append(out, o.ev("response.output_text.delta", nil, delta))
-	}
-	return out, nil
+func (r *responsesBlockSink) BeginMessage(id, model string, _ *Usage) [][]byte {
+	r.started = true
+	r.id, r.model = id, model
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.created", Response: &ResponsesResponse{
+		ID: r.id, Object: "response", Status: "in_progress", Model: r.model,
+	}})}
 }
 
-func (o *openAIToResponsesStream) Finish() ([][]byte, error) {
-	if !o.started {
-		return nil, nil
+func (r *responsesBlockSink) TextDelta(s string) [][]byte {
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.output_text.delta", Delta: s})}
+}
+
+func (r *responsesBlockSink) ReasoningDelta(s string) [][]byte {
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.reasoning_summary_text.delta", Delta: s})}
+}
+
+func (r *responsesBlockSink) ToolStart(index int, id, name string) [][]byte {
+	return [][]byte{r.ev(ResponsesStreamEvent{
+		Type:        "response.output_item.added",
+		OutputIndex: index,
+		Item:        &OutputItem{Type: "function_call", CallID: id, Name: name},
+	})}
+}
+
+func (r *responsesBlockSink) ToolDelta(index int, args string) [][]byte {
+	return [][]byte{r.ev(ResponsesStreamEvent{
+		Type:        "response.function_call_arguments.delta",
+		OutputIndex: index,
+		Delta:       args,
+	})}
+}
+
+// ToolComplete 发 output_item.done——Responses 客户端（codex 的 SSE 处理器）
+// 只在该事件上分发工具执行，added + delta 而无 done 的工具调用永远不会被执行；
+// item 携带骨架累积的完整参数与 completed 状态。
+func (r *responsesBlockSink) ToolComplete(index int, id, name, args string) [][]byte {
+	return [][]byte{r.ev(ResponsesStreamEvent{
+		Type:        "response.output_item.done",
+		OutputIndex: index,
+		Item:        &OutputItem{Type: "function_call", CallID: id, Name: name, Arguments: args, Status: "completed"},
+	})}
+}
+
+func (r *responsesBlockSink) TextEnd() [][]byte { return nil }
+
+// Finish 发 response.completed（Responses 事件无 finish_reason 字段，完成即
+// status=completed；usage 反向还原——input_tokens 是含缓存的总输入，需加回
+// 缓存读 / 写）。与旧实现一致：未收到任何 chunk 时不产出。
+func (r *responsesBlockSink) Finish(_ string, u *Usage) [][]byte {
+	if !r.started {
+		return nil
 	}
 	resp := &ResponsesResponse{
-		ID:     o.id,
+		ID:     r.id,
 		Object: "response",
 		Status: "completed",
-		Model:  o.model,
-		Usage:  o.usage,
+		Model:  r.model,
 	}
-	return [][]byte{o.ev("response.completed", resp, "")}, nil
+	if u != nil {
+		resp.Usage = toResponsesUsage(u)
+	}
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.completed", Response: resp})}
 }
-
-func (o *openAIToResponsesStream) Usage() *Usage { return nil }

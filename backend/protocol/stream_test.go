@@ -451,15 +451,10 @@ func TestStreamOpenAIToAnthropicUsageCacheMapping(t *testing.T) {
 // message_start.usage.input_tokens 用预估值填充，客户端据此显示上下文占用；
 // 若上游随后返回真实 usage，message_delta 仍用真实值覆盖。
 func TestStreamOpenAIToAnthropicMessageStartEstimate(t *testing.T) {
-	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic, WithInputEstimate(func() int { return 1234 }))
 	if err != nil {
 		t.Fatalf("构建转换器失败: %v", err)
 	}
-	es, ok := conv.(EstimateSetter)
-	if !ok {
-		t.Fatal("OpenAI→Anthropic 转换器应实现 EstimateSetter")
-	}
-	es.SetEstimateInputTokens(1234)
 
 	var rawEvents []string
 	feed := func(payload string) {

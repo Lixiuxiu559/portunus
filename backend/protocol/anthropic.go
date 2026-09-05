@@ -729,18 +729,3 @@ func rawJSONOrEmptyObject(s string) json.RawMessage {
 
 // intPtr 返回 int 指针。
 func intPtr(v int) *int { return &v }
-
-// toAnthropicUsage 把统一 Usage 归一为 Anthropic usage。
-// PromptTokens 已是非缓存输入（见 Usage.UnmarshalJSON），直接作为 input_tokens；
-// 缓存读写单独映射到 cache_read/cache_creation_input_tokens。
-func toAnthropicUsage(u *Usage) *AnthropicUsage {
-	if u == nil {
-		return nil
-	}
-	return &AnthropicUsage{
-		InputTokens:              u.PromptTokens,
-		OutputTokens:             u.CompletionTokens,
-		CacheReadInputTokens:     u.CacheReadTokens,
-		CacheCreationInputTokens: u.CacheWriteTokens,
-	}
-}

@@ -3,11 +3,8 @@ package gateway
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -119,24 +116,27 @@ func (w *streamWatchdog) fire() {
 // wd 为上游静默看门狗：首包阶段在拿到响应头后开始计时，提交后切换静默时限，
 // 超时掐断并以上游 ctx 取消报错，由 wd.Fired() 还原为 streamStallError。
 // 返回 first 为首个有效事件写出时刻（首包前失败或未产出事件时为零值），供上层计算客户端 TTFT。
+// SSE 帧的解帧 / 装帧 / [DONE] / 流内 error 形状由 protocol.StreamFramer 承担，
+// 本函数只管编排：看门狗、committed 状态、首包计时、错误时机与类别判定。
 func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *http.Response, conv protocol.StreamConverter, wd *streamWatchdog) (first time.Time, err error) {
 	scanner := bufio.NewScanner(upstreamResp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 放大缓冲，避免长行截断
 
+	fr := protocol.NewStreamFramer(clientProto, conv)
 	wd.Arm() // 响应头已回，开始首包静默计时
 	committed := false
 	for scanner.Scan() {
 		wd.Reset() // 有数据，续命
-		payload, ok := parseSSEDataLine(scanner.Text())
+		payload, ok, done := fr.Unframe([]byte(scanner.Text()))
+		if done {
+			break
+		}
 		if !ok {
 			continue
 		}
-		if payload == "[DONE]" {
-			break
-		}
-		chunks, err := conv.Convert([]byte(payload))
+		frames, err := fr.ConvertPayload(payload)
 		if err != nil {
-			return first, failCommittedStream(c, clientProto, committed, err, "api_error")
+			return first, failCommittedStream(c, fr, committed, err, "api_error")
 		}
 		if !committed {
 			first = time.Now()
@@ -144,8 +144,8 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 			committed = true
 			wd.UseIdle() // 已提交，切换静默时限
 		}
-		for _, chunk := range chunks {
-			writeSSE(c.Writer, clientProto, chunk)
+		for _, frame := range frames {
+			c.Writer.Write(frame)
 		}
 		c.Writer.Flush()
 	}
@@ -155,12 +155,12 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		if stall := wd.Fired(); stall != nil {
 			err = stall
 		}
-		return first, failCommittedStream(c, clientProto, committed, err, "overloaded_error")
+		return first, failCommittedStream(c, fr, committed, err, "overloaded_error")
 	}
 
-	finals, err := conv.Finish()
+	finals, err := fr.FinishFrames()
 	if err != nil {
-		return first, failCommittedStream(c, clientProto, committed, err, "api_error")
+		return first, failCommittedStream(c, fr, committed, err, "api_error")
 	}
 	if !committed {
 		// 上游 200 但未产出有效事件（如空流）：提交头后再收尾，交给客户端结束。
@@ -168,58 +168,30 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		writeStreamHeaders(c)
 		committed = true
 	}
-	for _, chunk := range finals {
-		writeSSE(c.Writer, clientProto, chunk)
-	}
-	// OpenAI / Responses 客户端补 [DONE]；Anthropic 客户端已在 message_stop 事件里结束
-	if clientProto != protocol.ProviderAnthropic {
-		c.Writer.WriteString("data: [DONE]\n\n")
+	for _, frame := range finals {
+		c.Writer.Write(frame)
 	}
 	c.Writer.Flush()
 	return first, nil
 }
 
-// failCommittedStream 提交后失败：向 Anthropic 客户端发协议内 error 事件再包装为
-// streamCommittedError；未提交时原样返回错误（走 failover，客户端什么都还没收到）。
-//
-// Anthropic 流式协议的 error 是终止事件，形如 {"type":"error","error":{"type":...,
-// "message":...}}——嵌套错误对象必须在 "error" 键下（官方 SDK 只读 body.error.type
-// 判类型，写别的键名客户端识别不了，只能退化为非流式回退）。Claude Code v2.1.260
-// 实测（/tmp 实验室复现，2026-09）：收到流内 error 后——已有文本内容时静默把残缺
-// 内容定稿为完整回答（无警告；工具调用等无法定稿时才显示「Server error
-// mid-response」）；无内容时显示重试横幅（错误原文可见）重试 2 次，耗尽后自动降级
-// 为非流式请求重发——用户视角即「卡住 → 重试 → 报检查网关/网络」，流已被掐断这件
-// 事客户端不会明说。分类：静默掐断 / 上游断连 →
-// overloaded_error（过载重试语义）；转换失败 → api_error（由调用方传入）。
-// OpenAI / Responses 客户端无对应的流内错误标准形式，保持截断，由客户端按断流处理。
-// 客户端主动断连（context.Canceled）不发事件——连接已亡，写了无意义。
-func failCommittedStream(c *gin.Context, clientProto protocol.Provider, committed bool, err error, anthropicType string) error {
+// failCommittedStream 提交后失败：向客户端发协议内错误事件（形状由帧器决定——
+// anthropic 为流内 error 终止事件，openai / responses 无标准形式保持截断）再包装
+// 为 streamCommittedError；未提交时原样返回错误（走 failover，客户端什么都还没收到）。
+// 时机与类别由本层决定：仅在 committed 后、且非客户端主动断连（连接已亡，写了
+// 无意义）时发；转换失败 api_error、静默掐断 / 上游断连 overloaded_error（过载
+// 重试语义，由调用方传入）。
+func failCommittedStream(c *gin.Context, fr *protocol.StreamFramer, committed bool, err error, kind string) error {
 	if !committed {
 		return err
 	}
-	if clientProto == protocol.ProviderAnthropic && !errors.Is(err, context.Canceled) {
-		if payload, merr := json.Marshal(map[string]any{
-			"type":  "error",
-			"error": map[string]string{"type": anthropicType, "message": err.Error()},
-		}); merr == nil {
-			writeSSE(c.Writer, clientProto, payload)
+	if !errors.Is(err, context.Canceled) {
+		if frame := fr.ErrorFrame(kind, err.Error()); frame != nil {
+			c.Writer.Write(frame)
 			c.Writer.Flush()
 		}
 	}
 	return &streamCommittedError{err: err}
-}
-
-// parseSSEDataLine 解析一行 SSE：是 `data:` 行则返回去除前缀与空白的载荷（trim 后非空），
-// 否则返回 ok=false。`[DONE]` 原样作为载荷返回。
-func parseSSEDataLine(line string) (payload string, ok bool) {
-	if !strings.HasPrefix(line, "data:") {
-		return "", false
-	}
-	payload = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-	if payload == "" {
-		return "", false
-	}
-	return payload, true
 }
 
 // writeStreamHeaders 提交 SSE 响应头与 200 状态码。仅调用一次（首个有效事件后）。
@@ -228,17 +200,4 @@ func writeStreamHeaders(c *gin.Context) {
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.WriteHeader(http.StatusOK)
-}
-
-// writeSSE 按客户端协议补 SSE 帧。
-func writeSSE(w io.Writer, clientProto protocol.Provider, payload []byte) {
-	if clientProto == protocol.ProviderAnthropic {
-		var ev struct {
-			Type string `json:"type"`
-		}
-		if json.Unmarshal(payload, &ev) == nil && ev.Type != "" {
-			io.WriteString(w, "event: "+ev.Type+"\n")
-		}
-	}
-	io.WriteString(w, "data: "+string(payload)+"\n\n")
 }

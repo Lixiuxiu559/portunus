@@ -3,7 +3,6 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 )
 
 // 本文件定义 Anthropic 流式事件的结构，以及 anthropic ↔ openai 的流式转换状态机。
@@ -90,8 +89,10 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		if ev.Message != nil {
 			a.st.setMeta(ev.Message.ID, ev.Message.Model)
 			if ev.Message.Usage != nil {
-				u := usageFromAnthropic(*ev.Message.Usage)
-				a.st.usage = &u
+				u := *ev.Message.Usage
+				a.st.rawUsage = &u
+				x := usageFromAnthropic(u)
+				a.st.usage = &x
 			}
 			if b := a.st.emitRole("assistant"); b != nil {
 				out = append(out, b)
@@ -127,11 +128,13 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			a.st.finish = anthropicStopToOpenAI(ev.Delta.StopReason)
 		}
 		if ev.Usage != nil {
-			if a.st.usage == nil {
-				a.st.usage = &Usage{}
+			// 持有原始用量、经 usageFromAnthropic 重算——Total 数学不在此手写
+			if a.st.rawUsage == nil {
+				a.st.rawUsage = &AnthropicUsage{}
 			}
-			a.st.usage.CompletionTokens = ev.Usage.OutputTokens
-			a.st.usage.TotalTokens = a.st.usage.PromptTokens + a.st.usage.CompletionTokens + a.st.usage.CacheReadTokens + a.st.usage.CacheWriteTokens
+			a.st.rawUsage.OutputTokens = ev.Usage.OutputTokens
+			x := usageFromAnthropic(*a.st.rawUsage)
+			a.st.usage = &x
 		}
 	case "message_stop":
 		// no-op，收尾由 Finish 统一处理
@@ -150,239 +153,196 @@ func (a *anthropicToOpenAIStream) Usage() *Usage { return a.st.usage }
 
 // ===== 流式：openai → anthropic =====
 
-// openAIToAnthropicStream 把 OpenAI chunk 逐条映射为 Anthropic 流事件。
+// anthropicBlockSink 把块生命周期回调映射为 Anthropic 流事件（由
+// fromOpenAISkeleton 驱动，骨架见 from_openai.go）。
 //
-// Anthropic 流式状态机里，多个 content block 可交错 open（按 index 关联），
-// 尤其多工具并行时 OpenAI 会同时流式多个 tool_calls（各带独立的 index），
-// 每个都需映射为一个独立的 tool_use block。这里维护两块状态：
-//   - 单块（text / thinking）：同一时刻至多一个 open
-//   - 并行 tool_use 块：openai tool_calls index → anthropic content block index，
-//     block index 按 open 顺序从 nextIdx 顺序分配，保证 Anthropic 侧 index 连续无空洞
-type openAIToAnthropicStream struct {
-	id      string
-	model   string
+// Anthropic 流式里多个 content block 可交错 open（按 index 关联），尤其多工具
+// 并行时 OpenAI 会同时流式多个 tool_calls（各带独立的 index），每个都需映射为
+// 一个独立的 tool_use block。anthropic content block index 按块首次出现顺序
+// 从 0 顺序分配，保证连续无空洞。
+type anthropicBlockSink struct {
 	started bool
 
 	// 单块状态（text / thinking）
 	blockOpen bool
-	blockType string // "text" | "thinking"
+	blockType string // "text" | "thinking"，TextEnd 据此决定是否补签名
 	blockIdx  int
 
-	// 并行 tool_use 块状态：只记录实际 open 的 offset，
-	// close 时只对 open 过的块发 stop，避免对从未 start 的 index 发孤儿 stop。
-	toolOpen map[int]int // openai tool_calls index → anthropic content block index
+	// 并行 tool_use 块：openai tool_calls index → anthropic content block index
+	toolIdx map[int]int
 
-	nextIdx int // 下一个可分配的 anthropic content block index
-	finish  string
+	nextIdx int
 	usage   *AnthropicUsage
-	// estimate 是请求输入的预估 token 数；message_start 时上游尚未返回 usage，
-	// 用它填充 input_tokens，让客户端能看到上下文占用。
-	estimate int
+
+	// estimateFn 是请求输入 token 的惰性估算 thunk（见 WithInputEstimate）：
+	// message_start 发出前调用一次（上游 usage 缺失时兜底 input_tokens）。
+	estimateFn   func() int
+	estimate     int
+	estimateDone bool
 }
 
-func newOpenAIToAnthropicStream() StreamConverter {
-	return &openAIToAnthropicStream{}
+// setInputEstimate 设置惰性输入估算 thunk。
+func (a *anthropicBlockSink) setInputEstimate(fn func() int) { a.estimateFn = fn }
+
+// estimatedInput 返回估算的输入 token：thunk 缺省按 0 兜底，只调用一次。
+func (a *anthropicBlockSink) estimatedInput() int {
+	if a.estimateFn == nil {
+		return 0
+	}
+	if !a.estimateDone {
+		a.estimate = a.estimateFn()
+		a.estimateDone = true
+	}
+	return a.estimate
 }
 
-// SetEstimateInputTokens 设置请求输入的预估 token 数（供 message_start 填充）。
-func (o *openAIToAnthropicStream) SetEstimateInputTokens(n int) {
-	o.estimate = n
+func newAnthropicFromOpenAI() StreamConverter {
+	return newFromOpenAISkeleton(&anthropicBlockSink{})
 }
 
 // evBlock 构造一个 content_block_* 事件（显式指定 index）并序列化。
-func (o *openAIToAnthropicStream) evBlock(typ string, idx int, block *ContentBlock, delta *StreamDelta) []byte {
+func (a *anthropicBlockSink) evBlock(typ string, idx int, block *ContentBlock, delta *StreamDelta) []byte {
 	event := MessagesStreamEvent{Type: typ, Index: intPtr(idx), ContentBlock: block, Delta: delta}
 	b, _ := json.Marshal(event)
 	return b
 }
 
-// evMessage 构造一个非 content_block 的事件（message_start / message_delta / message_stop）。
-func (o *openAIToAnthropicStream) evMessage(typ string, msg *MessagesResponse, delta *StreamDelta) []byte {
-	event := MessagesStreamEvent{Type: typ, Message: msg, Delta: delta}
-	if typ == "message_delta" {
-		event.Usage = o.usage
-	}
-	b, _ := json.Marshal(event)
+// evMessage 构造一个非 content_block 的事件（message_start / message_stop）。
+func (a *anthropicBlockSink) evMessage(typ string, msg *MessagesResponse) []byte {
+	b, _ := json.Marshal(MessagesStreamEvent{Type: typ, Message: msg})
 	return b
 }
 
-// closeSingleBlock 若 text / thinking 单块打开，发出对应的 content_block_stop。
-// thinking 块收尾前必须补发 signature_delta：Anthropic 扩展思考的 thinking 块要带签名
-// 才能被客户端在下一轮原样回传（多轮回传才会带上 reasoning_content，否则 DeepSeek 等
-// thinking 模式上游报 400 "reasoning_content must be passed back"）。签名值上游
-// （DeepSeek 等）不提供，发非空占位符——部分客户端校验签名非空才肯在下一轮回传思考块，
-func (o *openAIToAnthropicStream) closeSingleBlock(out *[][]byte) {
-	if !o.blockOpen {
-		return
+// BeginMessage 发出 message_start。message 的 usage 是必填对象（不能为 null）：
+// 首个 chunk 已携带上游真实 usage 时直接采用；否则用预估 input_tokens 兜底
+// （若无预估则全 0），保证客户端能看到上下文占用。
+func (a *anthropicBlockSink) BeginMessage(id, model string, u *Usage) [][]byte {
+	a.started = true
+	if u != nil {
+		a.usage = toAnthropicUsage(u)
 	}
-	if o.blockType == "thinking" {
-		*out = append(*out, o.evBlock("content_block_delta", o.blockIdx, nil, &StreamDelta{
-			Type:      "signature_delta",
-			Signature: "sig",
-		}))
+	if a.usage == nil {
+		a.usage = &AnthropicUsage{InputTokens: a.estimatedInput()}
 	}
-	*out = append(*out, o.evBlock("content_block_stop", o.blockIdx, nil, nil))
-	o.blockOpen = false
+	return [][]byte{a.evMessage("message_start", &MessagesResponse{
+		ID:      id,
+		Type:    "message",
+		Role:    "assistant",
+		Model:   model,
+		Content: []ContentBlock{},
+		Usage:   a.usage,
+	})}
 }
 
-// closeToolBlocks 关闭所有实际 open 的并行 tool_use 块（只对 open 过的发 stop），
-// 并按 block index 排序保证事件顺序稳定。关闭后清空状态。
-func (o *openAIToAnthropicStream) closeToolBlocks(out *[][]byte) {
-	if len(o.toolOpen) == 0 {
-		return
-	}
-	blockIdxs := make([]int, 0, len(o.toolOpen))
-	for _, blockIdx := range o.toolOpen {
-		blockIdxs = append(blockIdxs, blockIdx)
-	}
-	sort.Ints(blockIdxs)
-	for _, blockIdx := range blockIdxs {
-		*out = append(*out, o.evBlock("content_block_stop", blockIdx, nil, nil))
-	}
-	o.toolOpen = nil
+// TextDelta / ReasoningDelta 打开（或续写）text / thinking 单块并发增量。
+func (a *anthropicBlockSink) TextDelta(s string) [][]byte {
+	return a.textBlock("text", s)
 }
 
-// handleTextBlock 处理 text 或 thinking 增量。类型切换时关闭之前的块。
-func (o *openAIToAnthropicStream) handleTextBlock(typ, text string) [][]byte {
+func (a *anthropicBlockSink) ReasoningDelta(s string) [][]byte {
+	return a.textBlock("thinking", s)
+}
+
+// textBlock 打开（或续写）单块。骨架保证类型切换前已回调 TextEnd，此处只管
+// 「未打开则开块」。
+func (a *anthropicBlockSink) textBlock(typ, text string) [][]byte {
 	var out [][]byte
-	if !o.blockOpen || o.blockType != typ {
-		o.closeSingleBlock(&out)
-		o.closeToolBlocks(&out) // 从 tool 切回 text/thinking，关掉所有 tool 块
-		o.blockIdx = o.nextIdx
-		o.nextIdx++
-		o.blockOpen = true
-		o.blockType = typ
+	if !a.blockOpen {
+		a.blockOpen = true
+		a.blockType = typ
+		a.blockIdx = a.nextIdx
+		a.nextIdx++
 		blk := &ContentBlock{Type: typ}
 		if typ == "text" {
-			// text 块必须含空 "text" 字段，否则客户端拿不到字符串字段（与 content_block_start 同病根）。
+			// text 块必须含空 "text" 字段，否则客户端拿不到字符串字段。
 			blk.Text = ""
 		}
-		out = append(out, o.evBlock("content_block_start", o.blockIdx, blk, nil))
+		out = append(out, a.evBlock("content_block_start", a.blockIdx, blk, nil))
 	}
 	delta := &StreamDelta{Type: "text_delta", Text: text}
 	if typ == "thinking" {
 		delta = &StreamDelta{Type: "thinking_delta", Thinking: text}
 	}
-	out = append(out, o.evBlock("content_block_delta", o.blockIdx, nil, delta))
+	out = append(out, a.evBlock("content_block_delta", a.blockIdx, nil, delta))
 	return out
 }
 
-// handleToolCalls 处理并行 tool_calls。每个 OpenAI tool_call 的 index 首次出现时
-// 分配一个独立的 anthropic block index 并发 content_block_start（携带当前帧的
-// id / name，即使为空也保证后续 input_json_delta 有对应的 start）；
-// 其后 arguments 增量发 input_json_delta。
-func (o *openAIToAnthropicStream) handleToolCalls(toolCalls []ChunkToolCall) [][]byte {
+// TextEnd 关闭当前单块。thinking 块收尾前必须补发 signature_delta：Anthropic
+// 扩展思考的 thinking 块要带签名才能被客户端在下一轮原样回传（多轮回传才会
+// 带上 reasoning_content，否则 DeepSeek 等 thinking 模式上游报 400
+// "reasoning_content must be passed back"）。签名值上游（DeepSeek 等）不提供，
+// 发非空占位符——部分客户端校验签名非空才肯在下一轮回传思考块。
+func (a *anthropicBlockSink) TextEnd() [][]byte {
+	if !a.blockOpen {
+		return nil
+	}
 	var out [][]byte
-	o.closeSingleBlock(&out) // 从 text/thinking 切到 tool，关闭单块
-	if o.toolOpen == nil {
-		o.toolOpen = map[int]int{}
+	if a.blockType == "thinking" {
+		out = append(out, a.evBlock("content_block_delta", a.blockIdx, nil, &StreamDelta{
+			Type:      "signature_delta",
+			Signature: "sig",
+		}))
 	}
-	for _, tc := range toolCalls {
-		offset := tc.Index
-		if offset < 0 {
-			offset = 0
-		}
-		blockIdx, open := o.toolOpen[offset]
-		if !open {
-			blockIdx = o.nextIdx
-			o.nextIdx++
-			o.toolOpen[offset] = blockIdx
-			out = append(out, o.evBlock("content_block_start", blockIdx, &ContentBlock{
-				Type: "tool_use",
-				ID:   tc.ID,
-				Name: tc.Function.Name,
-			}, nil))
-		}
-		if tc.Function.Arguments != "" {
-			out = append(out, o.evBlock("content_block_delta", blockIdx, nil, &StreamDelta{
-				Type:        "input_json_delta",
-				PartialJSON: tc.Function.Arguments,
-			}))
-		}
-	}
+	out = append(out, a.evBlock("content_block_stop", a.blockIdx, nil, nil))
+	a.blockOpen = false
 	return out
 }
 
-func (o *openAIToAnthropicStream) Convert(payload []byte) ([][]byte, error) {
-	var chunk ChatCompletionChunk
-	if err := json.Unmarshal(payload, &chunk); err != nil {
-		return nil, fmt.Errorf("解析 openai chunk 失败: %w", err)
+// ToolStart 为新的并行工具调用分配 anthropic content block index 并发
+// content_block_start（携带当前帧的 id / name，即使为空也保证后续
+// input_json_delta 有对应的 start）。
+func (a *anthropicBlockSink) ToolStart(index int, id, name string) [][]byte {
+	blockIdx := a.nextIdx
+	a.nextIdx++
+	if a.toolIdx == nil {
+		a.toolIdx = map[int]int{}
 	}
-	o.id = firstNonEmpty(o.id, chunk.ID)
-	o.model = firstNonEmpty(o.model, chunk.Model)
-	if chunk.Usage != nil {
-		o.usage = toAnthropicUsage(chunk.Usage)
-	}
-
-	var out [][]byte
-	if len(chunk.Choices) == 0 {
-		return out, nil
-	}
-	delta := chunk.Choices[0].Delta
-	finish := chunk.Choices[0].FinishReason
-
-	if !o.started {
-		o.started = true
-		// message 的 usage 是必填对象（不能为 null），首 chunk 尚未拿到上游 usage 时，
-		// 用预估 input_tokens 兜底（若无预估则全 0），保证客户端能看到上下文占用。
-		if o.usage == nil {
-			o.usage = &AnthropicUsage{InputTokens: o.estimate}
-		}
-		out = append(out, o.evMessage("message_start", &MessagesResponse{
-			ID:      o.id,
-			Type:    "message",
-			Role:    "assistant",
-			Model:   o.model,
-			Content: []ContentBlock{},
-			Usage:   o.usage,
-		}, nil))
-	}
-	if delta.Role != "" && len(delta.ToolCalls) == 0 && delta.ReasoningContent == "" && delta.Content == "" {
-		// 纯 role 标记 chunk（OpenAI 首个 chunk 仅声明 assistant 角色），无可转换内容，忽略。
-		// 不能直接按 role 非空 return：官方 OpenAI 的工具开场块 role 与 tool_calls 同帧，
-		// 整帧被吞后后续参数帧拿不到 id/name，tool_use 块发空 id 导致客户端 Tool use interrupted。
-		return out, nil
-	}
-
-	if len(delta.ToolCalls) > 0 {
-		out = append(out, o.handleToolCalls(delta.ToolCalls)...)
-		return out, nil
-	}
-
-	// DeepSeek 等兼容方的 reasoning_content 扩展字段 → Anthropic thinking 块。
-	// 官方 OpenAI 没有该字段；有此字段说明上游是兼容方，思考内容应显式转为 thinking_delta。
-	if delta.ReasoningContent != "" {
-		out = append(out, o.handleTextBlock("thinking", delta.ReasoningContent)...)
-		return out, nil
-	}
-
-	if delta.Content != "" {
-		out = append(out, o.handleTextBlock("text", delta.Content)...)
-	}
-
-	if finish != "" {
-		o.finish = openAIFinishToAnthropic(finish)
-	}
-	return out, nil
+	a.toolIdx[index] = blockIdx
+	return [][]byte{a.evBlock("content_block_start", blockIdx, &ContentBlock{
+		Type: "tool_use",
+		ID:   id,
+		Name: name,
+	}, nil)}
 }
 
-func (o *openAIToAnthropicStream) Finish() ([][]byte, error) {
-	var out [][]byte
-	o.closeSingleBlock(&out)
-	o.closeToolBlocks(&out)
-	if o.started {
-		// stop_reason 上游没给时兜底 end_turn；usage 未累积时兜底空对象，
-		// 保证 message_delta 的 delta.stop_reason 与 usage 两个必填键始终存在。
-		if o.finish == "" {
-			o.finish = "end_turn"
-		}
-		if o.usage == nil {
-			o.usage = &AnthropicUsage{}
-		}
-		out = append(out, o.evMessage("message_delta", nil, &StreamDelta{StopReason: o.finish}))
-		out = append(out, o.evMessage("message_stop", nil, nil))
+// ToolDelta 发工具参数增量（input_json_delta）。
+func (a *anthropicBlockSink) ToolDelta(index int, args string) [][]byte {
+	blockIdx, ok := a.toolIdx[index]
+	if !ok || args == "" {
+		return nil
 	}
-	return out, nil
+	return [][]byte{a.evBlock("content_block_delta", blockIdx, nil, &StreamDelta{
+		Type:        "input_json_delta",
+		PartialJSON: args,
+	})}
 }
 
-func (o *openAIToAnthropicStream) Usage() *Usage { return nil }
+// ToolComplete 关闭该工具的 content block（参数已按增量流出，无需重发）。
+func (a *anthropicBlockSink) ToolComplete(index int, _, _, _ string) [][]byte {
+	blockIdx, ok := a.toolIdx[index]
+	if !ok {
+		return nil
+	}
+	delete(a.toolIdx, index)
+	return [][]byte{a.evBlock("content_block_stop", blockIdx, nil, nil)}
+}
+
+// Finish 发 message_delta（stop_reason 与 usage，两个必填键始终存在：
+// stop_reason 兜底 end_turn、usage 兜底空对象）与 message_stop。
+func (a *anthropicBlockSink) Finish(finishReason string, u *Usage) [][]byte {
+	if !a.started {
+		return nil
+	}
+	if u != nil {
+		a.usage = toAnthropicUsage(u)
+	}
+	if a.usage == nil {
+		a.usage = &AnthropicUsage{}
+	}
+	delta := &StreamDelta{StopReason: openAIFinishToAnthropic(finishReason)}
+	deltaEvent, _ := json.Marshal(MessagesStreamEvent{Type: "message_delta", Delta: delta, Usage: a.usage})
+	return [][]byte{
+		deltaEvent,
+		a.evMessage("message_stop", nil),
+	}
+}

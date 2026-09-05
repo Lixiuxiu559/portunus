@@ -62,8 +62,14 @@ func usageFromAnthropic(u AnthropicUsage) Usage {
 // promptTokenCount 是含缓存的总输入，缓存命中单独记 CacheRead；
 // Gemini 无缓存写概念。
 func usageFromGemini(u GeminiUsageMetadata) Usage {
+	prompt := u.PromptTokenCount - u.CachedContentTokenCount
+	if prompt < 0 {
+		// 部分中转上游把 cachedContentTokenCount 单列、不并入 promptTokenCount：
+		// 扣减为负说明口径不一，钳 0 防止计费的输入项为负
+		prompt = 0
+	}
 	return Usage{
-		PromptTokens:     u.PromptTokenCount - u.CachedContentTokenCount,
+		PromptTokens:     prompt,
 		CompletionTokens: u.CandidatesTokenCount,
 		TotalTokens:      u.TotalTokenCount,
 		CacheReadTokens:  u.CachedContentTokenCount,
@@ -78,6 +84,49 @@ func usageFromResponses(u ResponsesUsage) Usage {
 		CompletionTokens: u.OutputTokens,
 		TotalTokens:      u.TotalTokens,
 		CacheReadTokens:  u.InputTokensDetails.CachedTokens,
+	}
+}
+
+// toAnthropicUsage 把统一 Usage 归一为 Anthropic usage（anthropic.go 同名函数
+// 的归属迁移——反向换算与正向归一同居一处，改口径不会漏一半）。
+// PromptTokens 已是非缓存输入，直接作为 input_tokens；缓存读写单独映射到
+// cache_read/cache_creation_input_tokens。
+func toAnthropicUsage(u *Usage) *AnthropicUsage {
+	if u == nil {
+		return nil
+	}
+	return &AnthropicUsage{
+		InputTokens:              u.PromptTokens,
+		OutputTokens:             u.CompletionTokens,
+		CacheReadInputTokens:     u.CacheReadTokens,
+		CacheCreationInputTokens: u.CacheWriteTokens,
+	}
+}
+
+// toGeminiUsage 把 canonical Usage 反向换算为 Gemini 用量：promptTokenCount 是
+// 含缓存的总输入，需补回缓存读 / 写（与 usageFromGemini 的扣减互为逆运算）。
+func toGeminiUsage(u *Usage) *GeminiUsageMetadata {
+	if u == nil {
+		return nil
+	}
+	return &GeminiUsageMetadata{
+		PromptTokenCount:        u.PromptTokens + u.CacheReadTokens + u.CacheWriteTokens,
+		CandidatesTokenCount:    u.CompletionTokens,
+		TotalTokenCount:         u.TotalTokens,
+		CachedContentTokenCount: u.CacheReadTokens,
+	}
+}
+
+// toResponsesUsage 把 canonical Usage 反向换算为 Responses 用量：input_tokens
+// 是含缓存的总输入，需补回缓存读 / 写（与 usageFromResponses 的扣减互为逆运算）。
+func toResponsesUsage(u *Usage) *ResponsesUsage {
+	if u == nil {
+		return nil
+	}
+	return &ResponsesUsage{
+		InputTokens:  u.PromptTokens + u.CacheReadTokens + u.CacheWriteTokens,
+		OutputTokens: u.CompletionTokens,
+		TotalTokens:  u.TotalTokens,
 	}
 }
 
@@ -98,32 +147,40 @@ func newOpenAIUsageExtractor() func([]byte) *Usage {
 }
 
 // newAnthropicUsageExtractor Anthropic 流事件的 usage 提取：message_start 给初始值，
-// message_delta 覆盖 output 并重算 Total（其恒等式与 usageFromAnthropic 一致：
-// Prompt + CacheRead + CacheWrite = Input，故 Total = Input + Output）。
+// message_delta 覆盖 output；持有原始 AnthropicUsage、每次经 usageFromAnthropic
+// 换算——Total 数学不在此手写（与归一唯一权威保持同一份）。
 func newAnthropicUsageExtractor() func([]byte) *Usage {
-	var acc *Usage
+	var raw *AnthropicUsage
 	return func(payload []byte) *Usage {
 		var ev MessagesStreamEvent
 		if json.Unmarshal(payload, &ev) != nil {
-			return acc
+			return canonical(raw)
 		}
 		switch ev.Type {
 		case "message_start":
 			if ev.Message != nil && ev.Message.Usage != nil {
-				u := usageFromAnthropic(*ev.Message.Usage)
-				acc = &u
+				u := *ev.Message.Usage
+				raw = &u
 			}
 		case "message_delta":
 			if ev.Usage != nil {
-				if acc == nil {
-					acc = &Usage{}
+				if raw == nil {
+					raw = &AnthropicUsage{}
 				}
-				acc.CompletionTokens = ev.Usage.OutputTokens
-				acc.TotalTokens = acc.PromptTokens + acc.CompletionTokens + acc.CacheReadTokens + acc.CacheWriteTokens
+				raw.OutputTokens = ev.Usage.OutputTokens
 			}
 		}
-		return acc
+		return canonical(raw)
 	}
+}
+
+// canonical 把累积的原始用量换算为 canonical Usage；未累积到任何事件时为 nil。
+func canonical(raw *AnthropicUsage) *Usage {
+	if raw == nil {
+		return nil
+	}
+	u := usageFromAnthropic(*raw)
+	return &u
 }
 
 // newGeminiUsageExtractor Gemini 流事件的 usage 提取：每条 chunk 的 usageMetadata

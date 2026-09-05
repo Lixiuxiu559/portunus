@@ -72,19 +72,16 @@ func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) 
 	if err != nil {
 		return nil, err
 	}
-	applyUpstreamRequest(req, up)
-	return renderRequestFromOpenAI(to, req)
-}
-
-// applyUpstreamRequest 把覆盖项写进 canonical 请求。Thinking 是否落进目标
-// 请求体由各协议渲染决定（当前仅 openai 渲染经 canonical 字段带出）。
-func applyUpstreamRequest(req *ChatCompletionRequest, up UpstreamRequest) {
 	if up.Model != "" {
 		req.Model = up.Model
 	}
-	if up.Thinking != nil {
+	// thinking 意图仅 openai 兼容上游消费：非 openai 目标不写入 canonical——
+	// 死存储会让「装配意图」看似各协议自行取舍，一旦任一 renderer 将来读取
+	// 该字段，-thinking 意图即静默漏进非 openai 上游（9a8e785 的 400 回归）。
+	if up.Thinking != nil && to == ProviderOpenAI {
 		req.Thinking = up.Thinking
 	}
+	return renderRequestFromOpenAI(to, req)
 }
 
 // rewriteSameProtocol 同协议直通的顶层覆盖：model / thinking 的外科手术式

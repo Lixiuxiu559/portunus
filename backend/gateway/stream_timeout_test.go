@@ -40,18 +40,16 @@ func TestIsRetryableStreamCommitted(t *testing.T) {
 	}
 }
 
-// 层-1 错误（等响应头超时）实现 net.Error，保持可重试分类且文案可读。
+// 层-1 错误（等响应头超时）的分类语义由 failSpec 按具体类型前置判定（见
+// fail_test.go 的「等头假死」行：可重试 + 快速熔断 + 504），此处不再断言
+// net.Error 接口——分类已不依赖该接口。
 func TestUpstreamHeaderTimeoutErrorIsNetError(t *testing.T) {
-	var ne net.Error
 	e := &upstreamHeaderTimeoutError{seconds: 60}
-	if !errors.As(e, &ne) {
-		t.Fatal("upstreamHeaderTimeoutError 应实现 net.Error")
-	}
-	if !ne.Timeout() {
-		t.Error("Timeout() 应为 true（保持可重试分类）")
-	}
 	if !isRetryable(e) {
 		t.Error("等响应头超时应可重试")
+	}
+	if !isStall(e) {
+		t.Error("等响应头超时应判为等头假死")
 	}
 }
 
@@ -369,9 +367,10 @@ func TestRelayStreamErrorEventShape(t *testing.T) {
 	}
 
 	var payload string
+	fr := protocol.NewStreamFramer(protocol.ProviderAnthropic, conv)
 	for _, line := range strings.Split(w.Body.String(), "\n") {
-		if p, ok := parseSSEDataLine(line); ok && strings.Contains(p, `"type":"error"`) {
-			payload = p
+		if p, ok, _ := fr.Unframe([]byte(line)); ok && strings.Contains(string(p), `"type":"error"`) {
+			payload = string(p)
 		}
 	}
 	if payload == "" {

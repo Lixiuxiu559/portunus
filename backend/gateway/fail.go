@@ -56,8 +56,10 @@ func (e *streamStallError) Error() string {
 }
 
 // upstreamHeaderTimeoutError 上游在 FirstByteTimeoutSeconds 内未返回响应头。
-// 实现 net.Error（Timeout / Temporary）以保持可重试分类不变，
-// 只把 Transport 原生晦涩文案（net/http: timeout awaiting response headers）换成可读错误。
+// 只把 Transport 原生晦涩文案（net/http: timeout awaiting response headers）
+// 换成可读错误。可重试 / 假死分类由 failSpec 按具体类型前置判定（在 net.Error
+// 分支之前），不依赖 net.Error 接口——调整 failSpec 分支顺序时不得把该类型
+// 落回通用网络分支，否则丢失快速熔断 + 504 语义。
 type upstreamHeaderTimeoutError struct {
 	seconds int
 }
@@ -65,8 +67,6 @@ type upstreamHeaderTimeoutError struct {
 func (e *upstreamHeaderTimeoutError) Error() string {
 	return fmt.Sprintf("上游 %ds 未返回响应头", e.seconds)
 }
-func (*upstreamHeaderTimeoutError) Timeout() bool   { return true }
-func (*upstreamHeaderTimeoutError) Temporary() bool { return true }
 
 // ── 失败归因词表（shared.Log.ErrKind 取值），前端与排障按此过滤 ────────────
 

@@ -20,20 +20,38 @@ type StreamConverter interface {
 	Usage() *Usage
 }
 
-// EstimateSetter 可选接口：设置请求输入的预估 token 数。
-// 上游未返回 usage 时，转换器据此填充 message_start 的 input_tokens，
-// 让 Anthropic 客户端能看到上下文占用。仅转换器实现；调用方用类型断言触发。
-type EstimateSetter interface {
-	SetEstimateInputTokens(n int)
+// StreamOption 是 NewStreamConverter 的可选项。
+type StreamOption func(*streamOptions)
+
+type streamOptions struct {
+	inputEstimate func() int
+}
+
+// WithInputEstimate 提供客户端输入 token 的惰性估算 thunk。仅 OpenAI→Anthropic
+// 转换器会在发出首个 message_start 前调用它（上游 usage 缺失时兜底填充
+// input_tokens，让客户端能看到上下文占用）；其他协议的转换器永不调用，
+// body 全量解析的开销只在需要时发生。
+func WithInputEstimate(fn func() int) StreamOption {
+	return func(o *streamOptions) { o.inputEstimate = fn }
+}
+
+// inputEstimateSetter 是接受惰性估算 thunk 的转换器内部能力（仅 anthropic
+// from 方向实现）；不导出——何时需要估算是转换器的实现细节，调用方无须知道。
+type inputEstimateSetter interface {
+	setInputEstimate(fn func() int)
 }
 
 // NewStreamConverter 构建 from→to 的流式转换器，经 OpenAI 规范格式中转。
-func NewStreamConverter(from, to Provider) (StreamConverter, error) {
+func NewStreamConverter(from, to Provider, opts ...StreamOption) (StreamConverter, error) {
 	if !from.Valid() {
 		return nil, fmt.Errorf("未知的源协议: %s", from)
 	}
 	if !to.Valid() {
 		return nil, fmt.Errorf("未知的目标协议: %s", to)
+	}
+	var o streamOptions
+	for _, opt := range opts {
+		opt(&o)
 	}
 	if from == to {
 		// 同协议直通：仍按源协议提取 usage，否则流式日志的 token/费用丢失
@@ -41,6 +59,11 @@ func NewStreamConverter(from, to Provider) (StreamConverter, error) {
 	}
 	first := newToOpenAIStream(from)
 	second := newFromOpenAIStream(to)
+	if o.inputEstimate != nil {
+		if es, ok := second.(inputEstimateSetter); ok {
+			es.setInputEstimate(o.inputEstimate)
+		}
+	}
 	return &chainedStreamConverter{first: first, second: second}, nil
 }
 
@@ -158,20 +181,13 @@ func (c *chainedStreamConverter) Finish() ([][]byte, error) {
 
 func (c *chainedStreamConverter) Usage() *Usage { return c.first.Usage() }
 
-// SetEstimateInputTokens 把预估输入 token 转发给第二段转换器（openai→to 方向），
-// 由它在 message_start 里填充 input_tokens。
-func (c *chainedStreamConverter) SetEstimateInputTokens(n int) {
-	if s, ok := c.second.(EstimateSetter); ok {
-		s.SetEstimateInputTokens(n)
-	}
-}
-
 // openAIStreamState 是「→OpenAI」方向各转换器共享的 chunk 元信息累积器，
 // 借鉴 new-api 的 ResponseInfo：跨事件累积 id/model/usage/finish_reason/文本。
 type openAIStreamState struct {
 	id         string
 	model      string
 	usage      *Usage
+	rawUsage   *AnthropicUsage // anthropic 原始用量，经 usageFromAnthropic 重算（gemini/responses 方向不用）
 	finish     string
 	text       strings.Builder
 	roleSent   bool

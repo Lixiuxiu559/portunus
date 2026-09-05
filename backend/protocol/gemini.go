@@ -415,11 +415,7 @@ func geminiResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		}}
 	}
 	if resp.Usage != nil {
-		out.UsageMetadata = &GeminiUsageMetadata{
-			PromptTokenCount:     resp.Usage.PromptTokens,
-			CandidatesTokenCount: resp.Usage.CompletionTokens,
-			TotalTokenCount:      resp.Usage.TotalTokens,
-		}
+		out.UsageMetadata = toGeminiUsage(resp.Usage)
 	}
 	return json.Marshal(out)
 }
@@ -507,47 +503,55 @@ func (g *geminiToOpenAIStream) Usage() *Usage { return g.st.usage }
 
 // ===== 流式：openai → gemini =====
 
-// openAIToGeminiStream 把 OpenAI chunk 逐条映射为 Gemini 流式响应。
-type openAIToGeminiStream struct {
-	finish string
+// geminiBlockSink 把块生命周期回调映射为 Gemini 流式 chunk（由
+// fromOpenAISkeleton 驱动）。Gemini 的 functionCall part 携带完整参数对象
+// （没有增量 JSON 形态），因此工具参数由骨架累积、ToolComplete 时整包发出。
+func newGeminiFromOpenAI() StreamConverter {
+	return newFromOpenAISkeleton(&geminiBlockSink{})
 }
 
-func newOpenAIToGeminiStream() StreamConverter { return &openAIToGeminiStream{} }
+type geminiBlockSink struct{}
 
-func (o *openAIToGeminiStream) Convert(payload []byte) ([][]byte, error) {
-	var chunk ChatCompletionChunk
-	if err := json.Unmarshal(payload, &chunk); err != nil {
-		return nil, fmt.Errorf("解析 openai chunk 失败: %w", err)
-	}
-	var out [][]byte
-	if len(chunk.Choices) == 0 {
-		return out, nil
-	}
-	delta := chunk.Choices[0].Delta
-	if delta.Content != "" {
-		resp := GenerateContentResponse{
-			Candidates: []GeminiCandidate{{
-				Content: &GeminiContent{Role: "model", Parts: []GeminiPart{{Text: delta.Content}}},
-			}},
-		}
-		b, _ := json.Marshal(resp)
-		out = append(out, b)
-	}
-	if chunk.Choices[0].FinishReason != "" {
-		o.finish = openAIFinishToGemini(chunk.Choices[0].FinishReason)
-	}
-	return out, nil
+func (g *geminiBlockSink) BeginMessage(string, string, *Usage) [][]byte { return nil }
+
+// TextDelta / ReasoningDelta 每个增量一个 candidate chunk；思考摘要走
+// thought 标记 part（Gemini 2.5+ 形状，与 gemini→openai 方向的解析对称）。
+func (g *geminiBlockSink) TextDelta(s string) [][]byte {
+	return g.candidate(GeminiContent{Role: "model", Parts: []GeminiPart{{Text: s}}})
 }
 
-func (o *openAIToGeminiStream) Finish() ([][]byte, error) {
-	if o.finish == "" {
-		return nil, nil
+func (g *geminiBlockSink) ReasoningDelta(s string) [][]byte {
+	return g.candidate(GeminiContent{Role: "model", Parts: []GeminiPart{{Text: s, Thought: true}}})
+}
+
+func (g *geminiBlockSink) ToolStart(int, string, string) [][]byte { return nil }
+func (g *geminiBlockSink) ToolDelta(int, string) [][]byte         { return nil }
+
+// ToolComplete 发出完整的 functionCall part（openai 工具块关闭时由骨架回调）。
+func (g *geminiBlockSink) ToolComplete(_ int, _, name, args string) [][]byte {
+	return g.candidate(GeminiContent{Role: "model", Parts: []GeminiPart{
+		{FunctionCall: &GeminiFunctionCall{Name: name, Args: jsonToMap(args)}},
+	}})
+}
+
+func (g *geminiBlockSink) TextEnd() [][]byte { return nil }
+
+// Finish 发收尾 chunk：finishReason 与 usageMetadata（经 toGeminiUsage 反向
+// 还原）。与旧实现一致：未收到 finishReason 时不产出收尾 chunk——被截断的流
+// 保持截断语义，客户端据此触发重试 / 告警，不凭空补 STOP 伪装自然完成。
+func (g *geminiBlockSink) Finish(finishReason string, u *Usage) [][]byte {
+	if finishReason == "" {
+		return nil
 	}
-	resp := GenerateContentResponse{
-		Candidates: []GeminiCandidate{{FinishReason: o.finish}},
-	}
+	resp := GenerateContentResponse{Candidates: []GeminiCandidate{{FinishReason: openAIFinishToGemini(finishReason)}}}
+	resp.UsageMetadata = toGeminiUsage(u)
 	b, _ := json.Marshal(resp)
-	return [][]byte{b}, nil
+	return [][]byte{b}
 }
 
-func (o *openAIToGeminiStream) Usage() *Usage { return nil }
+func (g *geminiBlockSink) candidate(content GeminiContent) [][]byte {
+	b, _ := json.Marshal(GenerateContentResponse{
+		Candidates: []GeminiCandidate{{Content: &content}},
+	})
+	return [][]byte{b}
+}

@@ -24,11 +24,12 @@ import (
 
 // relayMeta 是三种客户端协议请求体的最小公共字段。thinking 为 anthropic 与
 // DeepSeek 等兼容方共用的顶层形状，随首次解码一并取出，供 -thinking 后缀复用
-// budget_tokens（省去对请求体的第二次探测解码）。
+// budget_tokens（省去对请求体的第二次探测解码）。存原文而非结构体：非对象
+// 形状（字符串 / 布尔等自定义用法）不该让整个请求 400，仅在需要时按需解析。
 type relayMeta struct {
-	Model    string                   `json:"model"`
-	Stream   bool                     `json:"stream"`
-	Thinking *protocol.ThinkingConfig `json:"thinking,omitempty"`
+	Model    string          `json:"model"`
+	Stream   bool            `json:"stream"`
+	Thinking json.RawMessage `json:"thinking,omitempty"`
 }
 
 // newRequestID 生成一次客户端请求的关联 ID：同一次请求对各上游的所有尝试共用，
@@ -79,8 +80,13 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		if strings.HasSuffix(groupName, thinkingSuffix) {
 			groupName = strings.TrimSuffix(groupName, thinkingSuffix)
 			upThinking = &protocol.ThinkingConfig{Type: "enabled"}
-			if clientProto == protocol.ProviderAnthropic && meta.Thinking != nil && meta.Thinking.BudgetTokens > 0 {
-				upThinking.BudgetTokens = meta.Thinking.BudgetTokens
+			// budget 解析宽容：thinking 形状怪异（字符串 / 布尔等）时忽略，
+			// 与旧探测行为一致，不让元数据形状影响请求放行
+			if clientProto == protocol.ProviderAnthropic && len(meta.Thinking) > 0 {
+				var ct *protocol.ThinkingConfig
+				if json.Unmarshal(meta.Thinking, &ct) == nil && ct != nil && ct.BudgetTokens > 0 {
+					upThinking.BudgetTokens = ct.BudgetTokens
+				}
 			}
 		}
 
@@ -263,16 +269,15 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	}
 
 	if stream {
-		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto)
+		// message_start 需要 input_tokens 才能显示上下文占用（anthropic 客户端）；
+		// 上游流式可能不返回 usage，惰性估算兜底——thunk 仅 anthropic 转换器调用，
+		// 其他协议不付 body 解析开销，gateway 无须判断客户端协议。
+		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto,
+			protocol.WithInputEstimate(func() int {
+				return protocol.EstimateRequestTokens(clientProto, originalBody)
+			}))
 		if convErr != nil {
 			return nil, status, &convertError{convErr}
-		}
-		// 客户端是 Anthropic 时，message_start 需要 input_tokens 才能显示上下文占用；
-		// 上游流式可能不返回 usage，先按客户端原始请求体估一个值兜底。
-		if clientProto == protocol.ProviderAnthropic {
-			if es, ok := conv.(protocol.EstimateSetter); ok {
-				es.SetEstimateInputTokens(protocol.EstimateRequestTokens(clientProto, originalBody))
-			}
 		}
 		var streamErr error
 		first, streamErr = relayStream(c, clientProto, resp, conv, wd)
