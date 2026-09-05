@@ -195,7 +195,7 @@ export default function Models() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
             {models.map((m) => (
               <Card key={m.id} className="gap-4 p-5">
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
