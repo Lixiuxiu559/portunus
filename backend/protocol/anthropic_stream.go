@@ -213,7 +213,7 @@ func (o *openAIToAnthropicStream) evMessage(typ string, msg *MessagesResponse, d
 // thinking 块收尾前必须补发 signature_delta：Anthropic 扩展思考的 thinking 块要带签名
 // 才能被客户端在下一轮原样回传（多轮回传才会带上 reasoning_content，否则 DeepSeek 等
 // thinking 模式上游报 400 "reasoning_content must be passed back"）。签名值上游
-// （DeepSeek 等）不提供，置空即可——它只在回传 Anthropic 官方 API 时才有意义。
+// （DeepSeek 等）不提供，发非空占位符——部分客户端校验签名非空才肯在下一轮回传思考块，
 func (o *openAIToAnthropicStream) closeSingleBlock(out *[][]byte) {
 	if !o.blockOpen {
 		return
@@ -221,7 +221,7 @@ func (o *openAIToAnthropicStream) closeSingleBlock(out *[][]byte) {
 	if o.blockType == "thinking" {
 		*out = append(*out, o.evBlock("content_block_delta", o.blockIdx, nil, &StreamDelta{
 			Type:      "signature_delta",
-			Signature: "",
+			Signature: "sig",
 		}))
 	}
 	*out = append(*out, o.evBlock("content_block_stop", o.blockIdx, nil, nil))

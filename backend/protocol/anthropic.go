@@ -690,7 +690,7 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		// thinking 块，客户端下一轮才能把它原样回传；否则上游 400
 		// "reasoning_content must be passed back"。
 		if rc := choice.Message.ReasoningContent; rc != "" {
-			out.Content = append(out.Content, ContentBlock{Type: "thinking", Thinking: rc, Signature: ""})
+			out.Content = append(out.Content, ContentBlock{Type: "thinking", Thinking: rc, Signature: "sig"})
 		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			out.Content = append(out.Content, ContentBlock{Type: "text", Text: text})
