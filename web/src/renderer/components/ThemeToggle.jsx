@@ -1,32 +1,28 @@
 import { useTheme } from '@heroui/react';
-import { Sun, Moon, Monitor } from 'lucide-react';
 
-const themes = [
-  { key: 'light', icon: Sun },
-  { key: 'dark', icon: Moon },
-  { key: 'system', icon: Monitor },
-];
-
-// 主题切换：复用 HeroUI useTheme（与 inflow ThemeSwitch 一致）
-// - 持久化到 localStorage(heroui-theme)，默认 system
-// - 自动订阅系统 prefers-color-scheme 变化
-// - 给 <html> 应用 light/dark class + data-theme 属性
+/**
+ * 主题切换开关：浅色（太阳）↔ 深色（月亮），复刻 uiverse "old-falcon" 的滑动动画。
+ * - resolvedTheme 会解析 system（跟随系统）为实际的 light / dark
+ * - 手动切换后即设为明确的 light / dark
+ */
 export default function ThemeToggle() {
-  const { theme, setTheme } = useTheme('system');
+  const { resolvedTheme, setTheme } = useTheme('system');
+  const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className="flex items-center rounded-full bg-default p-0.5 gap-0.5">
-      {themes.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => setTheme(t.key)}
-          className={`size-6 flex items-center justify-center rounded-full transition-all cursor-pointer ${
-            theme === t.key ? 'bg-background shadow-sm' : 'text-muted hover:text-foreground'
-          }`}
-        >
-          <t.icon className="size-3.5" />
-        </button>
-      ))}
-    </div>
+    <label className="theme-switch" title={isDark ? '切换到浅色' : '切换到深色'}>
+      <input
+        type="checkbox"
+        className="theme-switch__toggle"
+        checked={isDark}
+        onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
+        aria-label="深色模式"
+      />
+      <span className="theme-switch__icon" aria-hidden="true">
+        {Array.from({ length: 9 }, (_, i) => (
+          <span key={i} className="theme-switch__icon-part" />
+        ))}
+      </span>
+    </label>
   );
 }

@@ -5,6 +5,16 @@ import CreateModelModal from './CreateModelModal';
 import EditModelModal from './EditModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, updateModel, createModel, deleteModel, listChannels } from '../../api';
+import IconButton from '../../components/IconButton';
+
+// 价格格式化：避免科学计数法（如 1e-7），最多 8 位小数并去掉尾零
+function formatPrice(v) {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(8).replace(/\.?0+$/, '');
+}
 
 export default function Models() {
   const [models, setModels] = useState([]);
@@ -22,7 +32,7 @@ export default function Models() {
   // 输入框的临时值，未点击查询前不触发请求
   const [draftName, setDraftName] = useState('');
   const [draftChannel, setDraftChannel] = useState('all');
-  const pageSize = 20;
+  const pageSize = 24;
 
   const fetchAll = async () => {
     setLoading(true);
@@ -120,7 +130,7 @@ export default function Models() {
       <div className="flex items-center justify-between mb-4 shrink-0">
         <Typography type="h2">模型管理</Typography>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={refreshing}>
+          <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={refreshing} aria-label="刷新模型列表">
             <RotateCw className="size-4" />
           </Button>
           <Button variant="primary" size="md" onPress={() => setShowCreate(true)}>
@@ -145,13 +155,13 @@ export default function Models() {
           <Input />
         </TextField>
         {draftName && (
-          <button
+          <IconButton
+            size="sm"
+            label="清除名称筛选"
             onClick={() => { setDraftName(''); setQueryName(''); }}
-            className="flex size-6 items-center justify-center rounded text-muted hover:text-foreground cursor-pointer"
-            aria-label="清除名称筛选"
           >
             <X className="size-3.5" />
-          </button>
+          </IconButton>
         )}
 
         <Select
@@ -195,55 +205,47 @@ export default function Models() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {models.map((m) => (
               <Card key={m.id} className="gap-4 p-5">
-                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
-                  <Typography className="font-medium text-lg truncate" title={m.name}>
+                <Card.Header className="flex-row items-start justify-between gap-3 shrink-0">
+                  <Typography className="min-w-0 font-medium text-lg leading-snug break-words" title={m.name}>
                     {m.name}
                   </Typography>
-                  <Chip variant="soft" size="sm" color="default">
+                  <Chip variant="soft" size="sm" color="default" className="shrink-0 mt-1">
                     {channelMap[m.channel_id] || m.channel_id}
                   </Chip>
                 </Card.Header>
 
                 <Card.Content className="min-w-0">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <div>
-                      <div className="text-xs text-muted mb-0.5">输入价格</div>
-                      <div className="font-mono text-sm">${m.input_price ?? '—'}</div>
+                      <div className="text-xs text-muted">输入 $/1M</div>
+                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.input_price)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted mb-0.5">输出价格</div>
-                      <div className="font-mono text-sm">${m.output_price ?? '—'}</div>
+                      <div className="text-xs text-muted">输出 $/1M</div>
+                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.output_price)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted mb-0.5">缓存读取</div>
-                      <div className="font-mono text-sm">${m.cache_read_price ?? '—'}</div>
+                      <div className="text-xs text-muted">缓存读取 $/1M</div>
+                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.cache_read_price)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted mb-0.5">缓存写入</div>
-                      <div className="font-mono text-sm">${m.cache_write_price ?? '—'}</div>
+                      <div className="text-xs text-muted">缓存写入 $/1M</div>
+                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.cache_write_price)}</div>
                     </div>
                   </div>
                 </Card.Content>
 
                 <Card.Footer className="shrink-0">
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      aria-label={`编辑模型 ${m.name}`}
-                      onClick={() => setEditTarget(m)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer"
-                    >
+                  <div className="ml-auto flex items-center gap-0.5">
+                    <IconButton label={`编辑模型 ${m.name}`} onClick={() => setEditTarget(m)}>
                       <Pencil className="size-4" />
-                    </button>
-                    <button
-                      aria-label={`删除模型 ${m.name}`}
-                      onClick={() => setDeleteTarget(m)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
-                    >
+                    </IconButton>
+                    <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger>
                       <Trash2 className="size-4" />
-                    </button>
+                    </IconButton>
                   </div>
                 </Card.Footer>
               </Card>

@@ -3,6 +3,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button, Typography, Chip, Card, ScrollShadow, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck } from 'lucide-react';
 import { listGroups, updateGroup, deleteGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
+import IconButton from '../../components/IconButton';
 import CreateGroupModal from './CreateGroupModal';
 import EditGroupModal from './EditGroupModal';
 import DeleteGroupModal from './DeleteGroupModal';
@@ -134,20 +135,12 @@ export default function Groups() {
                   </Chip>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    aria-label={`编辑分组 ${g.name}`}
-                    onClick={() => setEditTarget(g)}
-                    className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
-                  >
+                  <IconButton label={`编辑分组 ${g.name}`} onClick={() => setEditTarget(g)}>
                     <Pencil className="size-4" />
-                  </button>
-                  <button
-                    aria-label={`删除分组 ${g.name}`}
-                    onClick={() => setDeleteTarget(g)}
-                    className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
-                  >
+                  </IconButton>
+                  <IconButton label={`删除分组 ${g.name}`} onClick={() => setDeleteTarget(g)} danger>
                     <Trash2 className="size-4" />
-                  </button>
+                  </IconButton>
                 </div>
               </Card.Header>
 
@@ -193,13 +186,14 @@ export default function Groups() {
                                   {g.strategy === 'manual' && g.active_item_id === item.id && (
                                     <CircleCheck className="size-4 text-success" />
                                   )}
-                                  <button
-                                    aria-label="移除模型"
+                                  <IconButton
+                                    label="移除模型"
+                                    size="sm"
+                                    danger
                                     onClick={(e) => { e.stopPropagation(); handleRemoveItem(g.id, item.id); }}
-                                    className="flex size-6 items-center justify-center rounded text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
                                   >
                                     <X className="size-3.5" />
-                                  </button>
+                                  </IconButton>
                                 </div>
                               </div>
                             )}

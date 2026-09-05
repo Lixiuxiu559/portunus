@@ -1,8 +1,16 @@
 import { Tabs } from '@heroui/react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { tabs } from './Header';
 import ThemeToggle from './ThemeToggle';
 import logo from '../assets/logo.png';
+
+export const tabs = [
+  { id: 'channels', label: '渠道', path: '/channels' },
+  { id: 'models', label: '模型', path: '/models' },
+  { id: 'groups', label: '分组', path: '/groups' },
+  { id: 'logs', label: '日志', path: '/logs' },
+  { id: 'clients', label: '客户端', path: '/clients' },
+  { id: 'settings', label: '设置', path: '/settings' },
+];
 
 export default function Layout() {
   const location = useLocation();
@@ -20,12 +28,15 @@ export default function Layout() {
   return (
     <div className="relative z-10 flex flex-col h-screen bg-background/70 text-foreground">
       <header
-        className="relative grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-separator h-14 pl-[72px] pr-6"
+        className="relative flex items-center border-b border-separator h-14 pl-[88px] pr-6"
         style={{ WebkitAppRegion: 'drag' }}
       >
-        {/* traffic-light 留空区：左侧 pl-[72px] 给 macOS 红黄绿灯腾出空间 */}
-        <img src={logo} alt="Portunus" className="h-10 w-auto pointer-events-none" />
-        <div className="flex justify-center" style={{ WebkitAppRegion: 'no-drag' }}>
+        {/* traffic-light 留空区：左侧 pl-[88px] 让 logo 与 macOS 红黄绿灯之间留出间距 */}
+        <div className="flex items-center gap-2.5">
+          <img src={logo} alt="" aria-hidden="true" className="h-10 w-auto pointer-events-none" />
+          <span className="brand-name">Portunus</span>
+        </div>
+        <div className="absolute left-1/2 -translate-x-1/2">
           <Tabs
             className="w-fit whitespace-nowrap"
             selectedKey={currentTab}
@@ -43,7 +54,7 @@ export default function Layout() {
             </Tabs.ListContainer>
           </Tabs>
         </div>
-        <div className="flex justify-end" style={{ WebkitAppRegion: 'no-drag' }}>
+        <div className="ml-auto flex items-center">
           <ThemeToggle />
         </div>
       </header>

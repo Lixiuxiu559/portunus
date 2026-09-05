@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, FolderInput, Info, Terminal, Braces } from 'lucide-react';
-import { toast } from '@heroui/react';
+import { Button, Card, Chip, Input, Label, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -274,107 +274,104 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
   };
 
   const status = dirty
-    ? { cls: 'warn', label: '有未保存改动' }
+    ? { color: 'warning', label: '有未保存改动' }
     : /3061|portunus/i.test(text)
-      ? { cls: 'ok', label: '已指向 Portunus' }
-      : { cls: 'mute', label: '未指向 Portunus' };
+      ? { color: 'success', label: '已指向 Portunus' }
+      : { color: 'default', label: '未指向 Portunus' };
 
   return (
-    <section className="card">
+    <Card className="gap-4 p-5">
       {/* 卡片头 */}
-      <div className="card-head">
-        <div className="brandicon">{icon}</div>
-        <div>
-          <div className="ttl">{title}</div>
-          <div className="sub">
-            <span className="mono">{fileName}</span> · {lang === 'json' ? 'JSON' : 'TOML'}
+      <Card.Header className="flex-row items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-secondary text-foreground">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <Typography className="font-medium">{title}</Typography>
+            <Typography type="body-xs" className="text-muted">
+              <span className="font-mono">{fileName}</span> · {lang === 'json' ? 'JSON' : 'TOML'}
+            </Typography>
           </div>
         </div>
-        <div className="spacer" />
-        <span className={`chip ${status.cls}`}>
-          <span className="dot" />
-          {status.label}
-        </span>
-      </div>
+        <Chip variant="soft" size="sm" color={status.color}>{status.label}</Chip>
+      </Card.Header>
 
-      {/* 文件路径行 */}
-      <div className="pathrow">
-        <FolderInput className="size-3.5" />
-        <span className="p">{path}</span>
-        <span className={`chip ${backupExists ? 'ok' : 'mute'} bak ${backupExists ? '' : 'opacity-60'}`}>
-          <span className="dot" />
-          {backupExists ? '已备份 .portunus.bak' : '尚未备份'}
-        </span>
-      </div>
-
-      {/* 连接 */}
-      <div className="section-label">连接</div>
-      <div className="form">
-        <div className="field">
-          <label>base_url</label>
-          <div className="link-field">
-            <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} spellCheck={false} />
-            <button type="button" className="btn btn-secondary" onClick={handleFillUrl}>同步 Portunus</button>
-          </div>
+      <Card.Content className="flex flex-col gap-4">
+        {/* 文件路径行 */}
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <FolderInput className="size-3.5 shrink-0" />
+          <span className="truncate font-mono">{path}</span>
+          <Chip variant="soft" size="sm" color={backupExists ? 'success' : 'default'} className="shrink-0">
+            {backupExists ? '已备份 .portunus.bak' : '尚未备份'}
+          </Chip>
         </div>
-        <div className="field">
-          <label>令牌</label>
-          <div className="link-field">
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button type="button" className="btn btn-secondary" onClick={handleImportToken}>从 Portunus 导入</button>
-          </div>
-        </div>
-        <p className="hint">{hint}</p>
-      </div>
 
-      {/* 模型映射（仅 Claude） */}
-      {modelSlots && (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="section-label">模型映射</div>
-            <button type="button" className="btn btn-tertiary" onClick={handleFetchModels} disabled={fetching}>
-              <RefreshCw className={fetching ? 'animate-spin' : ''} />
-              获取模型
-            </button>
+        {/* 连接 */}
+        <Typography type="body-sm" className="text-muted">连接</Typography>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end gap-2">
+            <TextField value={baseUrl} onChange={setBaseUrl} className="flex-1">
+              <Label>base_url</Label>
+              <Input spellCheck={false} />
+            </TextField>
+            <Button variant="secondary" onPress={handleFillUrl} className="shrink-0">同步 Portunus</Button>
           </div>
-          <div className="models-pane">
-            <div className="mm-list">
-              <div className="mm-head">
-                <span>角色</span>
-                <span>显示名</span>
-                <span>请求模型</span>
-                <span>声明 1M</span>
-              </div>
-              {modelSlots.map(renderSlot)}
+          <div className="flex items-end gap-2">
+            <TextField type="password" value={token} onChange={setToken} autoComplete="off" className="flex-1">
+              <Label>令牌</Label>
+              <Input />
+            </TextField>
+            <Button variant="secondary" onPress={handleImportToken} className="shrink-0">从 Portunus 导入</Button>
+          </div>
+          <Typography type="body-sm" className="text-muted">{hint}</Typography>
+        </div>
+
+        {/* 模型映射（仅 Claude） */}
+        {modelSlots && (
+          <>
+            <div className="flex items-center justify-between">
+              <Typography type="body-sm" className="text-muted">模型映射</Typography>
+              <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching}>
+                <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
+                获取模型
+              </Button>
             </div>
-            <p className="hint">显示名只影响 /model 菜单；1M 只是给 Claude Code 的上下文能力声明。</p>
-          </div>
-        </>
-      )}
+            <div className="models-pane">
+              <div className="mm-list">
+                <div className="mm-head">
+                  <span>角色</span>
+                  <span>显示名</span>
+                  <span>请求模型</span>
+                  <span>声明 1M</span>
+                </div>
+                {modelSlots.map(renderSlot)}
+              </div>
+              <Typography type="body-sm" className="text-muted">
+                显示名只影响 /model 菜单；1M 只是给 Claude Code 的上下文能力声明。
+              </Typography>
+            </div>
+          </>
+        )}
 
-      {/* 源码编辑器 */}
-      <div className="section-label">配置文件（源码）</div>
-      <CodeEditor
-        lang={lang}
-        fileName={fileName}
-        text={text}
-        backupText={backupText}
-        onTextChange={setText}
-        dirty={dirty}
-        savedAt={savedAt}
-        canRollback={backupExists}
-        onSave={handleSave}
-        onRollback={handleRollback}
-        onReread={handleReread}
-        saving={saving}
-      />
-    </section>
+        {/* 源码编辑器 */}
+        <Typography type="body-sm" className="text-muted">配置文件（源码）</Typography>
+        <CodeEditor
+          lang={lang}
+          fileName={fileName}
+          text={text}
+          backupText={backupText}
+          onTextChange={setText}
+          dirty={dirty}
+          savedAt={savedAt}
+          canRollback={backupExists}
+          onSave={handleSave}
+          onRollback={handleRollback}
+          onReread={handleReread}
+          saving={saving}
+        />
+      </Card.Content>
+    </Card>
   );
 }
 
@@ -394,7 +391,7 @@ export default function Clients() {
       icon: <Terminal className="size-4" />,
       hint: (
         <>
-          写入 <span className="mono">env.ANTHROPIC_BASE_URL</span> 与 <span className="mono">env.ANTHROPIC_AUTH_TOKEN</span>，其余字段原样保留。
+          写入 <span className="font-mono">env.ANTHROPIC_BASE_URL</span> 与 <span className="font-mono">env.ANTHROPIC_AUTH_TOKEN</span>，其余字段原样保留。
         </>
       ),
       config: hasElectron
@@ -417,7 +414,7 @@ export default function Clients() {
       icon: <Braces className="size-4" />,
       hint: (
         <>
-          写入 <span className="mono">[model_providers.portunus]</span> 段并激活 <span className="mono">model_provider = &quot;portunus&quot;</span>，其余 provider 原样保留。
+          写入 <span className="font-mono">[model_providers.portunus]</span> 段并激活 <span className="font-mono">model_provider = &quot;portunus&quot;</span>，其余 provider 原样保留。
         </>
       ),
       config: hasElectron
@@ -435,13 +432,15 @@ export default function Clients() {
     return (
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-1 space-y-4">
-          <h1 className="text-[28px] font-bold leading-[1.3]">客户端配置</h1>
-          <div className="card">
-            <div className="flex items-center gap-2 text-muted">
-              <Info className="size-5" />
-              <span className="text-sm">本功能需在 Portunus 桌面端使用（依赖本地文件访问），当前浏览器环境不可用。</span>
-            </div>
-          </div>
+          <Typography type="h2">客户端配置</Typography>
+          <Card className="gap-4 p-5">
+            <Card.Content className="flex items-center gap-2 text-muted">
+              <Info className="size-5 shrink-0" />
+              <Typography type="body" className="text-sm">
+                本功能需在 Portunus 桌面端使用（依赖本地文件访问），当前浏览器环境不可用。
+              </Typography>
+            </Card.Content>
+          </Card>
         </div>
       </div>
     );
@@ -452,25 +451,24 @@ export default function Clients() {
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="px-1 flex flex-col gap-5">
           <div>
-            <h1 className="text-[28px] font-bold leading-[1.3]">客户端配置</h1>
-            <p className="lead text-sm text-muted mt-1.5 max-w-[65ch]">
+            <Typography type="h2">客户端配置</Typography>
+            <Typography type="body" className="text-muted mt-1.5 max-w-[65ch]">
               把 Portunus 配成 Claude Code / Codex 的上游；下方直接编辑配置文件源码，保存即原子写入，写前自动备份。
-            </p>
+            </Typography>
           </div>
 
-          <div className="client-tabs">
-            {panels.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`client-tab ${client === p.id ? 'active' : ''}`}
-                onClick={() => setClient(p.id)}
-              >
-                <span className="client-logo">{p.icon}</span>
-                {p.id === 'claude' ? 'Claude Code' : 'Codex'}
-              </button>
-            ))}
-          </div>
+          <Tabs selectedKey={client} onSelectionChange={setClient} className="w-fit">
+            <Tabs.ListContainer>
+              <Tabs.List aria-label="客户端">
+                {panels.map((p) => (
+                  <Tabs.Tab id={p.id} key={p.id}>
+                    {p.id === 'claude' ? 'Claude Code' : 'Codex'}
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+            </Tabs.ListContainer>
+          </Tabs>
 
           {panels
             .filter((p) => p.id === client)

@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, Switch, Typography, Card, toast } from '@heroui/react';
+import { Button, Switch, Typography, Card, Chip, toast } from '@heroui/react';
 import { Plus, Trash2, RefreshCw, Pencil, RotateCw } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
 import EditChannelModal from './EditChannelModal';
 import ProviderIcon from '../../components/ProviderIcon';
+import IconButton from '../../components/IconButton';
 import { listChannels, updateChannel, syncChannel } from '../../api';
-
-// 协议类型标签颜色
-const providerBadge = {
-  openai: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-  openai_responses: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-  anthropic: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
-  gemini: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
-};
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
@@ -123,13 +116,9 @@ export default function Channels() {
                 </Card.Header>
 
                 <Card.Content className="min-w-0">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      providerBadge[ch.type] || 'bg-default text-default-foreground'
-                    }`}
-                  >
+                  <Chip variant="soft" size="sm">
                     {ch.type.replace(/_/g, ' ')}
-                  </span>
+                  </Chip>
                   <div className="mt-3">
                     <div className="text-xs text-muted mb-1">Base URL</div>
                     <span
@@ -143,28 +132,19 @@ export default function Channels() {
 
                 <Card.Footer className="shrink-0">
                   <div className="flex items-center gap-1">
-                    <button
-                      aria-label={`同步渠道 ${ch.name} 模型`}
+                    <IconButton
+                      label={`同步渠道 ${ch.name} 模型`}
                       onClick={() => handleSync(ch)}
                       disabled={syncingId === ch.id}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                      aria-label={`编辑渠道 ${ch.name}`}
-                      onClick={() => setEditTarget(ch)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
-                    >
+                    </IconButton>
+                    <IconButton label={`编辑渠道 ${ch.name}`} onClick={() => setEditTarget(ch)}>
                       <Pencil className="size-4" />
-                    </button>
-                    <button
-                      aria-label={`删除渠道 ${ch.name}`}
-                      onClick={() => setDeleteTarget(ch)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
-                    >
+                    </IconButton>
+                    <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger>
                       <Trash2 className="size-4" />
-                    </button>
+                    </IconButton>
                   </div>
                 </Card.Footer>
               </Card>

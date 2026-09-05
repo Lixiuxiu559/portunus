@@ -75,7 +75,7 @@ function CopyButton({ text }: { text: string }) {
       <button
         type="button"
         onClick={handleCopy}
-        className="inline-flex size-5 items-center justify-center rounded text-muted/0 transition-all hover:text-muted cursor-pointer group-hover/cell:text-muted"
+        className="inline-flex size-5 items-center justify-center rounded text-muted/60 transition-colors hover:text-foreground cursor-pointer"
         aria-label="复制"
       >
         {copied ? (
@@ -124,7 +124,7 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
       {/* 刷新指示器：表格正中间显示旋转图标 */}
       {refreshing && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/20 backdrop-blur-[1px] rounded-xl">
-          <Spinner size="sm" className="text-primary" />
+          <Spinner size="sm" className="text-accent" />
         </div>
       )}
 

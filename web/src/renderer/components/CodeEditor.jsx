@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { RotateCcw, RefreshCw, Save, AlignLeft } from 'lucide-react';
-import { toast } from '@heroui/react';
+import { Button, toast } from '@heroui/react';
 import { highlight, validate, format } from '../utils/configHighlight';
 
 /**
@@ -124,16 +124,16 @@ export default function CodeEditor({
           />
         </div>
         <div className="editor-foot">
-          <button
-            type="button"
-            className="btn btn-ghost-danger"
-            onClick={onRollback}
-            disabled={!canRollback}
+          <Button
+            variant="danger-soft"
+            size="sm"
+            onPress={onRollback}
+            isDisabled={!canRollback}
             title={canRollback ? '恢复为接入 Portunus 之前的配置' : '暂无备份'}
           >
-            <RotateCcw />
+            <RotateCcw className="size-4" />
             从备份回滚
-          </button>
+          </Button>
           <span className={isBackup ? 'savetime' : dirty ? 'unsaved' : 'savetime'}>
             {isBackup ? (
               '只读预览'
@@ -150,29 +150,19 @@ export default function CodeEditor({
       </div>
 
       <div className="flex items-center gap-2 mt-3">
-        <button type="button" className="btn btn-tertiary" onClick={onReread}>
-          <RefreshCw />
+        <Button variant="tertiary" size="sm" onPress={onReread}>
+          <RefreshCw className="size-4" />
           重新读取
-        </button>
-        <button
-          type="button"
-          className="btn btn-tertiary"
-          onClick={handleFormat}
-          disabled={isBackup}
-        >
-          <AlignLeft />
+        </Button>
+        <Button variant="tertiary" size="sm" onPress={handleFormat} isDisabled={isBackup}>
+          <AlignLeft className="size-4" />
           格式化
-        </button>
+        </Button>
         <span className="text-xs text-muted ml-auto">⌘ / Ctrl + S</span>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onSave}
-          disabled={saving || isBackup}
-        >
-          <Save />
+        <Button variant="primary" size="sm" onPress={onSave} isDisabled={saving || isBackup}>
+          <Save className="size-4" />
           保存
-        </button>
+        </Button>
       </div>
     </div>
   );

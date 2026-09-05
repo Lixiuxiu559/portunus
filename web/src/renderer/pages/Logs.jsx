@@ -137,15 +137,15 @@ export default function Logs() {
         const isStream = record?.first_token_ms > 0;
         return (
           <span className="flex items-center gap-1">
-            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-blue-500 text-white">
+            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-accent/15 text-accent">
               {formatMs(val)}
             </span>
             {isStream && (
-              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-cyan-500/15 text-cyan-500">
+              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-default/40 text-muted">
                 {formatMs(record.first_token_ms)}
               </span>
             )}
-            <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-zinc-500 text-white'}`}>
+            <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-default/40 text-muted'}`}>
               {isStream ? '流' : '非流'}
             </span>
           </span>
