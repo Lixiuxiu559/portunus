@@ -134,10 +134,14 @@ export default function Logs() {
       key: 'duration_ms',
       width: '200px',
       render: (val, record) => {
-        const isStream = record?.first_token_ms > 0;
+        // stream 字段由后端按客户端请求记录；旧数据（迁移前）回退按首包推断
+        const isStream = record?.stream || record?.first_token_ms > 0;
         return (
           <span className="flex items-center gap-1">
-            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-accent/15 text-accent">
+            <span
+              className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-accent/15 text-accent"
+              title={record?.request_id ? `req ${record.request_id}` : undefined}
+            >
               {formatMs(val)}
             </span>
             {isStream && (
