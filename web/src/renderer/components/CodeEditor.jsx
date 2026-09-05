@@ -69,6 +69,8 @@ export default function CodeEditor({
     }
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
       e.preventDefault();
+      // 与保存按钮同一守卫：无改动或保存中不重复触发
+      if (!dirty || saving) return;
       onSave();
     }
   };
@@ -88,9 +90,11 @@ export default function CodeEditor({
       <div className={`editor ${dirty ? 'dirty' : ''}`}>
         <div className="editor-head">
           <span className="lang">{fileName}</span>
-          <div className="view-tabs">
+          <div className="view-tabs" role="tablist" aria-label="查看模式">
             <button
               type="button"
+              role="tab"
+              aria-selected={!isBackup}
               className={`view-tab ${!isBackup ? 'active' : ''}`}
               onClick={() => setView('current')}
             >
@@ -98,6 +102,8 @@ export default function CodeEditor({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={isBackup}
               className={`view-tab ${isBackup ? 'active' : ''}`}
               onClick={() => setView('backup')}
               disabled={!hasBackup}
@@ -144,9 +150,13 @@ export default function CodeEditor({
             <RotateCcw className="size-4" />
             从备份回滚
           </Button>
-          <span className={isBackup ? 'savetime' : dirty ? 'unsaved' : 'savetime'}>
+          <span className={dirty ? 'unsaved' : 'savetime'}>
             {isBackup ? (
-              '只读预览'
+              <>
+                {/* 备份只读视图也保留 dirty 指示，防止查看备份时遗忘仍挂起的改动 */}
+                <span className="dot" />
+                {`只读预览${dirty ? ' · 仍有未保存改动' : ''}`}
+              </>
             ) : dirty ? (
               <>
                 <span className="dot" />
@@ -169,7 +179,7 @@ export default function CodeEditor({
           格式化
         </Button>
         <span className="text-xs text-muted ml-auto">⌘ / Ctrl + S</span>
-        <Button variant="primary" size="sm" onPress={onSave} isPending={saving} isDisabled={isBackup}>
+        <Button variant="primary" size="sm" onPress={onSave} isPending={saving} isDisabled={isBackup || !dirty}>
           <Save className="size-4" />
           保存
         </Button>

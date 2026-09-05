@@ -33,6 +33,8 @@ export default function Logs() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 20;
+  // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
+  const [loadError, setLoadError] = useState(false);
 
   const [filters, setFilters] = useState({
     model_name: '',
@@ -40,12 +42,13 @@ export default function Logs() {
     range: null,
   });
 
-  const fetchLogs = async (isRefresh = false) => {
+  // targetPage 显式传页码，避免 setPage 与请求闭包页码不一致的双请求竞态
+  const fetchLogs = async (isRefresh = false, targetPage = page) => {
     // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
     const setRefreshState = isRefresh || logs.data?.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
-      const params = { page, page_size: pageSize };
+      const params = { page: targetPage, page_size: pageSize };
       if (filters.model_name) params.model_name = filters.model_name;
       if (filters.success !== 'all') params.success = filters.success;
       if (filters.range?.start) params.start_time = filters.range.start.toString();
@@ -53,8 +56,10 @@ export default function Logs() {
       const [l, s] = await Promise.all([listLogs(params), getLogStats(params)]);
       setLogs(l || { total: 0, data: [] });
       setStats(s);
+      setLoadError(false);
     } catch {
-      setLogs({ total: 0, data: [] });
+      // 无数据时进错误态而非伪造空态；stats 保留旧值（表格错误态已表明数据不可信）
+      if ((logs.data?.length || 0) === 0) setLoadError(true);
     } finally {
       setRefreshState(false);
     }
@@ -194,7 +199,13 @@ export default function Logs() {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between mb-4">
         <Typography type="h2">调用日志</Typography>
-        <Button variant="secondary" size="md" onPress={() => fetchLogs(true)} isPending={refreshing}>
+        <Button
+          variant="secondary"
+          size="md"
+          aria-label="刷新日志"
+          onPress={() => fetchLogs(true)}
+          isPending={refreshing}
+        >
           <RotateCw className="size-4" />
         </Button>
       </div>
@@ -307,7 +318,15 @@ export default function Logs() {
           </Button>
         )}
 
-        <Button size="md" variant="primary" onPress={() => { setPage(1); fetchLogs(true); }}>
+        {/* 查询：已在第 1 页直接带筛选刷新；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
+        <Button
+          size="md"
+          variant="primary"
+          onPress={() => {
+            if (page === 1) fetchLogs(true);
+            else setPage(1);
+          }}
+        >
           <Search className="size-4" /> 查询
         </Button>
       </div>
@@ -318,7 +337,13 @@ export default function Logs() {
         columns={columns}
         loading={loading}
         refreshing={refreshing}
-        emptyText="暂无日志"
+        emptyText={
+          filters.model_name || filters.success !== 'all' || filters.range
+            ? '没有符合条件的日志，可调整或清除筛选'
+            : '暂无日志'
+        }
+        errorText="日志加载失败，请检查后端服务后重试"
+        onRetry={() => fetchLogs()}
       />
 
       {/* 分页 */}

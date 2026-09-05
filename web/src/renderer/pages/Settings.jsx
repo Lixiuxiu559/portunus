@@ -19,6 +19,8 @@ export default function Settings() {
   const [syncing, setSyncing] = useState(false);
 
   const [apiKey, setApiKey] = useState(null);
+  // 令牌区三态：loading 拉取中 / ready 有令牌 / empty 首次运行无令牌 / error 拉取失败
+  const [keyState, setKeyState] = useState('loading');
   const [copied, setCopied] = useState(false);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -30,11 +32,28 @@ export default function Settings() {
   const [savingMode, setSavingMode] = useState(false);
 
   const loadAPIKey = async () => {
+    setKeyState('loading');
     try {
       const k = await getAPIKey();
       setApiKey(k ?? null);
+      setKeyState(k ? 'ready' : 'empty');
+    } catch {
+      setKeyState('error'); // toast 由 request 拦截器统一提示
+    }
+  };
+
+  // 首次运行无令牌时直接生成（无旧令牌可失效，无需确认弹窗）
+  const handleGenerate = async () => {
+    setRegenerating(true);
+    try {
+      const k = await regenerateAPIKey();
+      setApiKey(k);
+      setKeyState(k ? 'ready' : 'empty');
+      toast.success('令牌已生成');
     } catch {
       // toast 由 request 拦截器统一提示
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -231,7 +250,7 @@ export default function Settings() {
         </Card.Header>
         <Card.Content className="p-0">
           <div className="flex flex-col gap-3">
-            {apiKey ? (
+            {keyState === 'ready' && apiKey ? (
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5 min-w-0">
@@ -246,6 +265,10 @@ export default function Settings() {
                     <IconButton label="复制令牌" onClick={() => handleCopyKey(apiKey.key)}>
                       {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
                     </IconButton>
+                    {/* 复制成功的读屏播报（视觉反馈是图标变化，这里补 aria-live） */}
+                    <span className="sr-only" aria-live="polite">
+                      {copied ? '令牌已复制到剪贴板' : ''}
+                    </span>
                     <Button variant="secondary" size="sm" onPress={() => setRegenerateOpen(true)}>
                       <RefreshCw className="size-4" />
                       重新生成
@@ -256,6 +279,24 @@ export default function Settings() {
                   重新生成后旧令牌立即失效，已配置的客户端需重新写入。
                 </Typography>
               </>
+            ) : keyState === 'empty' ? (
+              <div className="flex items-center justify-between gap-3">
+                <Typography type="body-sm" className="text-muted">
+                  暂无 API 令牌，客户端接入前需先生成一个。
+                </Typography>
+                <Button variant="primary" size="sm" isPending={regenerating} onPress={handleGenerate}>
+                  生成令牌
+                </Button>
+              </div>
+            ) : keyState === 'error' ? (
+              <div className="flex items-center justify-between gap-3">
+                <Typography type="body-sm" className="text-muted">
+                  令牌加载失败。
+                </Typography>
+                <Button variant="secondary" size="sm" onPress={loadAPIKey}>
+                  重试
+                </Button>
+              </div>
             ) : (
               <Typography type="body-sm" className="text-muted">加载中…</Typography>
             )}
@@ -308,6 +349,8 @@ export default function Settings() {
                 <Button
                   size="sm"
                   variant={networkMode === 'local' ? 'primary' : 'secondary'}
+                  aria-pressed={networkMode === 'local'}
+                  isDisabled={savingMode}
                   onPress={() => saveNetworkMode('local')}
                 >
                   仅本机
@@ -315,6 +358,8 @@ export default function Settings() {
                 <Button
                   size="sm"
                   variant={networkMode === 'lan' ? 'primary' : 'secondary'}
+                  aria-pressed={networkMode === 'lan'}
+                  isDisabled={savingMode}
                   onPress={() => saveNetworkMode('lan')}
                 >
                   局域网
@@ -398,7 +443,14 @@ export default function Settings() {
         </Card.Content>
 
         {progress.percent > 0 && progress.percent < 100 && (
-          <div className="mt-1">
+          <div
+            className="mt-1"
+            role="progressbar"
+            aria-label="更新下载进度"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress.percent)}
+          >
             <div className="w-full h-2 rounded-full bg-accent/10 overflow-hidden">
               <div
                 className="h-full rounded-full bg-accent transition-all duration-300"

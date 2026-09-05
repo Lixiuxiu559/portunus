@@ -100,21 +100,22 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
               </TextField>
 
               <div className="grid grid-cols-2 gap-3">
+                {/* step="any" 允许小数，否则浏览器 step 校验会弹原生气泡阻断提交 */}
                 <TextField name="input_price" value={form.input_price} onChange={set('input_price')}>
                   <Label>输入价格 ($/M tokens)</Label>
-                  <Input type="number" placeholder="0" />
+                  <Input type="number" step="any" placeholder="0" />
                 </TextField>
                 <TextField name="output_price" value={form.output_price} onChange={set('output_price')}>
                   <Label>输出价格 ($/M tokens)</Label>
-                  <Input type="number" placeholder="0" />
+                  <Input type="number" step="any" placeholder="0" />
                 </TextField>
                 <TextField name="cache_read_price" value={form.cache_read_price} onChange={set('cache_read_price')}>
                   <Label>缓存读取 ($/M)</Label>
-                  <Input type="number" placeholder="0" />
+                  <Input type="number" step="any" placeholder="0" />
                 </TextField>
                 <TextField name="cache_write_price" value={form.cache_write_price} onChange={set('cache_write_price')}>
                   <Label>缓存写入 ($/M)</Label>
-                  <Input type="number" placeholder="0" />
+                  <Input type="number" step="any" placeholder="0" />
                 </TextField>
               </div>
             </Form>

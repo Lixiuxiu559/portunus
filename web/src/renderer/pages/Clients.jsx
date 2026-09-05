@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'lucide-react';
 import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
+import { setNavBlock } from '../utils/navGuard';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -100,7 +101,7 @@ function applyModels(t, models) {
   return JSON.stringify(obj, null, 2);
 }
 
-function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultBase, icon, hint, active = true }) {
+function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defaultBase, icon, hint, active = true }) {
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
   const [savedAt, setSavedAt] = useState('');
@@ -114,11 +115,18 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
   const [fetching, setFetching] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [confirmRollback, setConfirmRollback] = useState(false);
+  const [confirmReread, setConfirmReread] = useState(false);
 
   // 源码 → 表单反解析的防抖计时器
   const parseTimer = useRef(null);
 
   const dirty = text !== savedText;
+
+  // 有未保存改动时注册导航守卫：切页前 Layout 拦截确认，防误触丢失
+  useEffect(() => {
+    setNavBlock(`client-${id}`, dirty ? '客户端配置' : null);
+    return () => setNavBlock(`client-${id}`, null);
+  }, [dirty, id]);
 
   const parseForm = (t) => {
     if (lang === 'json') {
@@ -202,7 +210,7 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
       toast.success('配置已原子写入');
       parseForm(text);
     } else {
-      toast.danger((r && r.error) || '保存失败');
+      toast.danger(`${(r && r.error) || '保存失败'} · 可修正后重试，或点「重新读取」恢复磁盘版本`);
     }
   };
 
@@ -217,7 +225,8 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
     }
   };
 
-  const handleReread = async () => {
+  const performReread = async () => {
+    setConfirmReread(false);
     await load();
     toast.success('已从磁盘重新读取');
   };
@@ -460,10 +469,35 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
           active={active}
           onSave={handleSave}
           onRollback={() => setConfirmRollback(true)}
-          onReread={handleReread}
+          onReread={dirty ? () => setConfirmReread(true) : performReread}
           saving={saving}
         />
       </Card.Content>
+
+      {/* 重新读取二次确认：有未保存改动时拦截，防止被磁盘内容静默覆盖 */}
+      <Modal.Backdrop isOpen={confirmReread} onOpenChange={setConfirmReread}>
+        <Modal.Container size="sm">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>重新读取配置</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <Typography color="muted">
+                当前有未保存改动，重新读取将用磁盘内容覆盖并丢弃这些改动，确定继续吗？
+              </Typography>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                取消
+              </Button>
+              <Button variant="danger" onPress={performReread}>
+                丢弃并重新读取
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
 
       {/* 回滚二次确认 */}
       <Modal.Backdrop isOpen={confirmRollback} onOpenChange={setConfirmRollback}>
@@ -594,9 +628,13 @@ export default function Clients() {
             </Tabs.ListContainer>
           </Tabs>
 
-          {/* 双面板常驻：切换 Tab 不卸载，未保存改动得以保留 */}
+          {/* 双面板常驻：切换 Tab 不卸载，未保存改动得以保留；切换时 page-in 弱化高度跳变 */}
           {panels.map((p) => (
-            <div key={p.id} className={p.id === client ? '' : 'hidden'} aria-hidden={p.id !== client}>
+            <div
+              key={p.id}
+              className={p.id === client ? 'page-in' : 'hidden'}
+              aria-hidden={p.id !== client}
+            >
               <ClientPanel {...p} active={p.id === client} />
             </div>
           ))}

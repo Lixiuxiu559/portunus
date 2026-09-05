@@ -17,7 +17,7 @@ export default function IconButton({
   ...rest
 }) {
   const base =
-    'flex items-center justify-center rounded-lg text-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+    'flex items-center justify-center rounded-lg text-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
   const color = danger
     ? 'hover:bg-danger/10 hover:text-danger'
     : 'hover:bg-accent/10 hover:text-accent';

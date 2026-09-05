@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Card, ScrollShadow, toast } from '@heroui/react';
+import { Button, Typography, Chip, Card, ScrollShadow, Spinner, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck } from 'lucide-react';
 import { listGroups, updateGroup, deleteGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
+import ConfirmModal from '../../components/ConfirmModal';
 import CreateGroupModal from './CreateGroupModal';
 import EditGroupModal from './EditGroupModal';
 import DeleteGroupModal from './DeleteGroupModal';
@@ -24,7 +25,11 @@ export default function Groups() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [addItemTarget, setAddItemTarget] = useState(null);
+  // 待确认移除的分组项（行内 X 触发确认，防误触丢配置）
+  const [removeTarget, setRemoveTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
+  const [loadError, setLoadError] = useState(false);
 
   const fetchAll = async (isRefresh = false) => {
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
@@ -35,8 +40,10 @@ export default function Groups() {
       setGroups(Array.isArray(g) ? g : []);
       setModels(Array.isArray(m?.data) ? m.data : []);
       setChannels(Array.isArray(c) ? c : []);
+      setLoadError(false);
     } catch {
-      setGroups([]);
+      // 无数据时进错误态而非伪造空态；已有数据时保留旧列表（toast 由拦截器提示）
+      if (groups.length === 0) setLoadError(true);
     } finally {
       setRefreshState(false);
     }
@@ -57,14 +64,11 @@ export default function Groups() {
     }
   };
 
-  const handleRemoveItem = async (groupId, itemId) => {
-    try {
-      await deleteGroupItem(groupId, itemId);
-      toast.success('已移除模型');
-      await fetchAll();
-    } catch {
-      // toast 由 request 拦截器统一提示
-    }
+  // 行内 X 确认后的实际移除：不自行 catch，失败时 ConfirmModal 保持打开（拦截器统一提示）
+  const performRemoveItem = async () => {
+    await deleteGroupItem(removeTarget.groupId, removeTarget.itemId);
+    toast.success('已移除模型');
+    await fetchAll();
   };
 
   // 拖拽排序：组内重排后，按新顺序重写优先级并落库
@@ -103,7 +107,13 @@ export default function Groups() {
       <div className="flex items-center justify-between mb-4 shrink-0">
         <Typography type="h2">分组管理</Typography>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="md" onPress={() => fetchAll(true)} isPending={refreshing}>
+          <Button
+            variant="secondary"
+            size="md"
+            aria-label="刷新分组"
+            onPress={() => fetchAll(true)}
+            isPending={refreshing}
+          >
             <RotateCw className="size-4" />
           </Button>
           <Button variant="primary" size="md" onPress={() => setShowCreate(true)}>
@@ -115,14 +125,25 @@ export default function Groups() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <span className="text-muted">加载中…</span>
+          <Spinner size="sm" />
+        </div>
+      ) : loadError && groups.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-muted">
+          <span>分组加载失败，请检查后端服务后重试</span>
+          <Button variant="secondary" size="sm" onPress={() => fetchAll()}>
+            重试
+          </Button>
         </div>
       ) : groups.length === 0 ? (
-        <div className="flex justify-center py-16 text-muted">
-          暂无分组，点击右上角「新增分组」创建
+        <div className="flex flex-col items-center gap-3 py-16 text-muted">
+          <span>暂无分组</span>
+          <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}>
+            <Plus className="size-4" />
+            新增分组
+          </Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (
@@ -157,11 +178,21 @@ export default function Groups() {
                               <div
                                 ref={draggableProvided.innerRef}
                                 {...draggableProvided.draggableProps}
+                                // 手动策略：点击行切换活跃项；键盘同样可达
+                                role={g.strategy === 'manual' ? 'button' : undefined}
+                                tabIndex={g.strategy === 'manual' ? 0 : undefined}
+                                aria-current={g.strategy === 'manual' && g.active_item_id === item.id}
                                 onClick={() => g.strategy === 'manual' && handleSetActive(g.id, item.id)}
+                                onKeyDown={(e) => {
+                                  if (g.strategy === 'manual' && (e.key === 'Enter' || e.key === ' ')) {
+                                    e.preventDefault();
+                                    handleSetActive(g.id, item.id);
+                                  }
+                                }}
                                 className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm shadow-sm ${
                                   g.strategy === 'manual'
                                     ? `cursor-pointer ${g.active_item_id === item.id ? 'bg-accent/10' : ''}`
-                                    : 'bg-accent/10'
+                                    : 'bg-surface-secondary'
                                 } ${snapshot.isDragging ? 'shadow-lg' : ''}`}
                               >
                                 <div className="flex items-center gap-2">
@@ -169,7 +200,7 @@ export default function Groups() {
                                     aria-label="拖拽排序"
                                     {...draggableProvided.dragHandleProps}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex size-6 items-center justify-center rounded text-muted cursor-grab active:cursor-grabbing outline-none focus:outline-none transition-colors hover:text-foreground"
+                                    className="flex size-6 items-center justify-center rounded text-muted cursor-grab active:cursor-grabbing transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                                   >
                                     <GripVertical className="size-4" />
                                   </button>
@@ -190,7 +221,15 @@ export default function Groups() {
                                     label="移除模型"
                                     size="sm"
                                     danger
-                                    onClick={(e) => { e.stopPropagation(); handleRemoveItem(g.id, item.id); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRemoveTarget({
+                                        groupId: g.id,
+                                        groupName: g.name,
+                                        itemId: item.id,
+                                        name: modelMap[item.model_id] || `#${item.model_id}`,
+                                      });
+                                    }}
                                   >
                                     <X className="size-3.5" />
                                   </IconButton>
@@ -250,6 +289,15 @@ export default function Groups() {
         isOpen={addItemTarget !== null}
         onOpenChange={(open) => { if (!open) setAddItemTarget(null); }}
         onAdded={() => fetchAll(true)}
+      />
+      <ConfirmModal
+        isOpen={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title="移除模型"
+        description={`确定从分组「${removeTarget?.groupName}」移除「${removeTarget?.name}」吗？移除后可随时重新添加。`}
+        confirmText="移除"
+        pendingText="移除中…"
+        onConfirm={performRemoveItem}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
 import { X, RefreshCw } from 'lucide-react';
 import { updateChannel, listModels, deleteModel, syncChannel } from '../../api';
+import ConfirmModal from '../../components/ConfirmModal';
 
 // 协议类型与后端 protocol.Provider 保持一致
 const providerOptions = [
@@ -17,6 +18,8 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
+  // 待确认删除的模型（Chip X 触发确认，确认后才真正删除）
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const formRef = useRef(null);
 
   // 打开弹窗时用渠道数据填充表单，并加载已有模型
@@ -55,14 +58,12 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
     }
   };
 
-  const handleDeleteModel = async (m) => {
-    try {
-      await deleteModel(m.id);
-      setModels((prev) => prev.filter((x) => x.id !== m.id));
-      toast.success('模型已删除');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    }
+  const handleDeleteModel = async () => {
+    if (!deleteTarget) return;
+    await deleteModel(deleteTarget.id);
+    setModels((prev) => prev.filter((x) => x.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    toast.success('模型已删除');
   };
 
   const handleSubmit = async (e) => {
@@ -91,7 +92,8 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
   };
 
   return (
-    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+    <>
+      <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Container size="xl">
         <Modal.Dialog className="w-[700px]">
           <Modal.CloseTrigger />
@@ -165,9 +167,9 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
               </div>
 
               {/* 模型列表 */}
-              <div className="border-t border-default-200 pt-4">
+              <div className="border-t border-separator pt-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <Typography type="body-sm" className="text-default-500">
+                  <Typography type="body-sm" className="text-muted">
                     模型列表
                   </Typography>
                   <Button
@@ -183,7 +185,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                   </Button>
                 </div>
                 {models.length === 0 ? (
-                  <Typography type="body-sm" className="text-default-400">
+                  <Typography type="body-sm" className="text-muted">
                     暂无模型
                   </Typography>
                 ) : (
@@ -208,7 +210,7 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
                           <span className="flex items-center gap-1">
                             {m.name}
                             <button
-                              onClick={() => handleDeleteModel(m)}
+                              onClick={() => setDeleteTarget(m)}
                               className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
                               aria-label={`删除模型 ${m.name}`}
                             >
@@ -234,6 +236,18 @@ export default function EditChannelModal({ channel, isOpen, onOpenChange, onUpda
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
-    </Modal.Backdrop>
+      </Modal.Backdrop>
+
+      {/* Chip X 删除模型的二次确认（嵌套于编辑弹窗之上） */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="删除模型"
+        description={`确定删除模型「${deleteTarget?.name}」吗？删除后不可恢复。`}
+        confirmText="删除"
+        pendingText="删除中…"
+        onConfirm={handleDeleteModel}
+      />
+    </>
   );
 }

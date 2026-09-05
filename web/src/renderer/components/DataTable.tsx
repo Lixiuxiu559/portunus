@@ -8,7 +8,7 @@
  * copy 字段：设置为 true 时，单元格内容旁会显示复制图标，hover 时可见，点击可复制文本到剪贴板。
  */
 import { useState, useCallback, memo, type ReactNode } from 'react';
-import { Table, Spinner } from '@heroui/react';
+import { Table, Spinner, Button } from '@heroui/react';
 import { Copy, Check } from 'lucide-react';
 
 /* ──────────── 类型定义 ──────────── */
@@ -41,6 +41,10 @@ export interface DataTableProps<T = Record<string, unknown>> {
   refreshing?: boolean;
   /** 空态文案 */
   emptyText?: string;
+  /** 错误态文案（无数据时显示，配合 onRetry 提供重试入口） */
+  errorText?: string;
+  /** 错误态重试回调 */
+  onRetry?: () => void;
   /** 表格 aria-label */
   ariaLabel?: string;
   /** 额外 className */
@@ -96,6 +100,8 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
   loading = false,
   refreshing = false,
   emptyText = '暂无数据',
+  errorText,
+  onRetry,
   ariaLabel = '数据表格',
   className = '',
 }: DataTableProps<T>) {
@@ -110,26 +116,34 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
     );
   }
 
-  // 空态
-  if (!hasData) {
+  // 错误态：与"真没数据"区分，提供重试入口
+  if (errorText && !hasData) {
     return (
-      <div className="flex items-center justify-center flex-1 text-muted">
-        {emptyText}
+      <div className="flex flex-col items-center justify-center flex-1 gap-3 text-muted">
+        <span>{errorText}</span>
+        {onRetry && (
+          <Button variant="secondary" size="sm" onPress={onRetry}>
+            重试
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={`relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface/40 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${className}`}>
-      {/* 刷新指示器：表格正中间显示旋转图标 */}
+    // table-glass：玻璃体系统一承载面（参数见 index.css），不再自建配方
+    <div className={`table-glass relative flex min-h-0 flex-col overflow-hidden rounded-2xl ${className}`}>
+      {/* 刷新指示器：表格正中间显示旋转图标（空数据时也渲染，查询零反馈问题） */}
       {refreshing && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/20 backdrop-blur-[1px] rounded-xl">
           <Spinner size="sm" className="text-accent" />
         </div>
       )}
 
-      <Table variant="secondary" className="h-full grid-rows-[minmax(0,1fr)] text-foreground">
-        <Table.ScrollContainer className="h-full min-h-0 overflow-auto no-scrollbar">
+      {/* 空态也留在容器内：刷新遮罩在"空结果再查询"时同样可见 */}
+      {hasData ? (
+        <Table variant="secondary" className="h-full grid-rows-[minmax(0,1fr)] text-foreground">
+        <Table.ScrollContainer className="h-full min-h-0 overflow-auto thin-scrollbar">
           <Table.Content
             aria-label={ariaLabel}
             className="min-w-[600px] px-0"
@@ -176,7 +190,10 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
             </Table.Body>
           </Table.Content>
         </Table.ScrollContainer>
-      </Table>
+        </Table>
+      ) : (
+        <div className="flex items-center justify-center flex-1 py-12 text-muted">{emptyText}</div>
+      )}
     </div>
   );
 });

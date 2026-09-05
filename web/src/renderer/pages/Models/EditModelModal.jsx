@@ -54,7 +54,7 @@ export default function EditModelModal({ model, channels, isOpen, onOpenChange, 
 
           <Modal.Body>
             <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-sm text-default-500">
+              <div className="flex items-center gap-2 text-sm text-muted">
                 <Typography type="body-sm" className="font-medium">
                   {model?.name}
                 </Typography>

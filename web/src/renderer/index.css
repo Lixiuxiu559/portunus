@@ -197,11 +197,12 @@ body {
 .bg-decor .mask {
   position: absolute;
   inset: 0;
-  /* 蒙版：底部透明露出色块，越往上越浓，收敛成背景氛围色 */
+  /* 蒙版：底部透明露出色块，越往上越浓收敛成背景氛围色。
+     顶部浓度刻意压低（0.45），让色块色彩能透到玻璃顶栏后面，否则玻璃无内容可透 */
   background: linear-gradient(
     to top,
     oklch(97% 0.008 34 / 0.12) 0%,
-    oklch(97% 0.008 34 / 0.82) 72%
+    oklch(97% 0.008 34 / 0.45) 72%
   );
 }
 
@@ -209,8 +210,254 @@ html.dark .bg-decor .mask {
   background: linear-gradient(
     to top,
     oklch(20% 0.02 265 / 0.18) 0%,
-    oklch(20% 0.02 265 / 0.85) 72%
+    oklch(20% 0.02 265 / 0.5) 72%
   );
+}
+
+/*
+ * ============================================================
+ * Apple Liquid Glass 材质体系
+ * ============================================================
+ * 分层原则（Apple HIG）：玻璃只给"浮在内容之上"的悬浮层——
+ * 顶栏 / 弹窗 / toast / 卡片；表单字段与表格内容保持实色稳定可读。
+ * 配方四件套：blur + saturate 提饱和、顶部 specular 亮线、
+ * 1px 边缘高光描边、大而柔的悬浮投影。
+ * 参数集中在 token，明暗各自映射，改质感只动这里。
+ * 暗色高光一律大幅低于亮色（白线在深底上感知亮度翻倍）。
+ * 注意：backdrop-filter 有渲染成本，玻璃层已收敛在悬浮件，勿铺到内容层。
+ */
+:root {
+  --glass-blur: 24px; /* 玻璃 blur 半径 */
+  --glass-saturate: 180%; /* 透过后色彩饱和提升 */
+  --glass-highlight: 45%; /* 顶部 specular 高光强度 */
+  --glass-edge: 40%; /* 1px 边缘高光描边强度 */
+  --glass-shadow:
+    0 8px 32px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 6%); /* 悬浮投影 */
+}
+
+html.dark {
+  --glass-highlight: 14%;
+  --glass-edge: 10%;
+  --glass-shadow:
+    0 8px 32px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
+}
+
+/*
+ * 玻璃面板基类（顶栏在用）：宿主需 position 非 static。
+ * 顶栏额外混入 accent 染色 + contrast，让玻璃色彩身份与"实感"更强；
+ * 染色浓度：亮 15% / 暗 18%（暗色 tint 底更透，等比增染色维持可感知度）。
+ */
+.glass {
+  background: color-mix(
+    in oklch,
+    var(--accent) 15%,
+    color-mix(in oklch, var(--surface) 58%, transparent)
+  );
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
+  /* 顶部 specular 高光线；底部不再画线，避免与宿主 border-b 贴成双线 */
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+html.dark .glass {
+  background: color-mix(
+    in oklch,
+    var(--accent) 18%,
+    color-mix(in oklch, var(--surface) 45%, transparent)
+  );
+}
+
+/*
+ * 弹窗玻璃化：覆盖全局 .modal__*，项目内所有 HeroUI Modal 生效，无需改 JSX。
+ * 对话框 tint 68% 比一般玻璃更"浊"——上面承载表单，可读性优先（Apple sheet 同思路）；
+ * 蒙层 blur + 压暗把页面内容退到景深后层，是 Apple 模态的标志性景深。
+ */
+.modal__dialog {
+  background: color-mix(in oklch, var(--surface) 68%, transparent);
+  backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+.modal__backdrop {
+  background: color-mix(in oklch, var(--background) 40%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/*
+ * 卡片玻璃化：覆盖 .card 与变体底色，全局渠道/分组/模型/客户端列表卡统一玻璃承载面。
+ * 卡内表格/表单保持自身实色底，玻璃只做外层材质。边缘描边给出玻璃厚度轮廓。
+ */
+.card {
+  background: color-mix(in oklch, var(--surface) 55%, transparent);
+  backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    0 0 0 1px color-mix(in oklch, white var(--glass-edge), transparent);
+}
+
+html.dark .card {
+  background: color-mix(in oklch, var(--surface) 40%, transparent);
+}
+
+/*
+ * toast 玻璃化：浮在最上层的通知条，玻璃材质 + specular 高光。
+ */
+.toast {
+  background: color-mix(in oklch, var(--surface) 62%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+/*
+ * 浮层家族玻璃化：Select/ComboBox/Menu 的弹出面板（.popover）与 .tooltip，
+ * 悬浮于内容之上，同属玻璃层。tooltip tint 更高——面积小、文字必须清晰。
+ * 菜单项自身的 hover 高亮为实色，压在玻璃上可读性不受影响。
+ */
+.popover {
+  background: color-mix(in oklch, var(--surface) 62%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+html.dark .popover {
+  background: color-mix(in oklch, var(--surface) 48%, transparent);
+}
+
+.tooltip {
+  background: color-mix(in oklch, var(--surface) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+html.dark .tooltip {
+  background: color-mix(in oklch, var(--surface) 55%, transparent);
+}
+
+/*
+ * 弹窗进场柔化：默认 150ms 偏脆，拉长到 220ms 更接近 Apple sheet 的从容感。
+ * 只调时长不换曲线，避免和 HeroUI 的 animate-in 体系打架。
+ */
+.modal__dialog[data-entering="true"] {
+  animation-duration: 220ms;
+}
+
+/*
+ * DataTable 承载面：玻璃体系统一参数（--glass-* token），比卡片更浊（70%）
+ * 以保表格内容可读；表头仍为 surface-secondary 实色，层次为头实底透。
+ */
+.table-glass {
+  border: 1px solid var(--separator);
+  background: color-mix(in oklch, var(--surface) 70%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+}
+
+/*
+ * ComboBox 弹层列表高度上限：模型/分组选项过长时列表内部滚动，
+ * 弹层不撑出视口（Select 的 popover 已有上限，ComboBox 缺失，此处补齐）。
+ */
+.combo-box__popover .list-box {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/*
+ * 玻璃卡内的 Chip 描边：soft 变体的柔色底与半透明玻璃卡亮度接近，边界消失
+ * （渠道卡协议类型、模型卡渠道名、分组策略标签等）。加 1px 中性描边恢复轮廓，
+ * 明暗自适应；描边属于玻璃语言的一部分，与 .glass 的边缘高光同思路。
+ */
+.card .chip {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+
+/*
+ * 页面切换过渡：路由切换时内容轻微上浮淡入（Layout 的 .page-in 容器）。
+ * 只用 opacity/transform，遵守 prefers-reduced-motion。
+ */
+.page-in {
+  animation: page-in 240ms var(--ease-smooth);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in {
+    animation: none;
+  }
+}
+
+/*
+ * 顶部导航 Tabs 玻璃化（Layout.jsx 中挂 nav-tabs 类的那组）：
+ * 外壳为玻璃长椭圆（半透明提亮 + 高光描边 + 柔投影）包住全部按钮，保留容器感；
+ * 选中胶囊改白色半透明 + 顶部高光（参照 uiverse 液态玻璃导航的 active 处理）；
+ * 选中文字亮色下用加深 accent 保对比度，暗色下维持默认近白。
+ * 作用域限定 nav-tabs，不影响设置页等其他 Tabs。
+ */
+.nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 32%, transparent);
+  border: 1px solid color-mix(in oklch, white 45%, transparent);
+  border-radius: 99rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
+}
+
+html.dark .nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 8%, transparent);
+  border-color: color-mix(in oklch, white 14%, transparent);
+}
+
+.nav-tabs .tabs__indicator {
+  background: color-mix(in oklch, white 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 60%, transparent),
+    0 4px 12px rgb(0 0 0 / 8%);
+}
+
+html.dark .nav-tabs .tabs__indicator {
+  background: color-mix(in oklch, white 35%, transparent);
+  /* 顶部高光同步减档，去掉外投影（暗色下几乎不可见） */
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 22%, transparent);
+}
+
+.nav-tabs .tabs__tab[data-selected="true"] {
+  color: color-mix(in oklch, var(--accent) 80%, black);
+}
+
+/*
+ * 暗色下未选中 tab 提亮：全局 --muted（76%L）在实色底上够用，
+ * 但玻璃顶栏叠了 accent 染色、色块飘过时背景亮度波动，对比被吃掉。
+ * hover 从"降透明度"（暗底上是负反馈）改为"提亮到前景色"（暗色模式的正确语义）。
+ */
+html.dark .nav-tabs .tabs__tab {
+  color: color-mix(in oklch, var(--foreground) 70%, transparent);
+}
+
+html.dark .nav-tabs .tabs__tab:not([data-selected="true"]):hover,
+html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) {
+  opacity: 1;
+  color: var(--foreground);
 }
 
 @keyframes blob-drift {
@@ -225,6 +472,14 @@ html.dark .bg-decor .mask {
   }
   100% {
     transform: translate(0, 0) scale(1);
+  }
+}
+
+/* 系统开启"减弱动态效果"时，装饰性无限动画（色块漂浮、品牌扫光）停为静态 */
+@media (prefers-reduced-motion: reduce) {
+  .bg-decor .blob,
+  .brand-name {
+    animation: none;
   }
 }
 
@@ -534,7 +789,10 @@ header .theme-switch {
 
 /* 编辑器叠层 */
 .editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; transition: border-color .15s; }
-.editor:focus-within { border-color: var(--accent); }
+.editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 30%, transparent);
+}
 .editor.dirty { border-color: color-mix(in oklch, var(--warning) 55%, transparent); }
 .editor-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--separator); font-size: 12px; }
 .editor-head .lang { font-family: var(--font-mono); color: var(--muted); }
