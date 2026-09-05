@@ -584,7 +584,7 @@ export default function Clients() {
             <Tabs.ListContainer>
               <Tabs.List aria-label="客户端">
                 {panels.map((p) => (
-                  <Tabs.Tab id={p.id} key={p.id} className="gap-1.5">
+                  <Tabs.Tab id={p.id} key={p.id} className="gap-1.5 min-w-max whitespace-nowrap">
                     {p.mark}
                     {p.tabLabel}
                     <Tabs.Indicator />
