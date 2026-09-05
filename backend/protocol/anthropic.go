@@ -122,11 +122,7 @@ type AnthropicTool struct {
 	InputSchema any    `json:"input_schema"`
 }
 
-// ThinkingConfig 是 Anthropic 思考配置。
-type ThinkingConfig struct {
-	Type         string `json:"type"` // enabled
-	BudgetTokens int    `json:"budget_tokens"`
-}
+// ThinkingConfig 定义在 openai.go（canonical 层与 Anthropic 同形状，此处复用）。
 
 // MessagesResponse 是 Anthropic Messages 非流式响应。
 type MessagesResponse struct {
@@ -191,6 +187,7 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		MaxTokens:   intPtr(req.MaxTokens),
 		Stop:        req.StopSequences,
 		Stream:      req.Stream,
+		Thinking:    req.Thinking,
 	}
 
 	// system：string 直接拼成一条 system 消息；[]ContentBlock 则把 text 块拼起来
@@ -473,6 +470,7 @@ func anthropicRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		Stream:        req.Stream,
 		Temperature:   req.Temperature,
 		TopP:          req.TopP,
+		Thinking:      req.Thinking,
 	}
 	if req.MaxTokens != nil {
 		out.MaxTokens = *req.MaxTokens
@@ -690,6 +688,12 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 	}
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
+		// reasoning_content（DeepSeek 等 thinking 模式的思考内容）先于 text 块映射为
+		// thinking 块，客户端下一轮才能把它原样回传；否则上游 400
+		// "reasoning_content must be passed back"。
+		if rc := choice.Message.ReasoningContent; rc != "" {
+			out.Content = append(out.Content, ContentBlock{Type: "thinking", Thinking: rc, Signature: ""})
+		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			out.Content = append(out.Content, ContentBlock{Type: "text", Text: text})
 		}

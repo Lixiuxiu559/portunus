@@ -18,6 +18,16 @@ type ChatCompletionRequest struct {
 	Tools               []Tool         `json:"tools,omitempty"`
 	ToolChoice          any            `json:"tool_choice,omitempty"`
 	StreamOptions       *StreamOptions `json:"stream_options,omitempty"`
+	// Thinking 是思考模式开关，DeepSeek 等兼容方沿用 Anthropic 的 {type,budget_tokens}
+	// 形状。请求侧需要原样转发：否则 deepseek-chat 这类需显式开思考的模型不会进入
+	// thinking 模式（deepseek-reasoner 等始终思考的模型不受影响）。
+	Thinking *ThinkingConfig `json:"thinking,omitempty"`
+}
+
+// ThinkingConfig 是思考模式配置（Anthropic 与 DeepSeek 等兼容方同形状）。
+type ThinkingConfig struct {
+	Type         string `json:"type"` // enabled / auto / disabled
+	BudgetTokens int    `json:"budget_tokens,omitempty"`
 }
 
 // ChatMessage 是一条对话消息。

@@ -351,6 +351,49 @@ func TestStreamOpenAIToAnthropicReasoningContent(t *testing.T) {
 	}
 }
 
+// TestStreamOpenAIToAnthropicReasoningContentSignature 断言 thinking 块收尾前会补发
+// signature_delta 事件。Anthropic 扩展思考的 thinking 块必须带签名才能被客户端在下一轮
+// 原样回传；缺了它，DeepSeek 等 thinking 模式上游报 400 "reasoning_content must be passed back"。
+func TestStreamOpenAIToAnthropicReasoningContentSignature(t *testing.T) {
+	conv, err := NewStreamConverter(ProviderOpenAI, ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("构建转换器失败: %v", err)
+	}
+
+	var rawEvents []string
+	feed := func(payload string) {
+		outs, err := conv.Convert([]byte(payload))
+		if err != nil {
+			t.Fatalf("Convert 失败: %v", err)
+		}
+		for _, o := range outs {
+			rawEvents = append(rawEvents, string(o))
+		}
+	}
+	feed(`{"id":"c1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"reasoning_content":"思考内容"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{"content":"答案"},"finish_reason":null}]}`)
+	feed(`{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`)
+	finals, err := conv.Finish()
+	if err != nil {
+		t.Fatalf("Finish 失败: %v", err)
+	}
+	for _, o := range finals {
+		rawEvents = append(rawEvents, string(o))
+	}
+
+	sawSignatureDelta := false
+	for _, raw := range rawEvents {
+		ev := parseAnthropicEvent(t, []byte(raw))
+		if ev.Type == "content_block_delta" && ev.Delta != nil && ev.Delta.Type == "signature_delta" {
+			sawSignatureDelta = true
+		}
+	}
+	if !sawSignatureDelta {
+		t.Error("thinking 块收尾前应补发 signature_delta，否则客户端无法在下一轮回传思考内容")
+	}
+}
+
 // TestStreamOpenAIToAnthropicUsageCacheMapping 断言 OpenAI usage 的缓存字段被完整映射到
 // Anthropic message_delta.usage（cache_read_input_tokens / cache_creation_input_tokens），
 // 否则客户端看不到缓存命中的上下文占用。

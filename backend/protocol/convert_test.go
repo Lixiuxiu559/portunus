@@ -416,6 +416,91 @@ func TestConvertRequestAnthropicPureThinkingKept(t *testing.T) {
 	}
 }
 
+// TestConvertRequestAnthropicThinkingConfigForwarded 断言 Anthropic 请求的 thinking 配置
+// （type / budget_tokens）被原样转发到 OpenAI 请求，否则 deepseek-chat 这类需显式开思考
+// 开关的上游不会进入 thinking 模式（deepseek-reasoner 等始终思考的模型不受影响）。
+func TestConvertRequestAnthropicThinkingConfigForwarded(t *testing.T) {
+	in := `{
+		"model": "deepseek-chat",
+		"messages": [{"role":"user","content":[{"type":"text","text":"hi"}]}],
+		"max_tokens": 100,
+		"thinking": {"type":"enabled","budget_tokens":2048}
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	thinking, ok := m["thinking"].(map[string]any)
+	if !ok {
+		t.Fatalf("输出应包含 thinking 配置: %s", out)
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("thinking.type 应=enabled, 实际 %v", thinking["type"])
+	}
+	if thinking["budget_tokens"] != float64(2048) {
+		t.Errorf("thinking.budget_tokens 应=2048, 实际 %v", thinking["budget_tokens"])
+	}
+}
+
+// TestConvertRequestOpenAIToAnthropicThinkingConfigForwarded 断言 OpenAI 请求的 thinking
+// 配置反向转回 Anthropic 时不丢失（对称于上面的 forward 方向）。
+func TestConvertRequestOpenAIToAnthropicThinkingConfigForwarded(t *testing.T) {
+	in := `{
+		"model": "claude-x",
+		"messages": [{"role":"user","content":"hi"}],
+		"max_tokens": 100,
+		"thinking": {"type":"enabled","budget_tokens":2048}
+	}`
+	out, err := ConvertRequest(ProviderOpenAI, ProviderAnthropic, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	thinking, ok := m["thinking"].(map[string]any)
+	if !ok {
+		t.Fatalf("输出应包含 thinking 配置: %s", out)
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("thinking.type 应=enabled, 实际 %v", thinking["type"])
+	}
+	if thinking["budget_tokens"] != float64(2048) {
+		t.Errorf("thinking.budget_tokens 应=2048, 实际 %v", thinking["budget_tokens"])
+	}
+}
+
+// TestConvertResponseOpenAIToAnthropicReasoningContent 断言非流式 OpenAI 响应的
+// reasoning_content（DeepSeek 等 thinking 模式的思考内容）被映射为 Anthropic thinking 块，
+// 否则客户端拿不到思考内容，下一轮无法回传，上游报 400 "reasoning_content must be passed back"。
+func TestConvertResponseOpenAIToAnthropicReasoningContent(t *testing.T) {
+	in := `{
+		"id":"c1","object":"chat.completion","model":"deepseek-v4-pro",
+		"choices":[{"index":0,"message":{"role":"assistant","content":"答案","reasoning_content":"思考内容"},"finish_reason":"stop"}]
+	}`
+	out, err := ConvertResponse(ProviderOpenAI, ProviderAnthropic, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	blocks := sliceAt(t, m, "content")
+	var sawThinking bool
+	for _, b := range blocks {
+		blk, ok := b.(map[string]any)
+		if !ok {
+			continue
+		}
+		if blk["type"] == "thinking" {
+			sawThinking = true
+			if blk["thinking"] != "思考内容" {
+				t.Errorf("thinking 块内容应为 %q，实际 %v", "思考内容", blk["thinking"])
+			}
+		}
+	}
+	if !sawThinking {
+		t.Errorf("非流式响应应把 reasoning_content 映射为 thinking 块: %s", out)
+	}
+}
+
 func TestConvertRequestIdentity(t *testing.T) {
 	in := []byte(`{"model":"gpt-4o","messages":[]}`)
 	out, err := ConvertRequest(ProviderOpenAI, ProviderOpenAI, in)
