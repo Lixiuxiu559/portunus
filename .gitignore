@@ -7,7 +7,8 @@
 .claude/settings.local.json
 
 # 运行时数据（本地数据库、配置）
-data/
+# 只忽略根目录的 data/（SQLite），避免误伤 .claude/skills 下各技能的 data/ 参考资料
+/data/
 config.json
 
 # 编译产物
