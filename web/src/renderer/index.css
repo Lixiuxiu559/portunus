@@ -523,9 +523,14 @@ header .theme-switch {
 .mm-input:disabled { opacity: .55; cursor: not-allowed; }
 .mm-na { font-size: 13px; color: var(--muted); text-align: center; user-select: none; }
 .mm-model { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.mm-solo { display: flex; align-items: center; gap: 16px; border: 1px solid var(--border); border-radius: 0.625rem; padding: 10px 14px; }
+.mm-solo .mm-slot { flex: 0 0 auto; }
+.mm-solo .mm-model { flex: 1 1 auto; }
 .mm-1m { display: inline-flex; align-items: center; align-self: stretch; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .mm-1m input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .mm-1m input:checked + span { color: var(--fg); }
+.mm-1m--ghost { visibility: hidden; }
+.mm-1m-box { width: 16px; height: 16px; }
 
 /* 编辑器叠层 */
 .editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; transition: border-color .15s; }

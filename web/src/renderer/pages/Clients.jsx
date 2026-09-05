@@ -256,12 +256,48 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
     if (modelSlots) writeText((prev) => applyModels(prev, next));
   };
 
-  const renderSlot = (slot) => {
-    const m = models[slot.id] || { base: '', onem: false, name: '' };
+  // 请求模型下拉 + 1M 勾选（各槽位共用）；无 1M 的槽位用等宽隐形占位保持对齐
+  const renderModelControls = (slot, m) => {
     const opts = [
       ...modelOptions,
       ...(m.base && !modelOptions.some((o) => o.id === m.base) ? [{ id: m.base, label: m.base }] : []),
     ];
+    return (
+      <div className="mm-model">
+        <div className="mm-select-wrap">
+          <select
+            className="mm-select"
+            aria-label={`${slot.label} 请求模型`}
+            value={m.base}
+            onChange={(e) => {
+              const v = e.target.value;
+              // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
+              setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
+            }}
+          >
+            <option value="">— 不映射 —</option>
+            {opts.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        {slot.has1m !== false ? (
+          <label className="mm-1m">
+            <input type="checkbox" checked={m.onem} onChange={(e) => setSlot(slot.id, { onem: e.target.checked })} />
+            <span>1M</span>
+          </label>
+        ) : (
+          <span className="mm-1m mm-1m--ghost" aria-hidden="true">
+            <span className="mm-1m-box" />
+            <span>1M</span>
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderSlot = (slot) => {
+    const m = models[slot.id] || { base: '', onem: false, name: '' };
     return (
       <div className="mm-row" key={slot.id}>
         <div className="mm-slot">
@@ -283,31 +319,21 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
         ) : (
           <span />
         )}
-        <div className="mm-model">
-          <div className="mm-select-wrap">
-            <select
-              className="mm-select"
-              aria-label={`${slot.label} 请求模型`}
-              value={m.base}
-              onChange={(e) => {
-                const v = e.target.value;
-                // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
-                setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
-              }}
-            >
-              <option value="">— 不映射 —</option>
-              {opts.map((o) => (
-                <option key={o.id} value={o.id}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-          {slot.has1m !== false ? (
-            <label className="mm-1m">
-              <input type="checkbox" checked={m.onem} onChange={(e) => setSlot(slot.id, { onem: e.target.checked })} />
-              <span>1M</span>
-            </label>
-          ) : null}
+        {renderModelControls(slot, m)}
+      </div>
+    );
+  };
+
+  // solo 槽（默认兜底模型）独立于映射表：无显示名概念，只有请求模型 + 1M
+  const renderSolo = (slot) => {
+    const m = models[slot.id] || { base: '', onem: false, name: '' };
+    return (
+      <div className="mm-solo" key={slot.id}>
+        <div className="mm-slot">
+          <span className="mm-label">{slot.label}</span>
+          <span className="mm-key" title={slot.key}>{slot.key}</span>
         </div>
+        {renderModelControls(slot, m)}
       </div>
     );
   };
@@ -409,8 +435,9 @@ function ClientPanel({ title, lang, fileName, path, config, modelSlots, defaultB
                   <span>显示名</span>
                   <span>请求模型</span>
                 </div>
-                {modelSlots.map(renderSlot)}
+                {modelSlots.filter((s) => !s.solo).map(renderSlot)}
               </div>
+              {modelSlots.filter((s) => s.solo).map(renderSolo)}
               <Typography type="body-sm" className="text-muted">
                 显示名只影响 /model 菜单；1M 只是给 Claude Code 的上下文能力声明。
               </Typography>
