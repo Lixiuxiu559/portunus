@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { Typography, Button, Card, Spinner, Input, TextField, Modal, toast } from '@heroui/react';
 import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
+import IconButton from '../components/IconButton';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
 import { getAPIKey, regenerateAPIKey } from '../api/apikey';
 
-const APP_VERSION = '0.1.0';
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
+const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 export default function Settings() {
-  const { checking, available, downloaded, version, progress, error, check, download, install } =
+  const { checking, available, downloaded, version, progress, error, check, download, install, isMac } =
     useUpdater();
 
   const [syncInterval, setSyncIntervalState] = useState('');
@@ -22,6 +23,12 @@ export default function Settings() {
   const [regenerateOpen, setRegenerateOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
+  // 应用版本（从主进程 package.json 读，消除前端双写）
+  const [appVersion, setAppVersion] = useState('');
+  // 后端监听范围：local（只本机）/ lan（局域网）
+  const [networkMode, setNetworkModeState] = useState('local');
+  const [savingMode, setSavingMode] = useState(false);
+
   const loadAPIKey = async () => {
     try {
       const k = await getAPIKey();
@@ -33,6 +40,12 @@ export default function Settings() {
 
   useEffect(() => {
     loadAPIKey();
+  }, []);
+
+  // 读应用版本与网络监听范围（Electron 环境下才有）
+  useEffect(() => {
+    window.api?.getAppVersion?.().then((v) => setAppVersion(v ?? '')).catch(() => {});
+    window.api?.getNetworkMode?.().then((m) => setNetworkModeState(m ?? 'local')).catch(() => {});
   }, []);
 
   const handleCopyKey = async (key) => {
@@ -126,6 +139,29 @@ export default function Settings() {
     }
   };
 
+  const openDownloadPage = (e) => {
+    e.preventDefault?.();
+    if (window.api?.openExternal) {
+      window.api.openExternal(RELEASES_URL).catch(() => {});
+    } else {
+      window.open(RELEASES_URL, '_blank', 'noopener');
+    }
+  };
+
+  const saveNetworkMode = async (mode) => {
+    if (mode === networkMode) return;
+    setSavingMode(true);
+    try {
+      const res = await window.api?.setNetworkMode?.(mode);
+      setNetworkModeState(res?.networkMode ?? mode);
+      toast.success(res?.restarted ? '已保存，后端已自动重启' : '已保存');
+    } catch (err) {
+      toast.error(`保存失败：${err?.message ?? ''}`);
+    } finally {
+      setSavingMode(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Typography type="h2">系统设置</Typography>
@@ -206,14 +242,9 @@ export default function Settings() {
                     </Typography>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyKey(apiKey.key)}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
-                      aria-label="复制令牌"
-                    >
+                    <IconButton label="复制令牌" onClick={() => handleCopyKey(apiKey.key)}>
                       {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-                    </button>
+                    </IconButton>
                     <Button variant="secondary" size="sm" onPress={() => setRegenerateOpen(true)}>
                       <RefreshCw className="size-4" />
                       重新生成
@@ -256,6 +287,48 @@ export default function Settings() {
         </Modal.Container>
       </Modal.Backdrop>
 
+      {/* 网络访问（后端 sidecar 监听范围） */}
+      <Card className="gap-4 p-5">
+        <Card.Header className="p-0">
+          <Typography type="body-sm" className="text-muted">
+            网络访问
+          </Typography>
+        </Card.Header>
+        <Card.Content className="p-0">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <Typography className="font-medium">后端监听范围</Typography>
+                <Typography type="body-sm" className="text-muted">
+                  仅本机：只这台机器能连；局域网：同网络下其他设备也能用你的聚合服务
+                </Typography>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant={networkMode === 'local' ? 'primary' : 'secondary'}
+                  onPress={() => saveNetworkMode('local')}
+                >
+                  仅本机
+                </Button>
+                <Button
+                  size="sm"
+                  variant={networkMode === 'lan' ? 'primary' : 'secondary'}
+                  onPress={() => saveNetworkMode('lan')}
+                >
+                  局域网
+                </Button>
+              </div>
+            </div>
+            {savingMode && (
+              <Typography type="body-sm" className="text-muted">
+                保存中，后端正在自动重启…
+              </Typography>
+            )}
+          </div>
+        </Card.Content>
+      </Card>
+
       {/* 版本信息 */}
       <Card className="gap-4 p-5">
         <Card.Header className="p-0">
@@ -279,15 +352,15 @@ export default function Settings() {
                   <ExternalLink className="size-3.5 text-accent" />
                 </a>
                 <Tag className="size-4 ml-2" />
-                <Typography className="text-sm text-muted">{APP_VERSION}</Typography>
+                <Typography className="text-sm text-muted">{appVersion || '—'}</Typography>
               </div>
               {available && version && (
-                <Typography type="body-sm" className="text-primary mt-1">
+                <Typography type="body-sm" className="text-accent mt-1">
                   新版本 {version} 可用
                 </Typography>
               )}
               {error && (
-                <Typography type="body-sm" className="text-red-500 mt-1">
+                <Typography type="body-sm" className="text-danger mt-1">
                   更新出错: {error}
                 </Typography>
               )}
@@ -302,13 +375,18 @@ export default function Settings() {
                   检查更新
                 </Button>
               )}
-              {available && !downloaded && !checking && (
+              {available && !downloaded && !checking && (isMac ? (
+                <Button variant="primary" size="sm" onPress={openDownloadPage}>
+                  <ExternalLink className="size-4" />
+                  去下载
+                </Button>
+              ) : (
                 <Button variant="primary" size="sm" onPress={download}>
                   <Download className="size-4" />
                   下载更新
                 </Button>
-              )}
-              {downloaded && (
+              ))}
+              {downloaded && !isMac && (
                 <Button variant="primary" size="sm" onPress={install}>
                   <CheckCircle className="size-4" />
                   安装并重启
@@ -322,7 +400,7 @@ export default function Settings() {
           <div className="mt-1">
             <div className="w-full h-2 rounded-full bg-accent/10 overflow-hidden">
               <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
+                className="h-full rounded-full bg-accent transition-all duration-300"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>

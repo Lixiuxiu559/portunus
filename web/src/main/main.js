@@ -1,8 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
-const { startServer, stopServer, SERVER_PORT, isDev: sidecarIsDev } = require('./sidecar');
+const { startServer, stopServer, restartServer } = require('./sidecar');
+const appConfig = require('./app-config');
 const clientConfig = require('./client-config');
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -15,24 +15,6 @@ process.on('uncaughtException', (err) => {
   }
   console.error('[main] 未捕获异常:', err);
 });
-
-/**
- * 首次运行时创建默认配置文件（userData/config.json）
- * 用户可修改 serverUrl 指向后端地址
- */
-function ensureConfig() {
-  if (isDev) return; // 开发模式不需要配置文件
-  const configDir = app.getPath('userData');
-  const configPath = path.join(configDir, 'config.json');
-  if (!fs.existsSync(configPath)) {
-    const defaultConfig = {
-      serverUrl: 'http://localhost:3061',
-    };
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
-    console.log(`[main] 已创建默认配置: ${configPath}`);
-  }
-}
 
 let mainWindow = null;
 
@@ -51,8 +33,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       // Electron 20 起 sandbox 默认 true，会导致 preload 里 require('fs')/require('path')
-      // 失效、整个 preload 执行中断（window.api / window.clientConfig 都无法暴露）。
-      // 显式关闭，让 preload 能访问 Node 内建模块（保持 contextIsolation + 无 nodeIntegration）。
+      // 失效、整个 preload 执行中断。显式关闭，让 preload 能访问 Node 内建模块。
       sandbox: false,
     },
   });
@@ -81,6 +62,10 @@ function createWindow() {
   }
 }
 
+// ─── IPC：应用信息 ───
+ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('app:platform', () => process.platform);
+
 // ─── IPC：更新操作 ───
 ipcMain.handle('update:check', () => checkForUpdates());
 ipcMain.handle('update:download', () => downloadUpdate());
@@ -93,6 +78,20 @@ ipcMain.handle('open-external', (_event, url) => {
     return shell.openExternal(url);
   }
   return Promise.reject(new Error('不支持的链接'));
+});
+
+// ─── IPC：网络监听范围（后端 sidecar）───
+ipcMain.handle('config:get-network-mode', () => appConfig.getNetworkMode());
+
+ipcMain.handle('config:set-network-mode', async (_event, mode) => {
+  const normalized = mode === 'lan' ? 'lan' : 'local';
+  appConfig.setNetworkMode(normalized);
+  // 打包模式：监听范围变了要重启后端子进程才生效；开发模式后端是外部的，仅落盘。
+  const restarted = app.isPackaged;
+  if (restarted) {
+    await restartServer();
+  }
+  return { ok: true, networkMode: normalized, restarted };
 });
 
 // ─── IPC：客户端配置文件读写（Claude Code / Codex）───
@@ -118,12 +117,10 @@ ipcMain.handle('client-config:rollback-claude', wrapClientConfig(() => clientCon
 ipcMain.handle('client-config:rollback-codex', wrapClientConfig(() => clientConfig.rollbackCodex()));
 
 app.whenReady().then(() => {
-  ensureConfig();
-
   // 先创建窗口，让用户看到 UI
   createWindow();
 
-  // 后台等待 Go 后端就绪（不阻塞窗口显示）
+  // 后台拉起 Go 后端（打包模式 spawn 子进程；开发模式等外部后端），不阻塞窗口显示
   startServer()
     .then(() => {
       console.log('[main] 后端服务已就绪');

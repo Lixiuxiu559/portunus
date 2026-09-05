@@ -1,23 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const path = require('path');
-const fs = require('fs');
 
-// 读取配置文件中的后端地址
-function getServerUrl() {
-  try {
-    const { app } = require('electron');
-    const configPath = path.join(app.getPath('userData'), 'config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      if (config.serverUrl) return config.serverUrl;
-    }
-  } catch (_) {}
-  return 'http://localhost:3061';
-}
-
-const SERVER_URL = getServerUrl();
+// 后端固定本机（sidecar 打包或外部后端都在 127.0.0.1:3061）
+const SERVER_URL = 'http://localhost:3061';
 
 contextBridge.exposeInMainWorld('api', {
+  // ─── 应用信息 ───
+  getAppVersion: () => ipcRenderer.invoke('app:version'),
+  // 平台标识（渲染进程据此区分 mac 半自动 / win 全自动更新）
+  platform: process.platform,
+
   // ─── 更新 ───
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
@@ -38,7 +29,11 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
 
-  // 后端服务地址（从配置文件读取）
+  // ─── 网络监听范围 ───
+  getNetworkMode: () => ipcRenderer.invoke('config:get-network-mode'),
+  setNetworkMode: (mode) => ipcRenderer.invoke('config:set-network-mode', mode),
+
+  // 后端服务地址（固定本机）
   getServerUrl: () => SERVER_URL,
 
   // 打开外部链接（默认浏览器）

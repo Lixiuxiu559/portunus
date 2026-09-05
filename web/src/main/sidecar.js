@@ -1,22 +1,30 @@
-const { app } = require('electron');
+// sidecar 子进程管理：打包模式下拉起 Go 后端，开发模式下等外部后端。
+//
+// 打包模式（app.isPackaged）：
+//   Go 后端二进制随安装包分发在 extraResources 的 bin/ 下，由本模块 spawn 拉起，
+//   通过 PORTUNUS_* 环境变量把「数据库落 userData」「监听地址按 networkMode」
+//   「端口 3061」注入，避免后端读 CWD 下的相对路径（打包后 CWD 不可控）。
+//
+// 开发模式：后端由开发者用 go run / go build 单独启动，这里只轮询等它就绪。
 
-const isDev = process.env.NODE_ENV === 'development';
+const { app } = require('electron');
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const appConfig = require('./app-config');
+
 const SERVER_PORT = 3061;
-/*
- * 说明：Go 后端不再打包进应用（不随安装包分发），
- * 生产模式下 app 直接连接本机已运行的 Go 后端（默认 3061 端口）。
- * Go 后端需由用户在外部单独启动，例如：
- *   go run . / go build -o portunus . 然后运行 ./portunus
- */
+const isPackaged = app.isPackaged;
+
+let child = null;
 
 /**
- * 等待服务端就绪（轮询 /api/ping）
+ * 轮询 /api/ping 直到后端就绪。
  */
-function waitForServer(url, retries = 30, interval = 500) {
+function waitForServer(url, retries = 60, interval = 500) {
   return new Promise((resolve, reject) => {
-    const http = require('http');
     let attempts = 0;
-
     const check = () => {
       attempts++;
       http
@@ -41,19 +49,77 @@ function waitForServer(url, retries = 30, interval = 500) {
   });
 }
 
-async function startServer() {
-  if (isDev) {
-    console.log('[sidecar] 开发模式，等待后端就绪...');
-    return waitForServer(`http://localhost:${SERVER_PORT}`);
+/** 打包后 Go 二进制路径（extraResources: bin/）。开发模式不适用，返回 null。 */
+function backendBinPath() {
+  if (!isPackaged) return null;
+  const name = process.platform === 'win32' ? 'portunus.exe' : 'portunus';
+  return path.join(process.resourcesPath, 'bin', name);
+}
+
+/** 按 networkMode 解析后端监听地址。 */
+function hostFor(networkMode) {
+  return networkMode === 'lan' ? '0.0.0.0' : '127.0.0.1';
+}
+
+/** 拉起后端子进程（仅打包模式）；返回就绪 Promise。 */
+function spawnBackend() {
+  const bin = backendBinPath();
+  if (!bin) {
+    return Promise.reject(new Error('后端二进制不存在'));
   }
-  // 生产模式：后端由用户独立部署（远程服务器或本地单独启动）
-  // app 不再等待/连接后端，由渲染进程根据配置的 serverUrl 直接请求
-  console.log('[sidecar] 生产模式，后端由外部部署，跳过连接检测');
+  if (!fs.existsSync(bin)) {
+    return Promise.reject(new Error(`后端二进制缺失: ${bin}`));
+  }
+
+  const dataDir = path.join(app.getPath('userData'), 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  const env = {
+    ...process.env,
+    // 监听范围随用户设置；端口固定 3061（渲染层与外部客户端工具都按它连）
+    PORTUNUS_SERVER_HOST: hostFor(appConfig.getNetworkMode()),
+    PORTUNUS_SERVER_PORT: String(SERVER_PORT),
+    // 数据库落 userData（升级时 app 目录会被整体替换，userData 不会丢）
+    PORTUNUS_DATABASE_PATH: path.join(dataDir, 'portunus.db'),
+    PORTUNUS_DATABASE_LOG_PATH: path.join(dataDir, 'portunus-log.db'),
+  };
+
+  child = spawn(bin, [], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  child.stdout.on('data', (d) => console.log('[backend]', d.toString().trimEnd()));
+  child.stderr.on('data', (d) => console.error('[backend]', d.toString().trimEnd()));
+  child.on('exit', (code) => {
+    console.log(`[sidecar] 后端退出，code=${code}`);
+    child = null;
+  });
+
+  return waitForServer(`http://127.0.0.1:${SERVER_PORT}`);
 }
 
-// Go 后端由用户外部启动，不归 app 管理，因此无需杀进程
+/** 停止后端子进程。 */
 function stopServer() {
-  // 无内置子进程，无操作
+  if (child) {
+    child.kill();
+    child = null;
+  }
 }
 
-module.exports = { startServer, stopServer, SERVER_PORT, isDev };
+/** 重启后端子进程（网络模式切换后调用），返回就绪 Promise。 */
+function restartServer() {
+  stopServer();
+  // 等旧进程端口释放，再拉起新进程
+  return new Promise((resolve) => setTimeout(resolve, 300)).then(spawnBackend);
+}
+
+/**
+ * 启动后端，返回就绪 Promise（不阻塞窗口显示）。
+ * 打包模式：spawn 随包二进制；开发模式：等外部后端。
+ */
+async function startServer() {
+  if (isPackaged) {
+    return spawnBackend();
+  }
+  console.log('[sidecar] 开发模式：等待外部后端就绪...');
+  return waitForServer(`http://localhost:${SERVER_PORT}`);
+}
+
+module.exports = { startServer, stopServer, restartServer, SERVER_PORT, isPackaged };

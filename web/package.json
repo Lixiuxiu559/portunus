@@ -17,6 +17,12 @@
       "!**/*.map",
       "!**/.DS_Store"
     ],
+    "extraResources": [
+      {
+        "from": "bin/${os}",
+        "to": "bin"
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
@@ -45,12 +51,12 @@
     "dev": "concurrently \"pnpm run dev:web\" \"wait-on tcp:localhost:5173 && pnpm run dev:main\"",
     "dev:web": "vite --open",
     "dev:main": "cross-env NODE_ENV=development electron .",
-    "build:go": "cd .. && go build -o portunus .",
+    "build:go": "node scripts/build-go.mjs",
     "build": "pnpm run build:go && VITE_BASE=./ vite build && electron-builder",
-    "build:renderer": "vite build",
+    "build:renderer": "VITE_BASE=./ vite build",
     "build:web": "vite build",
-    "build:mac": "pnpm run build:renderer && electron-builder --mac zip --arm64",
-    "build:win": "pnpm run build:renderer && electron-builder --win nsis --x64",
+    "build:mac": "pnpm run build:go && pnpm run build:renderer && electron-builder --mac dmg zip --arm64",
+    "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis --x64",
     "start": "electron ."
   },
   "dependencies": {

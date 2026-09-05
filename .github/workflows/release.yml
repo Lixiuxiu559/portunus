@@ -1,0 +1,84 @@
+name: Release
+
+# 打 tag（v*）或手动触发：矩阵构建 Electron 安装包（Windows NSIS + macOS DMG/ZIP），
+# 每个平台各自交叉编译 Go 后端到 extraResources，然后汇总到一个 draft release。
+# 发布是 draft（草稿），人工确认后手动点 publish，避免打错 tag 直接把坏包推给客户。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            args: --mac dmg zip --arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            args: --win nsis --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 构建 Go 后端
+        working-directory: web
+        run: node scripts/build-go.mjs ${{ matrix.goos }} ${{ matrix.goarch }}
+
+      - name: 安装依赖
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建渲染层并打包
+        working-directory: web
+        env:
+          # 本阶段不签名：mac 半自动、Windows 暂不签名，关闭签名身份自动发现避免误签名
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          VITE_BASE=./ pnpm exec vite build
+          pnpm exec electron-builder ${{ matrix.args }} --publish never
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}
+          path: web/dist-electron/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建 draft release 并上传产物
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/**/*
