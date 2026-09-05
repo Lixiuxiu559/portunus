@@ -76,7 +76,24 @@ function readCodex() {
   return readOrDefault(codexPath(), CODEX_DEFAULT);
 }
 
-/** 校验并整写保存（写前首次备份）。 */
+/** 读取 .portunus.bak 备份原文；不存在返回 { exists: false, text: '' }。 */
+function readBackup(file) {
+  const bak = file + '.portunus.bak';
+  if (!fs.existsSync(bak)) {
+    return { exists: false, text: '' };
+  }
+  return { exists: true, text: fs.readFileSync(bak, 'utf-8') };
+}
+
+function readBackupClaude() {
+  return readBackup(claudePath());
+}
+
+function readBackupCodex() {
+  return readBackup(codexPath());
+}
+
+/** 校验并整写保存（写前首次备份）。返回 { ok, backupExists }。 */
 function saveRaw(file, text, validate) {
   if (typeof text !== 'string') {
     throw new Error('配置内容必须是字符串');
@@ -84,7 +101,7 @@ function saveRaw(file, text, validate) {
   validate(text);
   backupIfExists(file);
   atomicWrite(file, text);
-  return { ok: true };
+  return { ok: true, backupExists: fs.existsSync(file + '.portunus.bak') };
 }
 
 function saveClaude(text) {
@@ -132,6 +149,8 @@ module.exports = {
   getPaths,
   readClaude,
   readCodex,
+  readBackupClaude,
+  readBackupCodex,
   saveClaude,
   saveCodex,
   rollbackClaude,

@@ -1,7 +1,7 @@
 // JSON / TOML 语法高亮与校验（复刻 client-config-editor.html 的实现）。
 // 高亮输出带 <span class="tk-*"> 的 HTML；对应配色见 index.css 的 .tk-* 规则。
 
-import { parse as parseToml } from 'smol-toml';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -136,4 +136,12 @@ export function validate(text, lang) {
   } catch (e) {
     return { ok: false, msg: 'TOML 语法错误：' + (e.message || String(e)) };
   }
+}
+
+/** 格式化：JSON 缩进 2 空格；TOML 用 smol-toml 重新序列化。解析失败抛错。 */
+export function format(text, lang) {
+  if (lang === 'json') {
+    return JSON.stringify(JSON.parse(text), null, 2) + '\n';
+  }
+  return stringifyToml(parseToml(text));
 }
