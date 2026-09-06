@@ -22,6 +22,7 @@ description: Portunus 发版流程：升版本号、打 tag、触发 GitHub Acti
 3. 确认发布 workflow 已在 GitHub 默认分支：`gh api repos/Lixiuxiu559/portunus/contents/.github/workflows --jq '.[].name'` 的输出必须含 `release.yml`。缺失（或 `gh run list --workflow=release.yml` 返回 404）意味着 tag 推上去 CI 静默不触发——先解决这个，再谈发版。
 4. `gh auth status` 确认 gh CLI 可用；不可用则提示用户 `gh auth login`（可建议用 `! gh auth login` 在会话内跑）。
 5. `go test ./...` 快速回归。测试红了就停下，发版流程终止——带病发版比不发版更糟。
+6. **主进程改动必须冒烟**：若本次发版包含 `web/src/main/**` 的改动，提醒用户先跑一次 `pnpm run dev` 确认 app 能正常启动。`node --check` 只查语法（查不出 TDZ/引用顺序错误，v0.1.1 坏包根因），`vite build` 只覆盖渲染层——主进程的运行时错误没有任何现有检查能兜住。
 
 ## 阶段 1：定版本号
 
