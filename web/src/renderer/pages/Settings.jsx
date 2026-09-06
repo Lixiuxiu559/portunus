@@ -72,6 +72,9 @@ export default function Settings() {
   // 用户从别的页切进来必然已错过，不补查就永远看不到最新版本信息。
   const didAutoCheck = useRef(false);
   useEffect(() => {
+    // 开发模式没有打包环境的 app-update.yml，检查必然报错；
+    // 不自动补查（手动点"检查更新"仍会触发，能看到明确错误，便于调试 UI）
+    if (import.meta.env.DEV) return;
     if (didAutoCheck.current || !window.api?.checkForUpdate) return;
     didAutoCheck.current = true;
     check();

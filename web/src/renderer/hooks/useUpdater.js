@@ -51,9 +51,30 @@ export function useUpdater() {
     });
   }, []);
 
-  const check = useCallback(() => window.api?.checkForUpdate?.().catch(() => {}), []);
-  const download = useCallback(() => window.api?.downloadUpdate?.().catch(() => {}), []);
-  const install = useCallback(() => window.api?.installUpdate?.().catch(() => {}), []);
+  // 点击必须有反馈：promise 的 rejection 直接落到 error 状态，
+  // 不能只依赖 update:error 事件（事件管道可能没注册，dev 下就是黑洞）。
+  const check = useCallback(
+    () =>
+      window.api?.checkForUpdate?.().catch((err) => {
+        setChecking(false);
+        setError(err?.message ?? String(err));
+      }),
+    [],
+  );
+  const download = useCallback(
+    () =>
+      window.api?.downloadUpdate?.().catch((err) => {
+        setError(err?.message ?? String(err));
+      }),
+    [],
+  );
+  const install = useCallback(
+    () =>
+      window.api?.installUpdate?.().catch((err) => {
+        setError(err?.message ?? String(err));
+      }),
+    [],
+  );
 
   return { checking, available, downloaded, latestVersion, progress, error, check, download, install, isMac };
 }

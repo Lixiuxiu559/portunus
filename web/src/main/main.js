@@ -67,9 +67,11 @@ function createWindow() {
       .catch((e) => console.warn('[main] preload 桥探测失败:', e.message));
   });
 
-  // 启动自动更新检查（仅生产模式）
+  // 更新事件转发 dev 下也要注册：否则渲染层点"检查更新"后，
+  // checking / error 事件到不了 UI，看起来就是"点了没反应"。
+  forwardEvents(mainWindow);
+  // 启动自动更新检查（仅生产模式；dev 无 app-update.yml，调了只会报错）
   if (!isDev) {
-    forwardEvents(mainWindow);
     checkForUpdates().catch(() => {
       // 静默失败
     });
