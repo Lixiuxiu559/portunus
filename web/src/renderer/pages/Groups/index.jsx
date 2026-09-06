@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button, Typography, Chip, Card, ScrollShadow, Spinner, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck } from 'lucide-react';
@@ -147,7 +148,7 @@ export default function Groups() {
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (
-            <Card key={g.id} className="gap-4 p-5 h-[22rem]">
+            <Card key={g.id} className="gap-4 p-5 h-[24rem]">
               <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   <Typography className="font-medium text-lg">{g.name}</Typography>
@@ -171,73 +172,96 @@ export default function Groups() {
                 {g.items && g.items.length > 0 ? (
                   <Droppable droppableId={String(g.id)}>
                     {(droppableProvided) => (
-                      <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps} className="space-y-1">
-                        {g.items.map((item, index) => (
-                          <Draggable key={item.id} draggableId={String(item.id)} index={index}>
-                            {(draggableProvided, snapshot) => (
-                              <div
-                                ref={draggableProvided.innerRef}
-                                {...draggableProvided.draggableProps}
-                                // 手动策略：点击行切换活跃项；键盘同样可达
-                                role={g.strategy === 'manual' ? 'button' : undefined}
-                                tabIndex={g.strategy === 'manual' ? 0 : undefined}
-                                aria-current={g.strategy === 'manual' && g.active_item_id === item.id}
-                                onClick={() => g.strategy === 'manual' && handleSetActive(g.id, item.id)}
-                                onKeyDown={(e) => {
-                                  if (g.strategy === 'manual' && (e.key === 'Enter' || e.key === ' ')) {
-                                    e.preventDefault();
-                                    handleSetActive(g.id, item.id);
-                                  }
-                                }}
-                                className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm shadow-sm ${
-                                  g.strategy === 'manual'
-                                    ? `cursor-pointer ${g.active_item_id === item.id ? 'bg-accent/10' : ''}`
-                                    : 'bg-surface-secondary'
-                                } ${snapshot.isDragging ? 'shadow-lg' : ''}`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    aria-label="拖拽排序"
-                                    {...draggableProvided.dragHandleProps}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="flex size-6 items-center justify-center rounded text-muted cursor-grab active:cursor-grabbing transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                      <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps} className="space-y-2">
+                        {g.items.map((item, index) => {
+                          const model = models.find((m) => m.id === item.model_id);
+                          const channelName = model ? channelMap[model.channel_id] : null;
+                          const name = modelMap[item.model_id] || `#${item.model_id}`;
+                          const isActive = g.strategy === 'manual' && g.active_item_id === item.id;
+                          return (
+                            <Draggable key={item.id} draggableId={String(item.id)} index={index}>
+                              {(provided, snapshot) => {
+                                // 视觉层与机械层分离：外层只承载 dnd 定位/位移（rbd 会写内联
+                                // transform 与 transition），浮起的 scale/阴影放在内层，
+                                // 两者互不覆盖，掉落滑行动画也不受影响。
+                                const row = (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    className={snapshot.isDragging ? 'relative z-50' : undefined}
                                   >
-                                    <GripVertical className="size-4" />
-                                  </button>
-                                  <span className="font-medium">{modelMap[item.model_id] || `#${item.model_id}`}</span>
-                                  {(() => {
-                                    const model = models.find((m) => m.id === item.model_id);
-                                    const channelName = model ? channelMap[model.channel_id] : null;
-                                    return channelName ? (
-                                      <span className="text-xs text-muted">{channelName}</span>
-                                    ) : null;
-                                  })()}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {g.strategy === 'manual' && g.active_item_id === item.id && (
-                                    <CircleCheck className="size-4 text-success" />
-                                  )}
-                                  <IconButton
-                                    label="移除模型"
-                                    size="sm"
-                                    danger
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setRemoveTarget({
-                                        groupId: g.id,
-                                        groupName: g.name,
-                                        itemId: item.id,
-                                        name: modelMap[item.model_id] || `#${item.model_id}`,
-                                      });
-                                    }}
-                                  >
-                                    <X className="size-3.5" />
-                                  </IconButton>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
+                                    <div
+                                      // 手动策略：点击行切换活跃项；键盘同样可达
+                                      role={g.strategy === 'manual' ? 'button' : undefined}
+                                      tabIndex={g.strategy === 'manual' ? 0 : undefined}
+                                      aria-current={isActive}
+                                      onClick={() => g.strategy === 'manual' && handleSetActive(g.id, item.id)}
+                                      onKeyDown={(e) => {
+                                        if (g.strategy === 'manual' && (e.key === 'Enter' || e.key === ' ')) {
+                                          e.preventDefault();
+                                          handleSetActive(g.id, item.id);
+                                        }
+                                      }}
+                                      className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm transition-[scale,box-shadow,border-color,background-color] duration-150 ease-out ${
+                                        snapshot.isDragging
+                                          ? // 按下拖拽：浮起（微放大 + 轻倾斜 + 重投影 + accent 描边）；reduced-motion 保持平面
+                                            'rotate-[0.5deg] scale-[1.03] cursor-grabbing border-accent/40 bg-surface-secondary shadow-[0_20px_48px_rgb(0_0_0/0.24)] ring-1 ring-accent/30 motion-reduce:rotate-0 motion-reduce:scale-100 motion-reduce:transition-none'
+                                          : isActive
+                                            ? 'border-accent/30 bg-accent/10'
+                                            : `border-foreground/10 bg-surface-secondary ${
+                                                g.strategy === 'manual'
+                                                  ? 'cursor-pointer hover:border-foreground/20 hover:bg-surface-tertiary'
+                                                  : 'hover:border-foreground/20'
+                                              }`
+                                      }`}
+                                    >
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <button
+                                          aria-label="拖拽排序"
+                                          {...provided.dragHandleProps}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted cursor-grab active:cursor-grabbing transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                                        >
+                                          <GripVertical className="size-4" aria-hidden="true" />
+                                        </button>
+                                        {/* 长模型名截断，悬浮显示全名 */}
+                                        <span className="truncate font-medium" title={name}>
+                                          {name}
+                                        </span>
+                                        {channelName && (
+                                          <span className="shrink-0 text-xs text-muted">{channelName}</span>
+                                        )}
+                                      </div>
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        {isActive && <CircleCheck className="size-4 text-success" aria-hidden="true" />}
+                                        <IconButton
+                                          label="移除模型"
+                                          size="sm"
+                                          danger
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setRemoveTarget({
+                                              groupId: g.id,
+                                              groupName: g.name,
+                                              itemId: item.id,
+                                              name,
+                                            });
+                                          }}
+                                        >
+                                          <X className="size-3.5" aria-hidden="true" />
+                                        </IconButton>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                                // 玻璃卡 .card 的 backdrop-filter 会成为 fixed 后代的包含块，
+                                // rbd 拖拽元素的 position:fixed 坐标随之错乱（视觉上"直接消失"）。
+                                // 官方修法：拖拽中传送到 document.body 渲染，落回原列表。
+                                return snapshot.isDragging ? createPortal(row, document.body) : row;
+                              }}
+                            </Draggable>
+                          );
+                        })}
                         {droppableProvided.placeholder}
                       </div>
                     )}
