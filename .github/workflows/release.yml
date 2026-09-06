@@ -54,8 +54,11 @@ jobs:
         env:
           # 本阶段不签名：mac 半自动、Windows 暂不签名，关闭签名身份自动发现避免误签名
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Electron（file://）要求相对资源路径。必须走 env 块：Windows runner 默认
+          # PowerShell，不支持 bash 的 VAR=x cmd 前缀语法（会把 VAR=x 当命令名）
+          VITE_BASE: ./
         run: |
-          VITE_BASE=./ pnpm exec vite build
+          pnpm exec vite build
           pnpm exec electron-builder ${{ matrix.args }} --publish never
 
       - name: 上传产物
