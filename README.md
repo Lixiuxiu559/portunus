@@ -33,6 +33,25 @@ Portunus ships as a self-contained Electron desktop app: the Go backend is bundl
 
 Grab an installer from [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) (macOS arm64 DMG/ZIP, Windows x64 NSIS), or build locally:
 
+### Install
+
+**macOS (Apple Silicon)**
+
+1. Open the DMG and drag Portunus into **Applications**.
+2. On first launch you may see **"Portunus.app is damaged and can't be opened"** — this is macOS Gatekeeper policy for unsigned apps, not actual damage. Run the following in Terminal, then open the app again:
+
+```bash
+sudo xattr -rd com.apple.quarantine /Applications/Portunus.app
+```
+
+> Signing & notarization (which removes this step) is on the roadmap; until then the command above is required once per install.
+
+**Windows (x64)**
+
+Double-click the installer. SmartScreen may warn about an unknown publisher — click **More info → Run anyway**.
+
+### Build Locally
+
 ```bash
 cd web
 pnpm install

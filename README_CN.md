@@ -33,6 +33,25 @@ Portunus 以自包含的 Electron 桌面应用交付：Go 后端作为 sidecar �
 
 从 [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) 下载对应平台的安装包（macOS arm64 DMG/ZIP、Windows x64 NSIS），或在本地构建：
 
+### 安装说明
+
+**macOS（Apple Silicon）**
+
+1. 打开 DMG，将 Portunus 拖入「应用程序」
+2. 首次打开若提示 **"已损坏，无法打开"** —— 这是 macOS 对未签名应用的 Gatekeeper 策略，并非真的损坏。在终端执行以下命令后重新打开即可：
+
+```bash
+sudo xattr -rd com.apple.quarantine /Applications/Portunus.app
+```
+
+> 引入签名与公证后可免去此步骤；在那之前，每次安装后需执行一次上述命令。
+
+**Windows（x64）**
+
+双击安装。SmartScreen 若提示"未知发布者"，点「更多信息 → 仍要运行」。
+
+### 本地构建
+
 ```bash
 cd web
 pnpm install
