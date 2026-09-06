@@ -1,6 +1,6 @@
 {
   "name": "@portunus/web",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Portunus 管理后台（Electron + React + Vite 模板）",
   "author": "Lixiuxiu559",
   "main": "src/main/main.js",
