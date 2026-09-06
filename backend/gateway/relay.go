@@ -52,7 +52,7 @@ const thinkingSuffix = "-thinking"
 // handleRelay 返回一个 relay handler，客户端协议由 clientProto 固定。
 // 按分组策略遍历目标（外层），每个目标失败后按配置先重试 N 次（内层），
 // 耗尽才换下一个目标；熔断开路的模型会被跳过。
-func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
+func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := newRequestID()
 		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位。
@@ -108,13 +108,13 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 		anyAttempted := false
 		var skipped []string // 被熔断挡掉的目标描述，全跳过时用于日志
 		for _, t := range targets {
-			if allow, reason := breakerAllow(t.Model.ID); !allow {
+			if allow, reason := s.deps.Breakers.Allow(t.Model.ID); !allow {
 				skipped = append(skipped, fmt.Sprintf("%s(id=%d) %s", t.Model.Name, t.Model.ID, reason))
 				continue // 熔断开路，跳过该模型
 			}
-			for attempt := 0; attempt <= proxyCfg.RetryCount; attempt++ {
+			for attempt := 0; attempt <= s.deps.Cfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking)
+				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -136,7 +136,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			// 此前只写 stdout，管理端日志页零痕迹，用户报障只能登服务器翻容器日志。
 			detail := "所有目标熔断开路: " + strings.Join(skipped, "; ")
 			log.Printf("relay 拒绝: model=%s %s", meta.Model, detail)
-			shared.LogDB.Create(&shared.Log{
+			s.deps.LogWrite(&shared.Log{
 				APIKeyID:  apiKeyID,
 				GroupName: g.Name,
 				Status:    http.StatusServiceUnavailable,
@@ -150,8 +150,8 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 			// 客户端不必立刻重试撞墙，也不必盲等固定时长。
 			retryAfter := 0
 			for _, t := range targets {
-				if s := breakerCooldownSeconds(t.Model.ID); s > 0 && (retryAfter == 0 || s < retryAfter) {
-					retryAfter = s
+				if s2 := s.deps.Breakers.CooldownSeconds(t.Model.ID); s2 > 0 && (retryAfter == 0 || s2 < retryAfter) {
+					retryAfter = s2
 				}
 			}
 			if retryAfter > 0 {
@@ -191,7 +191,7 @@ func handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig) (out []byte, status int, err error) {
+func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -207,7 +207,7 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 			logErr = failReason
 		}
 		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
-		logCall(apiKeyID, g, t, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
+		s.logCall(apiKeyID, g, t, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
 		if !success {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
@@ -215,12 +215,12 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 				g.Name, t.Model.Name, t.Channel.Name, d.ErrKind, logErr)
 		}
 		if success {
-			breakerRecord(t.Model.ID, false)
+			s.deps.Breakers.Record(t.Model.ID, false)
 		} else if d.BreakerFail {
 			if d.StallNoHeader {
-				breakerRecordStall(t.Model.ID) // 等头假死按更低阈值快速开路，别让死模型拖垮每一轮请求
+				s.deps.Breakers.RecordStall(t.Model.ID) // 等头假死按更低阈值快速开路，别让死模型拖垮每一轮请求
 			} else {
-				breakerRecord(t.Model.ID, true)
+				s.deps.Breakers.Record(t.Model.ID, true)
 			}
 		}
 	}()
@@ -242,20 +242,20 @@ func relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g
 	reqCtx := c.Request.Context()
 	if !stream {
 		var cancel context.CancelFunc
-		reqCtx, cancel = context.WithTimeout(reqCtx, time.Duration(proxyCfg.NonStreamTimeoutSeconds)*time.Second)
+		reqCtx, cancel = context.WithTimeout(reqCtx, time.Duration(s.deps.Cfg.NonStreamTimeoutSeconds)*time.Second)
 		defer cancel()
 	} else {
 		// 流式：看门狗 ctx 贯穿请求与 body 读，触发时掐断读阻塞。
 		// 首包计时在 relayStream 拿到响应头后才开始；等响应头由 Transport 兜底。
 		reqCtx, wd = newStreamWatchdog(reqCtx,
-			time.Duration(proxyCfg.FirstByteTimeoutSeconds)*time.Second,
-			time.Duration(proxyCfg.StreamIdleTimeoutSeconds)*time.Second)
+			time.Duration(s.deps.Cfg.FirstByteTimeoutSeconds)*time.Second,
+			time.Duration(s.deps.Cfg.StreamIdleTimeoutSeconds)*time.Second)
 		defer wd.Stop()
 	}
 
 	headers := upstream.ChatHeaders()
 	headers.Set("X-Request-Id", requestID)
-	resp, err := doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody)
+	resp, err := s.doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody)
 	if err != nil {
 		return nil, 0, err
 	}

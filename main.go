@@ -45,11 +45,23 @@ func main() {
 		log.Fatalf("初始化默认 API Key 失败: %v", err)
 	}
 
-	gateway.Configure(cfg.Proxy) // 注入网关转发配置（重试/超时/熔断）
-
+	// 网关依赖装配：转发配置、上游 HTTP 客户端、熔断 store、鉴权与日志写入
+	//（gateway 据此与数据库直连解耦，见 gateway.Deps）。
 	r := gin.Default()
 
-	gateway.Register(r)           // 对外 /v1 LLM 接口
+	gateway.Register(r, gateway.Deps{
+		Cfg:      cfg.Proxy,
+		Client:   gateway.NewHTTPClient(cfg.Proxy),
+		Breakers: gateway.NewBreakerStore(cfg.Proxy),
+		Auth: func(key string) (int64, bool) {
+			var k shared.APIKey
+			if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
+				return 0, false
+			}
+			return k.ID, true
+		},
+		LogWrite: func(e *shared.Log) { shared.LogDB.Create(e) },
+	})
 	api.Register(r.Group("/api")) // 管理 API
 
 	cron.Start() // 定时自动同步渠道模型

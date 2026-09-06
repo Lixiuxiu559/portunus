@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,35 +18,29 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
-// setProxyConfigForTest 注入转发配置并重置熔断器，避免测试间 channelID 残留污染。
-func setProxyConfigForTest(t *testing.T, pc shared.ProxyConfig) {
-	t.Helper()
-	old := proxyCfg
-	proxyCfg = pc
-	httpClient = newHTTPClient(pc)
-	oldBreakers := breakers
-	breakers = &sync.Map{}
-	t.Cleanup(func() {
-		proxyCfg = old
-		httpClient = newHTTPClient(old)
-		breakers = oldBreakers
-	})
+// withCfg 返回把转发配置注入 deps 的 mutate 函数：配置、熔断阈值、HTTP 客户端
+// 同源重建（替代旧的包级全局换血 helper）。
+func withCfg(pc shared.ProxyConfig) func(*Deps) {
+	return func(d *Deps) {
+		d.Cfg = pc
+		d.Client = NewHTTPClient(pc)
+		d.Breakers = NewBreakerStore(pc)
+	}
 }
 
-// setResponseHeaderTimeout 覆盖当前 httpClient 的等响应头超时，便于测试快速触发。
-func setResponseHeaderTimeout(t *testing.T, d time.Duration) {
-	t.Helper()
-	old := httpClient
-	tr := httpClient.Transport.(*http.Transport).Clone()
-	tr.ResponseHeaderTimeout = d
-	httpClient = &http.Client{Transport: tr}
-	t.Cleanup(func() { httpClient = old })
+// withHeaderTimeout 在 withCfg 之上覆盖等响应头超时（秒级配置表达不了的毫秒级用例）。
+func withHeaderTimeout(pc shared.ProxyConfig, d time.Duration) func(*Deps) {
+	return func(deps *Deps) {
+		withCfg(pc)(deps)
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.ResponseHeaderTimeout = d
+		deps.Client = &http.Client{Transport: tr}
+	}
 }
 
 func TestRelayRetryThenSucceed(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 2 // 最多 3 次尝试
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +52,7 @@ func TestRelayRetryThenSucceed(t *testing.T) {
 		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"upstream-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != 200 {
@@ -73,7 +66,6 @@ func TestRelayRetryThenSucceed(t *testing.T) {
 func TestRelayRetryExhausted(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 1 // 最多 2 次尝试
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +75,7 @@ func TestRelayRetryExhausted(t *testing.T) {
 		w.Write([]byte(`{"error":{"message":"upstream down"}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != http.StatusBadGateway {
@@ -100,7 +92,6 @@ func TestRelayRetryExhausted(t *testing.T) {
 func TestRelay4xxNoRetry(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 3
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +99,7 @@ func TestRelay4xxNoRetry(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != http.StatusBadRequest {
@@ -125,8 +116,6 @@ func TestRelay4xxNoRetry(t *testing.T) {
 func TestRelayHeaderTimeoutSkipsRetry(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 2 // 旧行为会把 3 次尝试全烧在假死目标上
-	setProxyConfigForTest(t, pc)
-	setResponseHeaderTimeout(t, 50*time.Millisecond)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +125,7 @@ func TestRelayHeaderTimeoutSkipsRetry(t *testing.T) {
 		w.Write([]byte(`{"id":"1"}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withHeaderTimeout(pc, 50*time.Millisecond), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != http.StatusGatewayTimeout {
@@ -153,8 +142,6 @@ func TestRelayHeaderTimeoutSkipsRetry(t *testing.T) {
 func TestRelayStallFailoverFastToNextTarget(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 2
-	setProxyConfigForTest(t, pc)
-	setResponseHeaderTimeout(t, 50*time.Millisecond)
 
 	var stallCalls, okCalls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +163,7 @@ func TestRelayStallFailoverFastToNextTarget(t *testing.T) {
 		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"good-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withHeaderTimeout(pc, 50*time.Millisecond), protocol.ProviderOpenAI, upstream)
 	// 同渠道再种 bad-model，并把它插为分组首选（priority 0），原模型降为 priority 1
 	var ch channel.Channel
 	if err := shared.DB.First(&ch).Error; err != nil {
@@ -216,7 +203,6 @@ func TestRelayStallFailoverFastToNextTarget(t *testing.T) {
 func TestRelayStreamRetryBeforeFirstByte(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 1
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +218,7 @@ func TestRelayStreamRetryBeforeFirstByte(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if w.Code != 200 {
@@ -251,16 +237,16 @@ func TestCircuitBreakerOpenAndRecover(t *testing.T) {
 	pc.CircuitFailureThreshold = 3
 	pc.CircuitSuccessThreshold = 2
 	pc.CircuitResetSeconds = 60
-	setProxyConfigForTest(t, pc)
+	bs := NewBreakerStore(pc)
 
 	id := int64(999)
-	if allow, _ := breakerAllow(id); !allow {
+	if allow, _ := bs.Allow(id); !allow {
 		t.Fatal("初始应放行")
 	}
 	for i := 0; i < 3; i++ {
-		breakerRecord(id, true)
+		bs.Record(id, true)
 	}
-	allow, reason := breakerAllow(id)
+	allow, reason := bs.Allow(id)
 	if allow {
 		t.Fatal("连续失败达阈值后应开路")
 	}
@@ -269,14 +255,14 @@ func TestCircuitBreakerOpenAndRecover(t *testing.T) {
 	}
 
 	// 把开路时间回拨到冷却期之前 → 半开探测
-	v, _ := breakers.Load(id)
+	v, _ := bs.m.Load(id)
 	v.(*circuitBreaker).openedAt = time.Now().Add(-time.Minute)
-	if allow, _ := breakerAllow(id); !allow {
+	if allow, _ := bs.Allow(id); !allow {
 		t.Fatal("冷却期后应半开放行")
 	}
-	breakerRecord(id, false)
-	breakerRecord(id, false)
-	b2, _ := breakers.Load(id)
+	bs.Record(id, false)
+	bs.Record(id, false)
+	b2, _ := bs.m.Load(id)
 	if b2.(*circuitBreaker).state != stateClosed {
 		t.Errorf("半开连续成功应转关闭，实际 state=%d", b2.(*circuitBreaker).state)
 	}
@@ -286,37 +272,37 @@ func TestCircuitBreakerOpenAndRecover(t *testing.T) {
 // 连续 2 次即开路（普通阈值 4 次要拖垮两轮完整请求）；普通失败不清假死趋势，
 // 成功才清零。
 func TestCircuitBreakerStallFastOpen(t *testing.T) {
-	setProxyConfigForTest(t, shared.DefaultProxyConfig()) // 普通阈值 CircuitFailureThreshold=4
+	bs := NewBreakerStore(shared.DefaultProxyConfig()) // 普通阈值 CircuitFailureThreshold=4
 
 	// 连续两次假死 → 快速开路
 	id := int64(888)
-	breakerRecordStall(id)
-	if allow, _ := breakerAllow(id); !allow {
+	bs.RecordStall(id)
+	if allow, _ := bs.Allow(id); !allow {
 		t.Fatal("单次假死不应开路")
 	}
-	breakerRecordStall(id)
-	if allow, _ := breakerAllow(id); allow {
+	bs.RecordStall(id)
+	if allow, _ := bs.Allow(id); allow {
 		t.Fatal("连续两次假死应按 stallOpenThreshold 快速开路")
 	}
 
 	// 假死与普通失败混发：普通失败（5xx，上游有回话）不清零假死计数
 	id2 := int64(889)
-	breakerRecordStall(id2)
-	breakerRecord(id2, true)
-	if allow, _ := breakerAllow(id2); !allow {
+	bs.RecordStall(id2)
+	bs.Record(id2, true)
+	if allow, _ := bs.Allow(id2); !allow {
 		t.Fatal("一次假死 + 一次普通失败不应达到快速开路条件")
 	}
-	breakerRecordStall(id2)
-	if allow, _ := breakerAllow(id2); allow {
+	bs.RecordStall(id2)
+	if allow, _ := bs.Allow(id2); allow {
 		t.Fatal("第二次假死应开路（假死计数不被普通失败清零）")
 	}
 
 	// 成功清零：假死 → 成功 → 孤立假死，仍是单次计数不开路
 	id3 := int64(890)
-	breakerRecordStall(id3)
-	breakerRecord(id3, false)
-	breakerRecordStall(id3)
-	if allow, _ := breakerAllow(id3); !allow {
+	bs.RecordStall(id3)
+	bs.Record(id3, false)
+	bs.RecordStall(id3)
+	if allow, _ := bs.Allow(id3); !allow {
 		t.Fatal("成功应清零假死计数，第二次孤立假死不应开路")
 	}
 }
@@ -327,23 +313,26 @@ func TestRelayCircuitSkipsOpenModel(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
 	pc.CircuitFailureThreshold = 1
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		w.WriteHeader(http.StatusInternalServerError)
 	})
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	var bs *BreakerStore
+	r, key, logs := setupGatewayDeps(t, func(d *Deps) {
+		withCfg(pc)(d)
+		bs = d.Breakers // 捕获注入的熔断 store，供预置开路
+	}, protocol.ProviderOpenAI, upstream)
 
 	// 拿到 setupGateway 建的模型 ID，直接制造开路态
 	var m model.Model
 	if err := shared.DB.First(&m).Error; err != nil {
 		t.Fatalf("查询模型失败: %v", err)
 	}
-	breakerRecord(m.ID, true) // 阈值 1，一次即开路
-	if allow, _ := breakerAllow(m.ID); allow {
-		t.Fatal("开路的模型在冷却期内应被 breakerAllow 拒绝")
+	bs.Record(m.ID, true) // 阈值 1，一次即开路
+	if allow, _ := bs.Allow(m.ID); allow {
+		t.Fatal("开路的模型在冷却期内应被 Allow 拒绝")
 	}
 
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
@@ -355,10 +344,10 @@ func TestRelayCircuitSkipsOpenModel(t *testing.T) {
 	}
 
 	// 503 必须落库（err_kind=circuit_open）：此前只写 stdout，管理端日志页零痕迹，
-	// 用户报障只能登服务器翻容器日志。
-	var entry shared.Log
-	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-		t.Fatalf("查日志失败: %v", err)
+	// 用户报障只能登服务器翻容器日志。写入走注入的 LogWrite，断言查内存记录。
+	entry := logs.last()
+	if entry == nil {
+		t.Fatalf("503 应落库")
 	}
 	if entry.Success {
 		t.Fatalf("503 落库应为失败记录")
@@ -384,7 +373,6 @@ func TestRelayCircuitIsolatedPerModel(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
 	pc.CircuitFailureThreshold = 1
-	setProxyConfigForTest(t, pc)
 
 	var badCalls, goodCalls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -403,7 +391,7 @@ func TestRelayCircuitIsolatedPerModel(t *testing.T) {
 		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"good-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	// 同渠道再种 bad-model，并把它插为分组首选（priority 0），原模型降为 priority 1
 	var ch channel.Channel
 	if err := shared.DB.First(&ch).Error; err != nil {

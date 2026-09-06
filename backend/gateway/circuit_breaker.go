@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // circuitState 是熔断器的三态。
@@ -34,15 +36,24 @@ type circuitBreaker struct {
 // 两轮完整请求才开路；假死连续 2 次即开路，让 failover 尽快绕开死路由。
 const stallOpenThreshold = 2
 
-// breakers 记录各模型的熔断器（内存态，重启清零）。
+// BreakerStore 记录各模型的熔断器（内存态，重启清零），由 Deps 注入：
+// 生产一个进程内实例跨请求共享，测试各造各的、互不污染。
 // 同一模型被多个分组引用时共享健康度——上游同一个端点，在哪都是同一个状态。
-var breakers = &sync.Map{} // int64(modelID) -> *circuitBreaker
+type BreakerStore struct {
+	cfg shared.ProxyConfig // 阈值 / 冷却时长（构造时定值）
+	m   sync.Map           // int64(modelID) -> *circuitBreaker
+}
 
-// breakerAllow 判断某模型当前是否放行。开路未冷却则拒绝；
+// NewBreakerStore 按转发配置构建熔断 store。
+func NewBreakerStore(cfg shared.ProxyConfig) *BreakerStore {
+	return &BreakerStore{cfg: cfg}
+}
+
+// Allow 判断某模型当前是否放行。开路未冷却则拒绝；
 // 开路冷却期满转半开放行一个探测请求。
 // 放行时描述为空串；拒绝时返回可读原因（剩余冷却秒数），供 relay 拒绝分支记日志。
-func breakerAllow(modelID int64) (bool, string) {
-	v, _ := breakers.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
+func (bs *BreakerStore) Allow(modelID int64) (bool, string) {
+	v, _ := bs.m.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
 	b := v.(*circuitBreaker)
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -50,7 +61,7 @@ func breakerAllow(modelID int64) (bool, string) {
 	case stateClosed, stateHalfOpen:
 		return true, ""
 	case stateOpen:
-		reset := time.Duration(proxyCfg.CircuitResetSeconds) * time.Second
+		reset := time.Duration(bs.cfg.CircuitResetSeconds) * time.Second
 		remain := reset - time.Since(b.openedAt)
 		if remain <= 0 {
 			b.state = stateHalfOpen
@@ -62,11 +73,11 @@ func breakerAllow(modelID int64) (bool, string) {
 	return true, ""
 }
 
-// breakerCooldownSeconds 返回某模型熔断开路的剩余冷却秒数；未开路返回 0。
+// CooldownSeconds 返回某模型熔断开路的剩余冷却秒数；未开路返回 0。
 // 供 relay 在全目标 503 时设置 Retry-After：告诉客户端最早何时值得重试，
 // 而不是立刻重试撞墙或盲等固定时长。
-func breakerCooldownSeconds(modelID int64) int {
-	v, ok := breakers.Load(modelID)
+func (bs *BreakerStore) CooldownSeconds(modelID int64) int {
+	v, ok := bs.m.Load(modelID)
 	if !ok {
 		return 0
 	}
@@ -76,19 +87,19 @@ func breakerCooldownSeconds(modelID int64) int {
 	if b.state != stateOpen {
 		return 0
 	}
-	remain := time.Duration(proxyCfg.CircuitResetSeconds)*time.Second - time.Since(b.openedAt)
+	remain := time.Duration(bs.cfg.CircuitResetSeconds)*time.Second - time.Since(b.openedAt)
 	if remain <= 0 {
 		return 0
 	}
 	return int(remain.Seconds()) + 1
 }
 
-// breakerRecord 记录一次尝试的结果：retryableFailure 为 true 表示一次可重试类失败，
+// Record 记录一次尝试的结果：retryableFailure 为 true 表示一次可重试类失败，
 // 否则视为成功。仅可重试失败计入熔断（不可重试的客户端错误不污染健康度）。
-// 假死失败走 breakerRecordStall；这里的普通失败（5xx / 429 等上游有回话的失败）
+// 假死失败走 RecordStall；这里的普通失败（5xx / 429 等上游有回话的失败）
 // 不清零 consecutiveStall——上游能回错误说明路由活着，但假死趋势仍应累积。
-func breakerRecord(modelID int64, retryableFailure bool) {
-	v, _ := breakers.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
+func (bs *BreakerStore) Record(modelID int64, retryableFailure bool) {
+	v, _ := bs.m.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
 	b := v.(*circuitBreaker)
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -96,7 +107,7 @@ func breakerRecord(modelID int64, retryableFailure bool) {
 	if retryableFailure {
 		b.consecutiveSuccess = 0
 		b.consecutiveFailure++
-		if b.consecutiveFailure >= proxyCfg.CircuitFailureThreshold {
+		if b.consecutiveFailure >= bs.cfg.CircuitFailureThreshold {
 			b.state = stateOpen
 			b.openedAt = time.Now()
 		}
@@ -106,17 +117,17 @@ func breakerRecord(modelID int64, retryableFailure bool) {
 	b.consecutiveFailure = 0
 	b.consecutiveStall = 0
 	b.consecutiveSuccess++
-	if b.state == stateHalfOpen && b.consecutiveSuccess >= proxyCfg.CircuitSuccessThreshold {
+	if b.state == stateHalfOpen && b.consecutiveSuccess >= bs.cfg.CircuitSuccessThreshold {
 		b.state = stateClosed
 		b.consecutiveSuccess = 0
 	}
 }
 
-// breakerRecordStall 记录一次「不吐响应头」假死失败（等头超时）：
+// RecordStall 记录一次「不吐响应头」假死失败（等头超时）：
 // 在普通连续失败计数之外另按 stallOpenThreshold 快速开路。否则假死模型要按普通
 // 阈值失败 4 次（拖垮两轮完整请求）才熔断，每轮请求都得陪它等满超时。
-func breakerRecordStall(modelID int64) {
-	v, _ := breakers.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
+func (bs *BreakerStore) RecordStall(modelID int64) {
+	v, _ := bs.m.LoadOrStore(modelID, &circuitBreaker{state: stateClosed})
 	b := v.(*circuitBreaker)
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -124,7 +135,7 @@ func breakerRecordStall(modelID int64) {
 	b.consecutiveSuccess = 0
 	b.consecutiveFailure++
 	b.consecutiveStall++
-	if b.consecutiveStall >= stallOpenThreshold || b.consecutiveFailure >= proxyCfg.CircuitFailureThreshold {
+	if b.consecutiveStall >= stallOpenThreshold || b.consecutiveFailure >= bs.cfg.CircuitFailureThreshold {
 		b.state = stateOpen
 		b.openedAt = time.Now()
 	}

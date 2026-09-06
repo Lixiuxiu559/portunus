@@ -7,14 +7,12 @@ import (
 	"testing"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
-	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // TestRelayThinkingSuffixInjectsParam 锁定 -thinking 后缀约定：分组名带后缀时剥后缀
 // 解析分组，并对 OpenAI 兼容上游注入 thinking 开关；上游模型名不带后缀；不带后缀的
 // 请求完全不注入（这正是该约定比全局转发安全的地方）。
 func TestRelayThinkingSuffixInjectsParam(t *testing.T) {
-	setProxyConfigForTest(t, shared.DefaultProxyConfig())
 
 	var gotBody []byte
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +20,7 @@ func TestRelayThinkingSuffixInjectsParam(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"upstream-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	})
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 
 	// 带 -thinking 后缀：注入 thinking 开关
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model-thinking","messages":[{"role":"user","content":"hello"}]}`, key)
@@ -64,7 +62,6 @@ func TestRelayThinkingSuffixInjectsParam(t *testing.T) {
 // 后缀时，openai 兼容上游应收到沿用客户端值的 budget_tokens。注入本身由 protocol
 // 的 ComposeUpstreamRequest 完成（形状契约见 protocol/compose_test.go）。
 func TestRelayThinkingSuffixAnthropicBudget(t *testing.T) {
-	setProxyConfigForTest(t, shared.DefaultProxyConfig())
 
 	var gotBody []byte
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +69,7 @@ func TestRelayThinkingSuffixAnthropicBudget(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"1","object":"chat.completion","model":"upstream-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	})
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model-thinking","max_tokens":64,"thinking":{"type":"enabled","budget_tokens":2048},"messages":[{"role":"user","content":"hello"}]}`, key)
 	if w.Code != 200 {

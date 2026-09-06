@@ -24,8 +24,10 @@ import (
 func TestClientWaitHeaderTimeoutSingleWindow(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 2 // 同生产默认：若退回同目标重试，会烧满 3 个窗口
-	setProxyConfigForTest(t, pc)
-	setResponseHeaderTimeout(t, 200*time.Millisecond)
+	// 等头超时缩为 200ms（秒级配置表达不了毫秒，直接注入自定义 client）
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.ResponseHeaderTimeout = 200 * time.Millisecond
+	customClient := &http.Client{Transport: tr}
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +41,11 @@ func TestClientWaitHeaderTimeoutSingleWindow(t *testing.T) {
 		}
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, func(d *Deps) {
+		d.Cfg = pc
+		d.Breakers = NewBreakerStore(pc)
+		d.Client = customClient
+	}, protocol.ProviderOpenAI, upstream)
 	start := time.Now()
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":16,"messages":[{"role":"user","content":"hi"}],"stream":true}`, key)
 	elapsed := time.Since(start)

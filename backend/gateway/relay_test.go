@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,47 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
-// setupGateway 初始化内存 SQLite、种子数据、mock 上游，返回路由与 apikey。
-func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler) (*gin.Engine, string) {
+// logRecorder 收集 gateway 写出的调用日志（替代真日志库），供落库断言。
+type logRecorder struct {
+	mu   sync.Mutex
+	logs []*shared.Log
+}
+
+func (l *logRecorder) write(e *shared.Log) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	cp := *e
+	l.logs = append(l.logs, &cp)
+}
+
+// reset 清空已收集日志（用例内多次调用时隔离）。
+func (l *logRecorder) reset() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = nil
+}
+
+// last 返回最新一条日志；无日志时返回 nil。
+func (l *logRecorder) last() *shared.Log {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.logs) == 0 {
+		return nil
+	}
+	return l.logs[len(l.logs)-1]
+}
+
+// setupGateway 初始化内存 SQLite 种子数据与注入式依赖，返回路由、apikey 与日志记录器。
+// 主库仍需内存 SQLite：路由解析经 model/channel 模块走 DB（模块内依赖，超注入范围）；
+// 鉴权与日志写入已注入——auth 只认 test-key，日志收集进 recorder，不再建日志库。
+func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler) (*gin.Engine, string, *logRecorder) {
+	return setupGatewayDeps(t, nil, chType, upstream)
+}
+
+// setupGatewayDeps 在默认依赖之上应用 mutate 定制（自定义转发配置 / HTTP 客户端等），
+// 替代旧的包级全局换血 helper。定制 Cfg 时应同步重建 Breakers（阈值随配置走），
+// 见 retry_test.go 的 withCfg。
+func setupGatewayDeps(t *testing.T, mutate func(*Deps), chType protocol.Provider, upstream http.Handler) (*gin.Engine, string, *logRecorder) {
 	t.Helper()
 	closeDB := func() {
 		if shared.DB != nil {
@@ -39,12 +79,8 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 	t.Cleanup(closeDB) // 先于 TempDir 清理关闭 DB，避免目录删除失败
 	if err := shared.AutoMigrate(
 		&channel.Channel{}, &model.Model{}, &group.Group{}, &group.GroupItem{},
-		&shared.APIKey{},
 	); err != nil {
 		t.Fatalf("迁移失败: %v", err)
-	}
-	if err := shared.InitLogDB(cfg); err != nil {
-		t.Fatalf("初始化日志库失败: %v", err)
 	}
 
 	srv := httptest.NewServer(upstream)
@@ -66,15 +102,22 @@ func setupGateway(t *testing.T, chType protocol.Provider, upstream http.Handler)
 		t.Fatalf("建分组项失败: %v", err)
 	}
 
-	k := shared.APIKey{Key: "test-key"}
-	if err := shared.DB.Create(&k).Error; err != nil {
-		t.Fatalf("建 APIKey 失败: %v", err)
+	logs := &logRecorder{}
+	deps := Deps{
+		Cfg:      shared.DefaultProxyConfig(),
+		Client:   NewHTTPClient(shared.DefaultProxyConfig()),
+		Breakers: NewBreakerStore(shared.DefaultProxyConfig()),
+		Auth:     func(key string) (int64, bool) { return 1, key == "test-key" },
+		LogWrite: logs.write,
+	}
+	if mutate != nil {
+		mutate(&deps)
 	}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	Register(r)
-	return r, k.Key
+	Register(r, deps)
+	return r, "test-key", logs
 }
 
 func doReq(t *testing.T, r *gin.Engine, path, body, key string) *httptest.ResponseRecorder {
@@ -95,7 +138,7 @@ func TestRelayNonStreamOpenAIToOpenAI(t *testing.T) {
 		w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","model":"upstream-model","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != 200 {
@@ -121,7 +164,7 @@ func TestRelayNonStreamOpenAIToAnthropic(t *testing.T) {
 		w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","model":"upstream-model","content":[{"type":"text","text":"hello from anthropic"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`))
 	})
 
-	r, key := setupGateway(t, protocol.ProviderAnthropic, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderAnthropic, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != 200 {
@@ -154,7 +197,7 @@ func TestRelayStreamOpenAIToOpenAI(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if w.Code != 200 {
@@ -185,7 +228,7 @@ func TestRelayStreamAnthropicToOpenAI(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderAnthropic, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderAnthropic, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if w.Code != 200 {
@@ -221,7 +264,7 @@ func TestRelayStreamAnthropicClientOpenAIUpstreamEstimate(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	// Anthropic 客户端请求，带上 message_start 所需的 model/max_tokens
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":100,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
@@ -253,7 +296,7 @@ func TestRelayStreamAnthropicClientOpenAIUpstreamEstimate(t *testing.T) {
 }
 
 func TestRelayGroupNotFound(t *testing.T) {
-	r, key := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"no-such-group","messages":[]}`, key)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("状态码 = %d, want 404", w.Code)
@@ -261,7 +304,7 @@ func TestRelayGroupNotFound(t *testing.T) {
 }
 
 func TestRelayUnauthorized(t *testing.T) {
-	r, _ := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r, _, _ := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model"}`, "wrong-key")
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("状态码 = %d, want 401", w.Code)
@@ -269,7 +312,7 @@ func TestRelayUnauthorized(t *testing.T) {
 }
 
 func TestListModels(t *testing.T) {
-	r, key := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	// 再种一个空分组，应被 /v1/models 过滤
 	if err := shared.DB.Create(&group.Group{Name: "empty-group", Strategy: group.StrategyManual}).Error; err != nil {
 		t.Fatalf("建空分组失败: %v", err)
@@ -328,7 +371,7 @@ func TestRelayStreamAnthropicClientOpenAIToolUseToAnthropic(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	// Claude Code 的 Anthropic 流式请求：带 stream:true + get_weather 工具定义
 	body := `{"model":"my-model","max_tokens":100,"stream":true,"messages":[{"role":"user","content":"北京天气怎么样?"}],"tools":[{"name":"get_weather","description":"查询天气","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}],"tool_choice":{"type":"auto"}}`
 	w := doReq(t, r, "/v1/messages", body, key)

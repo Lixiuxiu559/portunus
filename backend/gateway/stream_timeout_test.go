@@ -185,7 +185,6 @@ func TestRelayStreamPrimeTimeoutRetries(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 1
 	pc.FirstByteTimeoutSeconds = 1
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +192,7 @@ func TestRelayStreamPrimeTimeoutRetries(t *testing.T) {
 		writeStalledSSE(t, w, r, false)
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if got := atomic.LoadInt32(&calls); got != 2 {
@@ -211,7 +210,6 @@ func TestRelayStreamIdleTimeoutBreaksStreamAndTripsBreaker(t *testing.T) {
 	pc.RetryCount = 3
 	pc.CircuitFailureThreshold = 1
 	pc.StreamIdleTimeoutSeconds = 1
-	setProxyConfigForTest(t, pc)
 
 	var calls int32
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +221,7 @@ func TestRelayStreamIdleTimeoutBreaksStreamAndTripsBreaker(t *testing.T) {
 		writeStalledSSE(t, w, r, true)
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if got := atomic.LoadInt32(&calls); got != 1 {
@@ -248,7 +246,6 @@ func TestRelayStreamIdleTimeoutNoFalsePositive(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
 	pc.StreamIdleTimeoutSeconds = 1
-	setProxyConfigForTest(t, pc)
 
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -262,7 +259,7 @@ func TestRelayStreamIdleTimeoutNoFalsePositive(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	if w.Code != 200 {
@@ -431,13 +428,12 @@ func TestRelayStreamAnthropicInStreamErrorOnIdleTimeout(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
 	pc.StreamIdleTimeoutSeconds = 1
-	setProxyConfigForTest(t, pc)
 
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeStalledSSE(t, w, r, true)
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":64,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 
 	out := w.Body.String()

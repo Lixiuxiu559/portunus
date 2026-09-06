@@ -8,23 +8,24 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
-	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // Register 注册对外 /v1 LLM 接口，供 claude code / codex 等客户端调用。
-func Register(r *gin.Engine) {
+// deps 由 main 装配生产实现、测试装配内存替身（见 Deps）。
+func Register(r *gin.Engine, deps Deps) {
+	s := NewRelayServer(deps)
 	v1 := r.Group("/v1")
-	v1.Use(authMiddleware())
+	v1.Use(s.authMiddleware())
 
 	v1.GET("/models", listModels) // OpenAI 兼容模型列表
-	v1.POST("/chat/completions", handleRelay(protocol.ProviderOpenAI))
-	v1.POST("/responses", handleRelay(protocol.ProviderOpenAIResponses))
-	v1.POST("/messages", handleRelay(protocol.ProviderAnthropic))
+	v1.POST("/chat/completions", s.handleRelay(protocol.ProviderOpenAI))
+	v1.POST("/responses", s.handleRelay(protocol.ProviderOpenAIResponses))
+	v1.POST("/messages", s.handleRelay(protocol.ProviderAnthropic))
 }
 
 // authMiddleware 校验 API Key，并把 api_key_id 注入上下文。
 // 兼容 Authorization: Bearer <key> 与 x-api-key 两种携带方式。
-func authMiddleware() gin.HandlerFunc {
+func (s *relayServer) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := extractKey(c.GetHeader("Authorization"))
 		if key == "" {
@@ -37,14 +38,14 @@ func authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		var k shared.APIKey
-		if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
+		apiKeyID, ok := s.deps.Auth(key)
+		if !ok {
 			writeRelayError(c, proto, http.StatusUnauthorized, relayErrAuth, "invalid api key")
 			c.Abort()
 			return
 		}
 
-		c.Set("api_key_id", k.ID)
+		c.Set("api_key_id", apiKeyID)
 		c.Next()
 	}
 }

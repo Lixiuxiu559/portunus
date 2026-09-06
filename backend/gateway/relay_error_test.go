@@ -18,15 +18,18 @@ func TestRelayErrorShapeAnthropicCircuitOpen(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
 	pc.CircuitFailureThreshold = 1
-	setProxyConfigForTest(t, pc)
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	var bs *BreakerStore
+	r, key, _ := setupGatewayDeps(t, func(d *Deps) {
+		withCfg(pc)(d)
+		bs = d.Breakers // 捕获注入的熔断 store，供预置开路
+	}, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	var m model.Model
 	if err := shared.DB.First(&m).Error; err != nil {
 		t.Fatalf("查询模型失败: %v", err)
 	}
-	breakerRecord(m.ID, true) // 阈值 1，一次即开路
+	bs.Record(m.ID, true) // 阈值 1，一次即开路
 
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}`, key)
 	if w.Code != http.StatusServiceUnavailable {
@@ -49,7 +52,6 @@ func TestRelayErrorShapeAnthropicCircuitOpen(t *testing.T) {
 func TestRelay429RetryAfterPassthrough(t *testing.T) {
 	pc := shared.DefaultProxyConfig()
 	pc.RetryCount = 0
-	setProxyConfigForTest(t, pc)
 
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -57,7 +59,7 @@ func TestRelay429RetryAfterPassthrough(t *testing.T) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		w.Write([]byte(`{"error":{"message":"rate limited by upstream","code":"rate_limit_exceeded"}}`))
 	})
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, _ := setupGatewayDeps(t, withCfg(pc), protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"my-model","messages":[{"role":"user","content":"hello"}]}`, key)
 
 	if w.Code != http.StatusTooManyRequests {
@@ -77,7 +79,7 @@ func TestRelay429RetryAfterPassthrough(t *testing.T) {
 
 // TestRelay404ShapeOpenAI 锁定 404 错误体形状与 request id 追加（OpenAI 客户端）。
 func TestRelay404ShapeOpenAI(t *testing.T) {
-	r, key := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r, key, _ := setupGateway(t, protocol.ProviderOpenAI, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	w := doReq(t, r, "/v1/chat/completions", `{"model":"no-such-group","messages":[]}`, key)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("状态码 = %d, want 404", w.Code)

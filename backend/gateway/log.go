@@ -13,7 +13,8 @@ import (
 // logCall 写一条调用日志。callErr 非 nil 时把失败归因（类别 + 截断原文）一并落库，
 // 让 status=0 / success=0 的日志能区分「用户取消」与「真故障」。
 // 暂为同步写入（单条 SQLite insert 开销极小）；后续若成为瓶颈可改为队列异步落库。
-func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
+// 写入动作由 Deps.LogWrite 注入（生产 LogDB.Create，测试内存收集）。
+func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
 	entry := shared.Log{
 		APIKeyID:     apiKeyID,
 		GroupName:    g.Name,
@@ -37,7 +38,7 @@ func logCall(apiKeyID int64, g *group.Group, t router.Target, status int, succes
 		entry.CacheWriteToken = int64(usage.CacheWriteTokens)
 		entry.Cost = computeCost(usage, t.Model)
 	}
-	shared.LogDB.Create(&entry)
+	s.deps.LogWrite(&entry)
 }
 
 // truncateErr 把错误信息截断到不超过 max 字节（含 3 字节省略号，末尾不落在

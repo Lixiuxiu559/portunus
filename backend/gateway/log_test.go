@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,38 +15,15 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/router"
-	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
-
-// setupLogDBForTest 初始化独立的临时日志库（与 relay 测试的全套网关环境解耦，
-// 只跑 logCall / classifyErr 这类纯落库断言）。
-func setupLogDBForTest(t *testing.T) {
-	t.Helper()
-	closeDB := func() {
-		if shared.DB != nil {
-			if sqlDB, err := shared.DB.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}
-	}
-	closeDB()
-	cfg := &shared.Config{}
-	cfg.Database.Type = "sqlite"
-	cfg.Database.Path = filepath.Join(t.TempDir(), "test.db")
-	if _, err := shared.InitDB(cfg); err != nil {
-		t.Fatalf("初始化 DB 失败: %v", err)
-	}
-	t.Cleanup(closeDB)
-	if err := shared.InitLogDB(cfg); err != nil {
-		t.Fatalf("初始化日志库失败: %v", err)
-	}
-}
 
 // TestLogCallErrorAttribution 锁定失败归因落库：失败调用的日志必须带 err_kind
 // （固定类别，可过滤统计）与 err_msg（错误原文），成功调用两者为空。
 // 此前 status=0 / success=0 的日志无法区分「用户取消」与「真故障」，排障只能瞎猜。
+// 日志写入走注入的 LogWrite（内存收集），不再依赖日志库。
 func TestLogCallErrorAttribution(t *testing.T) {
-	setupLogDBForTest(t)
+	rec := &logRecorder{}
+	s := NewRelayServer(Deps{LogWrite: rec.write})
 
 	g := &group.Group{Name: "g"}
 	tt := router.Target{Model: model.Model{Name: "m"}, Channel: channel.Channel{Name: "c"}}
@@ -68,10 +44,11 @@ func TestLogCallErrorAttribution(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logCall(1, g, tt, 0, false, true, nil, 1, 0, "req-attr-1", c.err)
-			var entry shared.Log
-			if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-				t.Fatalf("查日志失败: %v", err)
+			rec.reset()
+			s.logCall(1, g, tt, 0, false, true, nil, 1, 0, "req-attr-1", c.err)
+			entry := rec.last()
+			if entry == nil {
+				t.Fatalf("未收集到日志")
 			}
 			if entry.ErrKind != c.wantKind {
 				t.Errorf("err_kind = %q, want %q", entry.ErrKind, c.wantKind)
@@ -89,10 +66,11 @@ func TestLogCallErrorAttribution(t *testing.T) {
 	}
 
 	// 成功调用不带归因字段；非流式 stream=false，request_id 照常落库
-	logCall(1, g, tt, 200, true, false, nil, 1, 0, "req-attr-2", nil)
-	var entry shared.Log
-	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-		t.Fatalf("查日志失败: %v", err)
+	rec.reset()
+	s.logCall(1, g, tt, 200, true, false, nil, 1, 0, "req-attr-2", nil)
+	entry := rec.last()
+	if entry == nil {
+		t.Fatalf("未收集到日志")
 	}
 	if entry.ErrKind != "" || entry.ErrMsg != "" {
 		t.Errorf("成功调用 err_kind/err_msg 应为空，实际: %q/%q", entry.ErrKind, entry.ErrMsg)

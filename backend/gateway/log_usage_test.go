@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
-	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // TestRelayStreamLogUsageSameProtocolAnthropic 验证渠道类型与客户端协议相同
@@ -29,15 +28,15 @@ func TestRelayStreamLogUsageSameProtocolAnthropic(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderAnthropic, upstream)
+	r, key, logs := setupGateway(t, protocol.ProviderAnthropic, upstream)
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":100,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 	if w.Code != 200 {
 		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
 	}
 
-	var entry shared.Log
-	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-		t.Fatalf("查日志失败: %v", err)
+	entry := logs.last()
+	if entry == nil {
+		t.Fatalf("应写出调用日志")
 	}
 	if entry.InputToken != 10 { // 100 - 60(cached) - 30(cache_creation) = 10
 		t.Errorf("input_token = %d, want 10", entry.InputToken)
@@ -69,15 +68,15 @@ func TestRelayStreamLogUsageOpenAIUpstream(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, logs := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":100,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 	if w.Code != 200 {
 		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
 	}
 
-	var entry shared.Log
-	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-		t.Fatalf("查日志失败: %v", err)
+	entry := logs.last()
+	if entry == nil {
+		t.Fatalf("应写出调用日志")
 	}
 	if entry.InputToken != 10 { // 100 - 60(cached) - 30(cache_creation) = 10
 		t.Errorf("input_token = %d, want 10", entry.InputToken)
@@ -113,16 +112,16 @@ func TestReplayCachedUsageProductionShape(t *testing.T) {
 		fl.Flush()
 	})
 
-	r, key := setupGateway(t, protocol.ProviderOpenAI, upstream)
+	r, key, logs := setupGateway(t, protocol.ProviderOpenAI, upstream)
 	w := doReq(t, r, "/v1/messages", `{"model":"my-model","max_tokens":100,"messages":[{"role":"user","content":"hello"}],"stream":true}`, key)
 	if w.Code != 200 {
 		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
 	}
 
 	// 落库侧：输入 = 196059 - 195968 = 91（未命中缓存的纯新增输入）
-	var entry shared.Log
-	if err := shared.LogDB.Order("id desc").First(&entry).Error; err != nil {
-		t.Fatalf("查日志失败: %v", err)
+	entry := logs.last()
+	if entry == nil {
+		t.Fatalf("应写出调用日志")
 	}
 	if entry.InputToken != 91 {
 		t.Errorf("input_token = %d, want 91（prompt 196059 - cached 195968）", entry.InputToken)
