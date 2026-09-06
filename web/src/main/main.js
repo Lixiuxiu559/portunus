@@ -152,8 +152,11 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  stopServer();
+  // macOS：关窗仅收起窗口、app 留在 Dock，后端继续运行——
+  // 后端是 gateway，终端里的 Claude Code 可能仍在调用，不能因关窗断连。
+  // 真正退出走 Cmd+Q / Dock 右键退出，before-quit 会停后端。
   if (process.platform !== 'darwin') {
+    stopServer();
     app.quit();
   }
 });
