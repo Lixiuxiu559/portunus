@@ -342,7 +342,7 @@ export default function Logs() {
             ? '没有符合条件的日志，可调整或清除筛选'
             : '暂无日志'
         }
-        errorText="日志加载失败，请检查后端服务后重试"
+        errorText={loadError ? '日志加载失败，请检查后端服务后重试' : undefined}
         onRetry={() => fetchLogs()}
       />
 
