@@ -11,25 +11,27 @@
 
 > 一个端点，聚合所有 LLM —— 多渠道路由、协议互转、用量记录。
 
-Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，按模型定价，分组对外暴露统一的 `/v1` 接口，供 Claude Code、Codex 等客户端直接调用。
+Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，按模型定价，分组对外暴露统一的 `/v1` 接口，供 Claude Code、Codex 等客户端直接调用，全部操作在一个桌面应用内完成。
 
 ## ✨ 功能特性
 
+- **桌面应用，开箱即用** — Electron 壳 + Go 后端 sidecar 打进同一个安装包，装完即用，无需另行部署；应用内自动更新，监听范围可切「仅本机 / 局域网」，明暗双主题。
 - **多渠道聚合** — 一个入口管理多个上游供应商，统一接入 OpenAI Chat / Responses、Anthropic、Gemini。
-- **模型自动同步** — 渠道保存即自动拉取上游模型列表，也支持一键手动同步。
-- **协议互转** — 客户端与上游协议不一致时自动转换，流式（SSE）透传。
-- **自动故障转移** — 分组内多模型按优先级排序，上游失败自动切换到下一个。
-- **按模型定价** — 价格挂在「渠道 × 模型」上，拉取时自动套默认价，可手动覆盖。
-- **四维用量计费** — 输入 / 输出 / 缓存读 / 缓存写 token 分开记录与计费。
+- **协议互转** — 客户端与上游协议不一致时自动转换，SSE 流式透传，流式工具调用全协议可用；模型名追加 `-thinking` 后缀即可开关思考模式（`reasoning_content` 全协议对齐）。
+- **智能路由与容错** — 分组三种路由策略：手动指定 / 轮询 / 故障转移，拖拽排序优先级；上游假死快速切换、失败重试与熔断保护，避免单点拖垮请求。
+- **客户端一键接入** — 应用内直接管理 Claude Code 与 Codex 的配置文件：自动写入服务地址与令牌、按槽位映射模型（含 1M 上下文槽位），改动前自动备份、支持一键回滚。
+- **按模型定价，四维计费** — 价格挂在「渠道 × 模型」上，输入 / 输出 / 缓存读 / 缓存写 token 分开记录与计费；拉取模型时自动套内置默认价，可手动覆盖。
+- **调用日志与统计** — 每次调用记录协议、模型、分组、耗时、token 与费用（含流式标记与 request_id），支持按保留天数自动清理过期日志。
+- **模型自动同步** — 渠道保存即拉取上游模型列表，支持定时自动同步与一键全量同步。
 - **轻量起步** — 单二进制 + SQLite，无外部依赖。
 
 ## 🚀 快速开始
 
 ### 桌面应用（Electron）
 
-Portunus 以自包含的 Electron 桌面应用交付：Go 后端作为 sidecar 子进程打进安装包，客户装一个应用即可使用，无需另行部署。
+Portunus 以自包含的 Electron 桌面应用交付：Go 后端作为 sidecar 子进程打进安装包，装一个应用即可使用，无需另行部署。
 
-本地构建安装包：
+从 [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) 下载对应平台的安装包（macOS arm64 DMG/ZIP、Windows x64 NSIS），或在本地构建：
 
 ```bash
 cd web
@@ -51,69 +53,24 @@ GOPROXY=https://goproxy.cn,direct go mod tidy   # 网络直连超时可用国内
 go run .
 ```
 
-服务默认监听 `0.0.0.0:3061`，数据库文件 `data/portunus.db`。
+服务默认监听 `0.0.0.0:3061`，数据库为 SQLite（落 `data/` 目录）。首次运行会自动生成 `config.json`，所有配置项均可通过 `PORTUNUS_*` 环境变量覆盖（如 `PORTUNUS_SERVER_PORT`、`PORTUNUS_DATABASE_PATH`）。
 
-### 开发（管理后台）
+### 本地开发（管理后台）
 
-管理后台位于 `web/`（Electron + React + Vite）。开发服务器会把 `/api`、`/v1` 代理到后端 `localhost:3061`，因此需先启动后端（`go run .`）。
+管理后台位于 `web/`（Electron + React + Vite）。开发时需先启动后端，Vite 会把 `/api`、`/v1` 代理到后端 `localhost:3061`。
+
+**环境要求:** Node.js 20+ 与 pnpm
 
 ```bash
-cd web
-pnpm install        # 安装依赖
-pnpm run dev:web    # 启动 Vite 并打开 http://localhost:5173
-pnpm run dev        # 同时启动 Vite + Electron 桌面窗口
+go run .            # 终端 1：启动 Go 后端
+
+cd web              # 终端 2：启动前端
+pnpm install
+pnpm run dev:web    # 浏览器开发：打开 http://localhost:5173
+pnpm run dev        # 或 Electron 桌面窗口（自动等待后端就绪）
 ```
 
-## 📝 配置
-
-首次运行自动生成 `config.json`：
-
-```json
-{
-  "server": { "host": "0.0.0.0", "port": 3061 },
-  "database": { "type": "sqlite", "path": "data/portunus.db" }
-}
-```
-
-| 配置项 | 说明 | 默认值 |
-|---|---|---|
-| `server.host` | 监听地址 | `0.0.0.0` |
-| `server.port` | 监听端口 | `3061` |
-| `database.type` | 数据库类型（`sqlite` / `mysql` / `postgres`） | `sqlite` |
-| `database.path` | 数据库路径 | `data/portunus.db` |
-
-支持环境变量覆盖：
-
-| 环境变量 | 对应配置 |
-|---|---|
-| `PORTUNUS_SERVER_PORT` | `server.port` |
-| `PORTUNUS_DATABASE_TYPE` | `database.type` |
-| `PORTUNUS_DATABASE_PATH` | `database.path` |
-
-## 🔌 API
-
-### 对外接口（`/v1`，需 API Key）
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/v1/models` | 模型列表（分组名即模型名） |
-| POST | `/v1/chat/completions` | OpenAI Chat |
-| POST | `/v1/responses` | OpenAI Responses |
-| POST | `/v1/messages` | Anthropic Messages |
-
-鉴权：`Authorization: Bearer <key>` 或 `x-api-key`。
-
-### 管理接口（`/api`）
-
-| 路径 | 说明 |
-|---|---|
-| `/api/ping` | 健康检查 |
-| `/api/channels` | 渠道 CRUD + 模型同步 |
-| `/api/models` | 模型 CRUD |
-| `/api/groups` | 分组及分组项 CRUD |
-| `/api/apikeys` | API Key 管理 |
-| `/api/settings` | 全局设置 |
-| `/api/logs` | 调用日志与统计 |
+后端测试：`go test ./...`。
 
 ## 📖 更多文档
 
