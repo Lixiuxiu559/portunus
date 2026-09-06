@@ -1,6 +1,6 @@
 name: Release
 
-# 打 tag（v*）或手动触发：矩阵构建 Electron 安装包（Windows NSIS + macOS DMG/ZIP），
+# 打 tag（v*）或手动触发：矩阵构建 Electron 安装包（macOS DMG/ZIP + Windows NSIS/ZIP + Linux AppImage），
 # 每个平台各自交叉编译 Go 后端到 extraResources，然后汇总到一个 draft release。
 # 发布是 draft（草稿），人工确认后手动点 publish，避免打错 tag 直接把坏包推给客户。
 
@@ -22,7 +22,11 @@ jobs:
           - os: windows-latest
             goos: windows
             goarch: amd64
-            args: --win nsis --x64
+            args: --win nsis zip --x64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            args: --linux AppImage --x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -90,8 +94,12 @@ jobs:
           mkdir -p release-assets
           find artifacts -type f \( \
             -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o \
-            -name "*.blockmap" -o -name "latest.yml" -o -name "latest-mac.yml" \) \
+            -name "*.AppImage" -o \
+            -name "*.blockmap" -o -name "latest.yml" -o -name "latest-mac.yml" -o -name "latest-linux.yml" \) \
             -not -path "*unpacked*" -exec cp {} release-assets/ \;
+          # 固定文件名副本：README 的免绕安装命令依赖 latest/download/<固定名> 永远指向最新版
+          cp release-assets/Portunus-*-arm64-mac.zip release-assets/Portunus-mac-arm64.zip
+          cp release-assets/Portunus-*.AppImage release-assets/Portunus-linux-x64.AppImage
           ls -la release-assets
 
       - name: 创建 draft release 并上传产物

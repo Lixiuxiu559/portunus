@@ -34,11 +34,13 @@
     "win": {
       "icon": "build/icons/icon.ico",
       "target": [
-        "nsis"
+        "nsis",
+        "zip"
       ]
     },
     "linux": {
       "icon": "build/icons",
+      "executableName": "Portunus",
       "target": [
         "AppImage",
         "deb"
@@ -58,7 +60,7 @@
     "build": "pnpm run build:go && VITE_BASE=./ vite build && electron-builder",
     "build:renderer": "VITE_BASE=./ vite build",
     "build:mac": "pnpm run build:go && pnpm run build:renderer && electron-builder --mac dmg zip --arm64",
-    "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis --x64",
+    "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis zip --x64",
     "start": "electron ."
   },
   "dependencies": {

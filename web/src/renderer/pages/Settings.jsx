@@ -7,10 +7,9 @@ import { getSettings, setSyncInterval, syncNow } from '../api/setting';
 import { getAPIKey, regenerateAPIKey } from '../api/apikey';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
-const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 export default function Settings() {
-  const { checking, available, downloaded, latestVersion, progress, error, check, download, install, isMac } =
+  const { checking, available, downloaded, latestVersion, progress, error, check, download, install } =
     useUpdater();
 
   const [syncInterval, setSyncIntervalState] = useState('');
@@ -168,15 +167,6 @@ export default function Settings() {
     } else {
       // 纯浏览器（开发模式）下退化为新标签页打开
       window.open(GITHUB_URL, '_blank', 'noopener');
-    }
-  };
-
-  const openDownloadPage = (e) => {
-    e.preventDefault?.();
-    if (window.api?.openExternal) {
-      window.api.openExternal(RELEASES_URL).catch(() => {});
-    } else {
-      window.open(RELEASES_URL, '_blank', 'noopener');
     }
   };
 
@@ -437,18 +427,13 @@ export default function Settings() {
                   检查更新
                 </Button>
               )}
-              {available && !downloaded && !checking && (isMac ? (
-                <Button variant="primary" size="sm" onPress={openDownloadPage}>
-                  <ExternalLink className="size-4" />
-                  去下载
-                </Button>
-              ) : (
+              {available && !downloaded && !checking && (
                 <Button variant="primary" size="sm" onPress={download}>
                   <Download className="size-4" />
                   下载更新
                 </Button>
-              ))}
-              {downloaded && !isMac && (
+              )}
+              {downloaded && (
                 <Button variant="primary" size="sm" onPress={install}>
                   <CheckCircle className="size-4" />
                   安装并重启

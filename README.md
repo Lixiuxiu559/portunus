@@ -31,24 +31,37 @@ Portunus is a lightweight LLM API aggregation service: connect multiple upstream
 
 Portunus ships as a self-contained Electron desktop app: the Go backend is bundled as a sidecar process, so one installer is all a customer needs — no separate deployment.
 
-Grab an installer from [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) (macOS arm64 DMG/ZIP, Windows x64 NSIS), or build locally:
+Grab an installer from [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest), or build locally.
 
 ### Install
 
-**macOS (Apple Silicon)**
+**macOS (Apple Silicon) — command-line install recommended**
 
-1. Open the DMG and drag Portunus into **Applications**.
-2. On first launch you may see **"Portunus.app is damaged and can't be opened"** — this is macOS Gatekeeper policy for unsigned apps, not actual damage. Run the following in Terminal, then open the app again:
+Command-line download + unzip never sets the quarantine flag, so Gatekeeper is not involved at all:
 
 ```bash
-sudo xattr -rd com.apple.quarantine /Applications/Portunus.app
+curl -L -o /tmp/portunus.zip https://github.com/Lixiuxiu559/portunus/releases/latest/download/Portunus-mac-arm64.zip
+unzip -o /tmp/portunus.zip -d /Applications
 ```
 
-> Signing & notarization (which removes this step) is on the roadmap; until then the command above is required once per install.
+If you install from a browser-downloaded DMG instead, the first launch shows **"Portunus.app is damaged and can't be opened"** (macOS Gatekeeper policy for unsigned apps, not actual damage). Run the following and reopen, or click "Open Anyway" in System Settings → Privacy & Security (one time only):
+
+```bash
+xattr -rd com.apple.quarantine /Applications/Portunus.app
+```
 
 **Windows (x64)**
 
-Double-click the installer. SmartScreen may warn about an unknown publisher — click **More info → Run anyway**.
+Double-click the NSIS installer to install; the ZIP is a portable build — just unzip and run. SmartScreen may warn about an unknown publisher — click **More info → Run anyway**.
+
+**Linux (x64)**
+
+Download the AppImage and run it:
+
+```bash
+chmod +x Portunus-*-x64.AppImage
+./Portunus-*-x64.AppImage
+```
 
 ### Build Locally
 
@@ -56,10 +69,10 @@ Double-click the installer. SmartScreen may warn about an unknown publisher — 
 cd web
 pnpm install
 pnpm run build:mac   # macOS DMG / ZIP (arm64)
-pnpm run build:win   # Windows NSIS (x64)
+pnpm run build:win   # Windows NSIS / portable ZIP (x64)
 ```
 
-Artifacts land in `web/dist-electron/`. Pushing a `v*` tag triggers GitHub Actions, which builds both platforms and uploads a **draft** GitHub Release — review it, then publish manually.
+Artifacts land in `web/dist-electron/`. Pushing a `v*` tag triggers GitHub Actions, which builds all three platforms (macOS / Windows / Linux) and uploads a **draft** GitHub Release — review it, then publish manually.
 
 ### Run from Source
 

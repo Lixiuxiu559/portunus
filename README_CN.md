@@ -31,24 +31,37 @@ Portunus 是一个轻量的 LLM API 聚合服务：接入多个上游渠道，�
 
 Portunus 以自包含的 Electron 桌面应用交付：Go 后端作为 sidecar 子进程打进安装包，装一个应用即可使用，无需另行部署。
 
-从 [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) 下载对应平台的安装包（macOS arm64 DMG/ZIP、Windows x64 NSIS），或在本地构建：
+从 [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest) 下载对应平台的安装包，或在本地构建。
 
 ### 安装说明
 
-**macOS（Apple Silicon）**
+**macOS（Apple Silicon）— 推荐命令行安装**
 
-1. 打开 DMG，将 Portunus 拖入「应用程序」
-2. 首次打开若提示 **"已损坏，无法打开"** —— 这是 macOS 对未签名应用的 Gatekeeper 策略，并非真的损坏。在终端执行以下命令后重新打开即可：
+命令行下载解压不会打 quarantine 标记，完全不触发 Gatekeeper，无需 xattr：
 
 ```bash
-sudo xattr -rd com.apple.quarantine /Applications/Portunus.app
+curl -L -o /tmp/portunus.zip https://github.com/Lixiuxiu559/portunus/releases/latest/download/Portunus-mac-arm64.zip
+unzip -o /tmp/portunus.zip -d /Applications
 ```
 
-> 引入签名与公证后可免去此步骤；在那之前，每次安装后需执行一次上述命令。
+若通过浏览器下载 DMG 安装，首次打开会提示 **"已损坏，无法打开"**（macOS 对未签名应用的 Gatekeeper 策略，并非真的损坏），执行以下命令后重新打开，或到 系统设置 → 隐私与安全性 点「仍要打开」（仅需一次）：
+
+```bash
+xattr -rd com.apple.quarantine /Applications/Portunus.app
+```
 
 **Windows（x64）**
 
-双击安装。SmartScreen 若提示"未知发布者"，点「更多信息 → 仍要运行」。
+双击 NSIS 安装包安装；zip 为便携版，解压即用。SmartScreen 若提示"未知发布者"，点「更多信息 → 仍要运行」。
+
+**Linux（x64）**
+
+下载 AppImage 后直接运行：
+
+```bash
+chmod +x Portunus-*-x64.AppImage
+./Portunus-*-x64.AppImage
+```
 
 ### 本地构建
 
@@ -56,10 +69,10 @@ sudo xattr -rd com.apple.quarantine /Applications/Portunus.app
 cd web
 pnpm install
 pnpm run build:mac   # macOS DMG / ZIP（arm64）
-pnpm run build:win   # Windows NSIS（x64）
+pnpm run build:win   # Windows NSIS / 便携 ZIP（x64）
 ```
 
-产物在 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions 矩阵构建两个平台，并上传 **draft** 草稿 Release —— 人工确认后手动发布。
+产物在 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions 矩阵构建三个平台（macOS / Windows / Linux），并上传 **draft** 草稿 Release —— 人工确认后手动发布。
 
 ### 从源码运行
 

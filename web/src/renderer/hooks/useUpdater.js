@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 
-// 平台标识（mac 走「去下载」半自动，win 走下载+安装全自动）
-const isMac = typeof window !== 'undefined' && window.api?.platform === 'darwin';
-
 /**
  * 监听 Electron 主进程的自动更新事件
- * @returns {{ checking, available, downloaded, version, progress, error, check, download, install, isMac }}
+ * 全平台统一「检查 → 下载 → 安装并重启」全自动流程（mac / win / linux）。
+ * @returns {{ checking, available, downloaded, version, progress, error, check, download, install }}
  */
 export function useUpdater() {
   const [checking, setChecking] = useState(false);
@@ -76,5 +74,5 @@ export function useUpdater() {
     [],
   );
 
-  return { checking, available, downloaded, latestVersion, progress, error, check, download, install, isMac };
+  return { checking, available, downloaded, latestVersion, progress, error, check, download, install };
 }
