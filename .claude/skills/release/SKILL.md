@@ -58,7 +58,10 @@ git push origin vX.Y.Z
 ## 阶段 3：盯 CI（自动执行）
 
 1. `gh run list --workflow=release.yml --limit 1` 找到本次 run，`gh run watch <run-id> --exit-status` 跟踪。整个矩阵构建约 10-20 分钟，期间告知用户进展即可。
-2. 失败排查（按命中率排序）：
+2. 失败排查（按命中率排序，前三条均为 v0.1.0 首发实测踩过）：
+   - **构建步骤报 `VAR=x is not recognized as a cmdlet`** → Windows runner 默认 PowerShell，不认 bash 的 `VAR=x cmd` 前缀语法；环境变量必须写进 step 的 `env:` 块。
+   - **release job 报 secondary rate limit / asset already exists (race condition)** → 上传列表混入了 Electron 运行时杂散文件（locale.pak 等），且 win/mac artifact 有同名小文件互相覆盖触发重试风暴；只上传发版必需资产（exe/dmg/zip/blockmap/latest*.yml），排除 `*unpacked*`。
+   - **重发时 draft 里有上一轮遗留的杂散资产** → softprops 对已存在的 draft 只追加不清理；重发前先清点资产数量，多余的手动删（`gh api -X DELETE repos/{owner}/{repo}/releases/assets/{id}`，加 sleep 防限流）。
    - **release job 报 403 / resource not accessible** → 仓库 Settings → Actions → General → Workflow permissions 被锁死，需允许写；workflow 内已声明 `contents: write`，个人仓库默认没问题。
    - **构建失败** → `gh run view <run-id> --log-failed` 看哪个平台挂了。常见：`pnpm install --frozen-lockfile` 与 pnpm-lock.yaml 不匹配、Go 编译错误。
    - **mac 报签名错误** → 不应发生（workflow 已设 `CSC_IDENTITY_AUTO_DISCOVERY: false`），发生说明 workflow 被改过。
