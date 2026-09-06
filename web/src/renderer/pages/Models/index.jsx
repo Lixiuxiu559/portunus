@@ -238,40 +238,17 @@ export default function Models() {
       ) : (
         <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
-            {models.map((m) => (
+            {models.map((m) => {
+              const channelName = channelMap[m.channel_id] || m.channel_id;
+              return (
               <Card key={m.id} className="gap-4 p-5">
-                <Card.Header className="flex-row items-start justify-between gap-3 shrink-0">
-                  <Typography className="min-w-0 font-medium text-lg leading-snug break-words" title={m.name}>
+                {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与渠道/分组卡同模式 */}
+                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                  {/* 模型名单行截断：长模型名（无空格 token）不换行，同网格行内价格区对齐 */}
+                  <Typography className="min-w-0 flex-1 truncate font-medium text-lg" title={m.name}>
                     {m.name}
                   </Typography>
-                  <Chip variant="soft" size="sm" color="default" className="shrink-0 mt-1">
-                    {channelMap[m.channel_id] || m.channel_id}
-                  </Chip>
-                </Card.Header>
-
-                <Card.Content className="min-w-0">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div>
-                      <div className="text-xs text-muted">输入 $/1M</div>
-                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.input_price)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted">输出 $/1M</div>
-                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.output_price)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted">缓存读取 $/1M</div>
-                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.cache_read_price)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted">缓存写入 $/1M</div>
-                      <div className="mt-0.5 font-mono text-sm tabular-nums">{formatPrice(m.cache_write_price)}</div>
-                    </div>
-                  </div>
-                </Card.Content>
-
-                <Card.Footer className="shrink-0">
-                  <div className="ml-auto flex items-center gap-0.5">
+                  <div className="flex items-center gap-1 shrink-0">
                     <IconButton label={`编辑模型 ${m.name}`} onClick={() => setEditTarget(m)}>
                       <Pencil className="size-4" />
                     </IconButton>
@@ -279,9 +256,49 @@ export default function Models() {
                       <Trash2 className="size-4" />
                     </IconButton>
                   </div>
-                </Card.Footer>
+                </Card.Header>
+
+                <Card.Content className="min-w-0">
+                  {/* 渠道归属 + 计价单位同行（左属性右单位），替代原 footer 行 */}
+                  <div className="flex items-center justify-between gap-3">
+                    <Chip variant="soft" size="sm" color="default" className="min-w-0 max-w-[60%]">
+                      <span className="truncate" title={channelName}>
+                        {channelName}
+                      </span>
+                    </Chip>
+                    <span className="shrink-0 text-xs text-muted">USD / 1M tokens</span>
+                  </div>
+                  {/* 价格两行制：标签左值右同行，2×2 压成两行；列内值右对齐 + tabular-nums 成数字纵列 */}
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="shrink-0 text-xs text-muted">输入</span>
+                      <span className="min-w-0 truncate font-mono text-sm tabular-nums" title={formatPrice(m.input_price)}>
+                        {formatPrice(m.input_price)}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="shrink-0 text-xs text-muted">输出</span>
+                      <span className="min-w-0 truncate font-mono text-sm tabular-nums" title={formatPrice(m.output_price)}>
+                        {formatPrice(m.output_price)}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="shrink-0 text-xs text-muted">缓存读取</span>
+                      <span className="min-w-0 truncate font-mono text-sm tabular-nums" title={formatPrice(m.cache_read_price)}>
+                        {formatPrice(m.cache_read_price)}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="shrink-0 text-xs text-muted">缓存写入</span>
+                      <span className="min-w-0 truncate font-mono text-sm tabular-nums" title={formatPrice(m.cache_write_price)}>
+                        {formatPrice(m.cache_write_price)}
+                      </span>
+                    </div>
+                  </div>
+                </Card.Content>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -95,12 +95,28 @@ export default function Channels() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {channels.map((ch) => (
               <Card key={ch.id} className="gap-4 p-5">
+                {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与分组卡同模式 */}
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
                     <ProviderIcon type={ch.type} className="size-6 shrink-0" />
                     <Typography className="font-medium text-lg truncate" title={ch.name}>
                       {ch.name}
                     </Typography>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <IconButton
+                      label={`同步渠道 ${ch.name} 模型`}
+                      onClick={() => handleSync(ch)}
+                      disabled={syncingId === ch.id}
+                    >
+                      <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
+                    </IconButton>
+                    <IconButton label={`编辑渠道 ${ch.name}`} onClick={() => setEditTarget(ch)}>
+                      <Pencil className="size-4" />
+                    </IconButton>
+                    <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger>
+                      <Trash2 className="size-4" />
+                    </IconButton>
                   </div>
                 </Card.Header>
 
@@ -118,24 +134,6 @@ export default function Channels() {
                     </span>
                   </div>
                 </Card.Content>
-
-                <Card.Footer className="shrink-0">
-                  <div className="flex items-center gap-1">
-                    <IconButton
-                      label={`同步渠道 ${ch.name} 模型`}
-                      onClick={() => handleSync(ch)}
-                      disabled={syncingId === ch.id}
-                    >
-                      <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
-                    </IconButton>
-                    <IconButton label={`编辑渠道 ${ch.name}`} onClick={() => setEditTarget(ch)}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger>
-                      <Trash2 className="size-4" />
-                    </IconButton>
-                  </div>
-                </Card.Footer>
               </Card>
             ))}
           </div>

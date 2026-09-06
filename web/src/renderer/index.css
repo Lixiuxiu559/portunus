@@ -829,7 +829,7 @@ header .theme-switch {
 .mm-row { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 14px; transition: background-color .15s; }
 .mm-row:hover { background: color-mix(in oklch, var(--surface-2) 55%, transparent); }
 .mm-row + .mm-row { border-top: 1px solid var(--separator); }
-.mm-head { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 14px; font-size: 12px; color: var(--muted); background: var(--surface-2); }
+.mm-head { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 14px; font-size: 12px; color: var(--muted); background: var(--surface-2); text-align: center; }
 .mm-slot { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mm-label { font-size: 13.5px; font-weight: 600; color: var(--fg); }
 .mm-key { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: "tnum"; }

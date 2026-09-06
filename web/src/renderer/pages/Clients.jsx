@@ -281,8 +281,8 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
             value={m.base}
             onChange={(e) => {
               const v = e.target.value;
-              // 仅在显示名为空时用所选模型填充，避免覆盖用户自定义显示名
-              setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: m.name || v });
+              // 选择请求模型后显示名同步跟随所选模型；清空时一并清空（之后手改显示名不会反向影响请求模型）
+              setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: v });
             }}
           >
             <option value="">— 不映射 —</option>
