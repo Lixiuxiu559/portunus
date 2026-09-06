@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
 const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
 const { startServer, stopServer, restartServer } = require('./sidecar');
@@ -6,6 +6,19 @@ const appConfig = require('./app-config');
 const clientConfig = require('./client-config');
 
 const isDev = process.env.NODE_ENV === 'development';
+
+// 开发模式下应用跑在 node_modules 的 Electron 默认 bundle 里，Dock/任务栏显示的是
+// Electron 官方图标；这里显式换成我们的 logo。打包版由 electron-builder 把
+// build/icons 注入 bundle（见 package.json 的 build.*.icon），不走这条路。
+// mac 的 Dock 图标须在 app ready 后用 app.dock.setIcon 设；win/linux 的任务栏
+// 图标跟随窗口 icon 选项。
+const appIcon = app.isPackaged
+  ? null
+  : (() => {
+      const file = process.platform === 'win32' ? 'icons/icon.ico' : 'icons/256x256.png';
+      const img = nativeImage.createFromPath(path.join(__dirname, '../../build', file));
+      return img.isEmpty() ? null : img;
+    })();
 
 // 忽略 electron-updater 的未捕获异常（如 GitHub Releases 返回404）
 process.on('uncaughtException', (err) => {
@@ -28,6 +41,7 @@ function createWindow() {
     title: 'Portunus',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -117,6 +131,11 @@ ipcMain.handle('client-config:rollback-claude', wrapClientConfig(() => clientCon
 ipcMain.handle('client-config:rollback-codex', wrapClientConfig(() => clientConfig.rollbackCodex()));
 
 app.whenReady().then(() => {
+  // 开发模式下把 Dock 图标换成我们的 logo（macOS 专属；app.dock 仅 ready 后可用）
+  if (process.platform === 'darwin' && appIcon) {
+    app.dock?.setIcon(appIcon);
+  }
+
   // 先创建窗口，让用户看到 UI
   createWindow();
 
