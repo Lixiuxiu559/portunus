@@ -215,6 +215,15 @@ html.dark .bg-decor .mask {
 }
 
 /*
+ * 暗色模式下压暗色块：亮色模式的色块（L 60-70% 高饱和）原样进暗色会变成
+ * "黑暗中的霓虹灯"，从半透明玻璃（弹窗/卡片/顶栏）后面穿透出来毁掉文字对比
+ * （编辑弹窗看不清的主因）。压暗降饱和后保留环境光氛围，但不再干扰前景。
+ */
+html.dark .bg-decor .blob {
+  filter: blur(64px) saturate(0.85) brightness(0.5);
+}
+
+/*
  * ============================================================
  * Apple Liquid Glass 材质体系
  * ============================================================
@@ -230,16 +239,29 @@ html.dark .bg-decor .mask {
   --glass-blur: 24px; /* 玻璃 blur 半径 */
   --glass-saturate: 180%; /* 透过后色彩饱和提升 */
   --glass-highlight: 45%; /* 顶部 specular 高光强度 */
+  --glass-highlight-bottom: 16%; /* 底部弱反光强度（上亮下暗 = 真实受光） */
   --glass-edge: 40%; /* 1px 边缘高光描边强度 */
+  --glass-hairline: 8%; /* 边缘外圈暗发丝线强度（内亮外暗双圈 = 玻璃厚度） */
   --glass-shadow:
     0 8px 32px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 6%); /* 悬浮投影 */
+  /* 弹窗级悬浮投影：最高悬浮层需要近接触影 + 远环境影分层撑起 elevation */
+  --glass-shadow-float:
+    0 24px 64px rgb(0 0 0 / 18%), 0 8px 20px rgb(0 0 0 / 10%),
+    0 2px 6px rgb(0 0 0 / 8%);
+  /* 磨砂颗粒：真实玻璃的微噪声散射，消除大面积纯 blur 平面的"塑料感" */
+  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 }
 
 html.dark {
   --glass-highlight: 14%;
+  --glass-highlight-bottom: 4%;
   --glass-edge: 10%;
+  --glass-hairline: 40%;
   --glass-shadow:
     0 8px 32px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
+  --glass-shadow-float:
+    0 24px 64px rgb(0 0 0 / 55%), 0 8px 20px rgb(0 0 0 / 35%),
+    0 2px 6px rgb(0 0 0 / 25%);
 }
 
 /*
@@ -248,19 +270,22 @@ html.dark {
  * 染色浓度：亮 15% / 暗 18%（暗色 tint 底更透，等比增染色维持可感知度）。
  */
 .glass {
-  background: color-mix(
+  background-color: color-mix(
     in oklch,
     var(--accent) 15%,
     color-mix(in oklch, var(--surface) 58%, transparent)
   );
+  background-image: var(--glass-noise);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
-  /* 顶部 specular 高光线；底部不再画线，避免与宿主 border-b 贴成双线 */
-  box-shadow: inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+  /* 顶亮下暗受光；底部内侧弱反光与宿主 border-b 暗线构成"外暗内亮"厚度双圈 */
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent);
 }
 
 html.dark .glass {
-  background: color-mix(
+  background-color: color-mix(
     in oklch,
     var(--accent) 18%,
     color-mix(in oklch, var(--surface) 45%, transparent)
@@ -269,22 +294,53 @@ html.dark .glass {
 
 /*
  * 弹窗玻璃化：覆盖全局 .modal__*，项目内所有 HeroUI Modal 生效，无需改 JSX。
- * 对话框 tint 68% 比一般玻璃更"浊"——上面承载表单，可读性优先（Apple sheet 同思路）；
- * 蒙层 blur + 压暗把页面内容退到景深后层，是 Apple 模态的标志性景深。
+ * 可读性三道闸（修复"编辑弹窗看不清"）：
+ *   1. 蒙层大幅压暗 + 20px blur——把页面内容退成平静景深底色，玻璃靠对比显形；
+ *   2. 弹窗 tint 提到亮 80% / 暗 78%——玻璃感保留在边缘与蒙层，正文承载面先保可读；
+ *   3. 弹窗 saturate 降为 160%——不再放大穿透色块的饱和度。
+ * 质感四件套：内亮外暗双圈描边（厚度）、顶部 specular + 底部弱反光（受光不对称）、
+ * 磨砂颗粒噪声（消除纯 blur 的塑料感）、分层悬浮投影（elevation）。
  */
 .modal__dialog {
-  background: color-mix(in oklch, var(--surface) 68%, transparent);
-  backdrop-filter: blur(28px) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+  background-color: color-mix(in oklch, var(--surface) 80%, transparent);
+  background-image: var(--glass-noise);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
   box-shadow:
-    var(--glass-shadow),
-    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+    var(--glass-shadow-float),
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent),
+    0 0 0 1px color-mix(in oklch, white var(--glass-edge), transparent),
+    0 0 0 2px color-mix(in oklch, black var(--glass-hairline), transparent);
+}
+
+html.dark .modal__dialog {
+  background-color: color-mix(in oklch, var(--surface) 78%, transparent);
 }
 
 .modal__backdrop {
-  background: color-mix(in oklch, var(--background) 40%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in oklch, var(--background) 55%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* 暗色蒙层改用近黑 scrim：背景世界整体沉下去，让玻璃边缘高光显形 */
+html.dark .modal__backdrop {
+  background: color-mix(in oklch, black 45%, transparent);
+}
+
+/* 系统开启"降低透明度"时弹窗退化为实色（可读性兜底，与 reduced-motion 同思路） */
+@media (prefers-reduced-transparency: reduce) {
+  .modal__dialog {
+    background-color: var(--overlay);
+    background-image: none;
+  }
+
+  .modal__backdrop {
+    background: var(--overlay);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 /*
@@ -292,29 +348,33 @@ html.dark .glass {
  * 卡内表格/表单保持自身实色底，玻璃只做外层材质。边缘描边给出玻璃厚度轮廓。
  */
 .card {
-  background: color-mix(in oklch, var(--surface) 55%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 55%, transparent);
+  background-image: var(--glass-noise);
   backdrop-filter: blur(20px) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent),
     0 0 0 1px color-mix(in oklch, white var(--glass-edge), transparent);
 }
 
 html.dark .card {
-  background: color-mix(in oklch, var(--surface) 40%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 40%, transparent);
 }
 
 /*
  * toast 玻璃化：浮在最上层的通知条，玻璃材质 + specular 高光。
  */
 .toast {
-  background: color-mix(in oklch, var(--surface) 62%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 62%, transparent);
+  background-image: var(--glass-noise);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
-    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent);
 }
 
 /*
@@ -323,29 +383,33 @@ html.dark .card {
  * 菜单项自身的 hover 高亮为实色，压在玻璃上可读性不受影响。
  */
 .popover {
-  background: color-mix(in oklch, var(--surface) 62%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 62%, transparent);
+  background-image: var(--glass-noise);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
-    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent);
 }
 
 html.dark .popover {
-  background: color-mix(in oklch, var(--surface) 48%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 48%, transparent);
 }
 
 .tooltip {
-  background: color-mix(in oklch, var(--surface) 72%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 72%, transparent);
+  background-image: var(--glass-noise);
   backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
-    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent);
+    inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
+    inset 0 -1px 0 color-mix(in oklch, white var(--glass-highlight-bottom), transparent);
 }
 
 html.dark .tooltip {
-  background: color-mix(in oklch, var(--surface) 55%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 55%, transparent);
 }
 
 /*
