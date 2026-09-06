@@ -8,7 +8,7 @@
       build/icons/icon.ico  —— Windows（≤64px 用 BMP 条目，128/256 内嵌 PNG）
 
 设计规范（Apple HIG Big Sur 网格）：1024 画布、824×824 圆角方板、圆角 185、
-底板用 UI 深色主题同源色（oklch hue 265 暗蓝灰渐变），螃蟹约 72% 板宽居中。
+底板用 UI 浅色主题同源暖白渐变（oklch hue 34，用户偏好白系），螃蟹约 72% 板宽居中。
 Windows 版底板放大到 900 减小透明边距，避免任务栏小尺寸下显得过小。
 
 仅依赖 Python 标准库 + macOS 自带 sips / iconutil。logo 更新后重跑本脚本即可。
@@ -50,10 +50,10 @@ def oklch(l, c, h):
         return 12.92 * u if u <= 0.0031308 else 1.055 * u ** (1 / 2.4) - 0.055
     return tuple(round(gamma(v) * 255) for v in (r, g, bb))
 
-BG_TOP = oklch(0.285, 0.028, 265)    # 底板渐变亮端（左上）
-BG_BOT = oklch(0.150, 0.020, 265)    # 底板渐变暗端（右下）
-EDGE   = oklch(0.620, 0.020, 265)    # 底板描边（半透明）
-GLOW   = oklch(0.740, 0.150, 48)     # 中心氛围光（品牌橙，极低强度）
+BG_TOP = oklch(0.995, 0.0040, 34)    # 底板渐变亮端（左上）：近纯白暖白
+BG_BOT = oklch(0.935, 0.0100, 34)    # 底板渐变暗端（右下）：浅暖灰（UI 浅色主题同源）
+EDGE   = oklch(0.780, 0.0120, 34)    # 底板描边：浅暖灰，白底 Dock 上勾出轮廓
+GLOW   = oklch(0.850, 0.0900, 48)    # 中心氛围光：暖调，极低强度
 
 
 # ── PNG 编解码（标准库实现，只支持 8bit RGBA 非隔行）──────────────────
@@ -227,20 +227,20 @@ def compose(crab, v):
             r = BG_TOP[0] + (BG_BOT[0] - BG_TOP[0]) * t
             g = BG_TOP[1] + (BG_BOT[1] - BG_TOP[1]) * t
             b = BG_TOP[2] + (BG_BOT[2] - BG_TOP[2]) * t
-            # 中心氛围光：品牌橙，仅提亮，不抢戏
+            # 中心氛围光：暖调，仅轻微提温，不抢戏
             dist = ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5
             if dist < maxr:
-                k = 0.055 * (1 - dist / maxr)
+                k = 0.04 * (1 - dist / maxr)
                 r += (GLOW[0] - r) * k; g += (GLOW[1] - g) * k; b += (GLOW[2] - b) * k
             # 顶部内侧高光（Apple 质感）
             hl = max(0.0, 1.0 - (y - (cy - half)) / (tile * 0.28))
             if hl > 0:
                 k = 0.10 * hl
                 r += (255 - r) * k; g += (255 - g) * k; b += (255 - b) * k
-            # 半透明描边：贴边 2px
+            # 半透明描边：贴边 2px（浅色板在白底 Dock 上要靠描边勾轮廓）
             cov = 1.0 if d <= -0.5 else 0.5 - d
             if d > -2.0:
-                k = 0.38 * cov
+                k = 0.55 * cov
                 r += (EDGE[0] - r) * k; g += (EDGE[1] - g) * k; b += (EDGE[2] - b) * k
             o = (y * CANVAS + x) * 4
             canvas[o], canvas[o + 1], canvas[o + 2] = round(r), round(g), round(b)
@@ -257,7 +257,7 @@ def compose(crab, v):
     for y in range(CANVAS):
         ys = min(small - 1, max(0, (y - dy) // 4))
         for x in range(CANVAS):
-            sh = sa[ys * small + min(small - 1, x // 4)] * 0.32
+            sh = sa[ys * small + min(small - 1, x // 4)] * 0.36
             if sh <= 0:
                 continue
             o = (y * CANVAS + x) * 4
