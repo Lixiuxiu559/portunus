@@ -14,12 +14,12 @@ const fs = require('fs');
 const http = require('http');
 const appConfig = require('./app-config');
 
+const isPackaged = app.isPackaged;
 // 端口按模式错开：开发模式走外部 go run 后端（3060），
 // 打包正式版的内置后端用 13060——两者同时跑（边开发边用正式版）不抢端口。
 const SERVER_PORT_DEV = 3060;
 const SERVER_PORT_PROD = 13060;
 const SERVER_PORT = isPackaged ? SERVER_PORT_PROD : SERVER_PORT_DEV;
-const isPackaged = app.isPackaged;
 
 let child = null;
 
