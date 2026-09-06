@@ -99,11 +99,18 @@ const (
 )
 
 // relayErrorKindByStatus 把非 2xx 的上游状态码映射为错误类别：429 限流、
-// 5xx 上游 / 网关故障、其余 4xx 按请求问题归类。
+// 401/403 渠道鉴权问题、404 目标不存在、5xx 上游 / 网关故障、其余 4xx 按请求
+// 问题归类。渠道 key 过期（401）被呈现为 authentication_error 而非
+// invalid_request_error——后者语义是「请求格式错、勿重试」，会把用户与运维
+// 的排障方向引向客户端 payload 而非换 key。
 func relayErrorKindByStatus(status int) relayErrorKind {
 	switch {
 	case status == http.StatusTooManyRequests:
 		return relayErrRateLimit
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return relayErrAuth
+	case status == http.StatusNotFound:
+		return relayErrNotFound
 	case status >= 500:
 		return relayErrAPI
 	default:
