@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Typography, Button, Card, Spinner, Input, TextField, Modal, toast } from '@heroui/react';
 import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
@@ -10,7 +10,7 @@ const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
 const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 export default function Settings() {
-  const { checking, available, downloaded, version, progress, error, check, download, install, isMac } =
+  const { checking, available, downloaded, latestVersion, progress, error, check, download, install, isMac } =
     useUpdater();
 
   const [syncInterval, setSyncIntervalState] = useState('');
@@ -66,6 +66,16 @@ export default function Settings() {
     window.api?.getAppVersion?.().then((v) => setAppVersion(v ?? '')).catch(() => {});
     window.api?.getNetworkMode?.().then((m) => setNetworkModeState(m ?? 'local')).catch(() => {});
   }, []);
+
+  // 进入设置页时主动检查一次更新：启动时的静默检查发生在后台，
+  // 其结果事件（available/not-available）只有本页挂载期间才能被订阅到，
+  // 用户从别的页切进来必然已错过，不补查就永远看不到最新版本信息。
+  const didAutoCheck = useRef(false);
+  useEffect(() => {
+    if (didAutoCheck.current || !window.api?.checkForUpdate) return;
+    didAutoCheck.current = true;
+    check();
+  }, [check]);
 
   const handleCopyKey = async (key) => {
     try {
@@ -398,13 +408,16 @@ export default function Settings() {
                   <ExternalLink className="size-3.5 text-accent" />
                 </a>
                 <Tag className="size-4 ml-2" />
-                <Typography className="text-sm text-muted">{appVersion || '—'}</Typography>
+                <Typography className="text-sm text-muted">当前 v{appVersion || '—'}</Typography>
+                {latestVersion && (
+                  <Typography
+                    className={`text-sm ${available ? 'text-accent' : 'text-muted'}`}
+                  >
+                    · 最新 v{latestVersion}
+                    {available ? '（可更新）' : '（已是最新）'}
+                  </Typography>
+                )}
               </div>
-              {available && version && (
-                <Typography type="body-sm" className="text-accent mt-1">
-                  新版本 {version} 可用
-                </Typography>
-              )}
               {error && (
                 <Typography type="body-sm" className="text-danger mt-1">
                   更新出错: {error}

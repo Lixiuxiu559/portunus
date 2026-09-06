@@ -11,7 +11,8 @@ export function useUpdater() {
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
-  const [version, setVersion] = useState(null);
+  // 远端最新版本号：available（有新版）、not-available（已是最新）、downloaded 时都会带出
+  const [latestVersion, setLatestVersion] = useState(null);
   const [progress, setProgress] = useState({ percent: 0, bytesPerSecond: 0 });
   const [error, setError] = useState(null);
 
@@ -26,12 +27,13 @@ export function useUpdater() {
     window.api.onUpdateEvent('update:available', (info) => {
       setChecking(false);
       setAvailable(true);
-      setVersion(info.version);
+      setLatestVersion(info.version);
     });
 
-    window.api.onUpdateEvent('update:not-available', () => {
+    window.api.onUpdateEvent('update:not-available', (info) => {
       setChecking(false);
       setAvailable(false);
+      setLatestVersion(info?.version ?? null);
     });
 
     window.api.onUpdateEvent('update:download-progress', (p) => {
@@ -40,7 +42,7 @@ export function useUpdater() {
 
     window.api.onUpdateEvent('update:downloaded', (info) => {
       setDownloaded(true);
-      setVersion(info.version);
+      setLatestVersion(info.version);
     });
 
     window.api.onUpdateEvent('update:error', (msg) => {
@@ -53,5 +55,5 @@ export function useUpdater() {
   const download = useCallback(() => window.api?.downloadUpdate?.().catch(() => {}), []);
   const install = useCallback(() => window.api?.installUpdate?.().catch(() => {}), []);
 
-  return { checking, available, downloaded, version, progress, error, check, download, install, isMac };
+  return { checking, available, downloaded, latestVersion, progress, error, check, download, install, isMac };
 }
