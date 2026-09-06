@@ -143,7 +143,7 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 				Success:   false,
 				Stream:    meta.Stream,
 				RequestID: requestID,
-				ErrKind:   errKindCircuitOpen,
+				ErrKind:   shared.ErrKindCircuitOpen,
 				ErrMsg:    truncateErr(detail, 256),
 			})
 			// Retry-After 取各开路目标剩余冷却的最小值：最早冷却结束的那个即值得重试，

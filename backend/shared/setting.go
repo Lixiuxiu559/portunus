@@ -23,9 +23,10 @@ func (c Currency) Valid() bool {
 type SettingKey string
 
 const (
-	SettingKeyCurrency     SettingKey = "currency"      // 费用计价货币
-	SettingKeySyncInterval SettingKey = "sync_interval" // 自动同步间隔（分钟，0 = 关闭）
-	SettingKeyLastSyncAt   SettingKey = "last_sync_at"  // 上次同步时间（Unix 秒，0 = 从未）
+	SettingKeyCurrency         SettingKey = "currency"           // 费用计价货币
+	SettingKeySyncInterval     SettingKey = "sync_interval"      // 自动同步间隔（分钟，0 = 关闭）
+	SettingKeyLastSyncAt       SettingKey = "last_sync_at"       // 上次同步时间（Unix 秒，0 = 从未）
+	SettingKeyLogRetentionDays SettingKey = "log_retention_days" // 调用日志保留天数（0 = 不自动清理）
 )
 
 // Setting 是全局设置项，key-value 存储。
@@ -40,6 +41,7 @@ func DefaultSettings() []Setting {
 		{Key: SettingKeyCurrency, Value: string(CurrencyUSD)},
 		{Key: SettingKeySyncInterval, Value: "360"},
 		{Key: SettingKeyLastSyncAt, Value: "0"},
+		{Key: SettingKeyLogRetentionDays, Value: "30"},
 	}
 }
 
@@ -125,6 +127,33 @@ func GetLastSyncAt() int64 {
 // SetLastSyncAt 记录上次同步时间。
 func SetLastSyncAt(t time.Time) error {
 	return saveSetting(SettingKeyLastSyncAt, strconv.FormatInt(t.Unix(), 10))
+}
+
+// LogRetentionDaysDefault 是调用日志保留天数的默认值。
+const LogRetentionDaysDefault = 30
+
+// GetLogRetentionDays 返回日志保留天数；未初始化或解析失败回退默认值。
+func GetLogRetentionDays() int {
+	if DB == nil {
+		return LogRetentionDaysDefault
+	}
+	var s Setting
+	if err := DB.First(&s, SettingKeyLogRetentionDays).Error; err != nil {
+		return LogRetentionDaysDefault
+	}
+	n, err := strconv.Atoi(s.Value)
+	if err != nil || n < 0 {
+		return LogRetentionDaysDefault
+	}
+	return n
+}
+
+// SetLogRetentionDays 更新日志保留天数；0 表示禁用自动清理，负数不合法。
+func SetLogRetentionDays(days int) error {
+	if days < 0 {
+		return &StatusError{Status: 400, Message: "日志保留天数不能为负"}
+	}
+	return saveSetting(SettingKeyLogRetentionDays, strconv.Itoa(days))
 }
 
 // saveSetting 以 key 为主键 upsert 一条设置。

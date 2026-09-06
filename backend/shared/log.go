@@ -2,9 +2,10 @@ package shared
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
+
+// 本文件是调用日志的实体与失败归因词表（写入方 gateway 经 Deps.LogWrite 注入，
+// 读方是管理端 api/log.go 的查询路由）。查询 / 统计 / 清理在 log_query.go。
 
 // Log 记录一次对外 LLM 调用的完整信息，供日志查询与费用统计。
 type Log struct {
@@ -15,8 +16,8 @@ type Log struct {
 	ModelName       string    `gorm:"index" json:"model_name"`
 	Status          int       `json:"status"` // 上游返回的 HTTP 状态码
 	Success         bool      `gorm:"index" json:"success"`
-	Stream          bool      `gorm:"index" json:"stream"`                                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
-	RequestID       string    `gorm:"size:32;index" json:"request_id,omitempty"`                 // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
+	Stream          bool      `gorm:"index" json:"stream"`                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
+	RequestID       string    `gorm:"size:32;index" json:"request_id,omitempty"` // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
 	InputToken      int64     `json:"input_token"`
 	OutputToken     int64     `json:"output_token"`
 	CacheReadToken  int64     `json:"cache_read_token"`
@@ -24,135 +25,21 @@ type Log struct {
 	Cost            float64   `json:"cost"`
 	DurationMs      int64     `json:"duration_ms"`
 	FirstTokenMs    int64     `json:"first_token_ms"`     // 流式首包耗时（客户端 TTFT），非流式为 0
-	ErrKind         string    `json:"err_kind,omitempty"` // 失败类别（见 gateway.failSpec 的失败处置词表），成功为空；无查询路径暂不建索引
+	ErrKind         string    `json:"err_kind,omitempty"` // 失败类别（取值见下方 ErrKind 词表；判定归 gateway.failSpec 的失败处置），成功为空；无查询路径暂不建索引
 	ErrMsg          string    `json:"err_msg,omitempty"`  // 失败原文（截断），成功为空
 	CreatedAt       time.Time `gorm:"index" json:"created_at"`
 }
 
-// LogFilter 是日志查询的筛选条件，零值字段不参与过滤。
-type LogFilter struct {
-	APIKeyID  int64
-	ChannelID int64
-	GroupName string
-	ModelName string
-	Success   *bool
-	StartTime *time.Time
-	EndTime   *time.Time
-	Page      int
-	PageSize  int
-}
+// ── 失败归因词表（Log.ErrKind 取值），前端与排障按此过滤 ──────────────────
+// 只持有取值；错误 → 类别的判定归 gateway.failSpec（失败处置模块，唯一权威）。
 
-// LogStats 是日志汇总统计。
-type LogStats struct {
-	TotalCost      float64 `json:"total_cost"`
-	InputTokens    int64   `json:"input_tokens"`
-	OutputTokens   int64   `json:"output_tokens"`
-	TotalRequests  int64   `json:"total_requests"`
-	RecentRequests int64   `json:"recent_requests"` // 近 60 秒请求数
-}
-
-// ListLogs 按筛选条件分页查询日志，返回日志与总数。
-func ListLogs(f LogFilter) ([]Log, int64, error) {
-	page, size := normalizePage(f.Page, f.PageSize)
-
-	var total int64
-	if err := applyLogFilter(LogDB.Model(&Log{}), f).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var logs []Log
-	err := applyLogFilter(LogDB.Model(&Log{}), f).
-		Order("id desc").
-		Offset((page - 1) * size).
-		Limit(size).
-		Find(&logs).Error
-	return logs, total, err
-}
-
-// LogStatsBy 按筛选条件返回汇总统计（忽略分页）。
-func LogStatsBy(f LogFilter) (LogStats, error) {
-	var s LogStats
-	err := applyLogFilter(LogDB.Model(&Log{}), f).
-		Select("COALESCE(SUM(cost),0) AS total_cost, COALESCE(SUM(input_token),0) AS input_tokens, COALESCE(SUM(output_token),0) AS output_tokens, COUNT(*) AS total_requests").
-		Scan(&s).Error
-	if err != nil {
-		return s, err
-	}
-
-	err = applyLogFilter(LogDB.Model(&Log{}), f).
-		Where("created_at >= ?", time.Now().Add(-time.Minute)).
-		Count(&s.RecentRequests).Error
-	return s, err
-}
-
-// applyLogFilter 应用筛选条件（不含分页）。
-func applyLogFilter(db *gorm.DB, f LogFilter) *gorm.DB {
-	if f.APIKeyID > 0 {
-		db = db.Where("api_key_id = ?", f.APIKeyID)
-	}
-	if f.ChannelID > 0 {
-		db = db.Where("channel_id = ?", f.ChannelID)
-	}
-	if f.GroupName != "" {
-		db = db.Where("group_name = ?", f.GroupName)
-	}
-	if f.ModelName != "" {
-		db = db.Where("model_name = ?", f.ModelName)
-	}
-	if f.Success != nil {
-		db = db.Where("success = ?", *f.Success)
-	}
-	if f.StartTime != nil {
-		db = db.Where("created_at >= ?", *f.StartTime)
-	}
-	if f.EndTime != nil {
-		db = db.Where("created_at <= ?", *f.EndTime)
-	}
-	return db
-}
-
-// normalizePage 归一化分页参数。
-func normalizePage(page, size int) (int, int) {
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 {
-		size = 20
-	}
-	if size > 100 {
-		size = 100
-	}
-	return page, size
-}
-
-// DeleteOldLogs 分批删除 created_at 早于 target 的日志，避免一次性删除锁住大表。
-// limit 为每批删除条数，返回删除总数。
-// GORM 的 Delete 会忽略 Limit，故先分页查出待删 id，再按 id 删除。
-func DeleteOldLogs(target time.Time, limit int) (int64, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	var total int64
-	for {
-		var ids []int64
-		if err := LogDB.Model(&Log{}).
-			Where("created_at < ?", target).
-			Order("id").
-			Limit(limit).
-			Pluck("id", &ids).Error; err != nil {
-			return total, err
-		}
-		if len(ids) == 0 {
-			break
-		}
-		res := LogDB.Where("id IN ?", ids).Delete(&Log{})
-		if res.Error != nil {
-			return total, res.Error
-		}
-		total += res.RowsAffected
-		if int64(len(ids)) < int64(limit) {
-			break
-		}
-	}
-	return total, nil
-}
+const (
+	ErrKindClientCancel    = "client_cancel"      // 客户端主动断开（Esc / 关窗口）
+	ErrKindUpstream        = "upstream_error"     // 上游返回非 2xx
+	ErrKindWatchdog        = "watchdog_timeout"   // 上游流静默超时被看门狗掐断
+	ErrKindStreamInterrupt = "stream_interrupted" // 流已提交后中途断掉，无法 failover
+	ErrKindConvert         = "convert_error"      // 协议转换 / 请求改写失败
+	ErrKindNetwork         = "network"            // 连接 / 超时等网络层失败
+	ErrKindInternal        = "internal"           // 其余未归类失败
+	ErrKindCircuitOpen     = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
+)

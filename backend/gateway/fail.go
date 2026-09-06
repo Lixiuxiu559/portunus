@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // 本文件是失败处置的唯一权威（领域词条见 CONTEXT.md「失败处置」）：
@@ -67,19 +69,6 @@ type upstreamHeaderTimeoutError struct {
 func (e *upstreamHeaderTimeoutError) Error() string {
 	return fmt.Sprintf("上游 %ds 未返回响应头", e.seconds)
 }
-
-// ── 失败归因词表（shared.Log.ErrKind 取值），前端与排障按此过滤 ────────────
-
-const (
-	errKindClientCancel    = "client_cancel"      // 客户端主动断开（Esc / 关窗口）
-	errKindUpstream        = "upstream_error"     // 上游返回非 2xx
-	errKindWatchdog        = "watchdog_timeout"   // 上游流静默超时被看门狗掐断
-	errKindStreamInterrupt = "stream_interrupted" // 流已提交后中途断掉，无法 failover
-	errKindConvert         = "convert_error"      // 协议转换 / 请求改写失败
-	errKindNetwork         = "network"            // 连接 / 超时等网络层失败
-	errKindInternal        = "internal"           // 其余未归类失败
-	errKindCircuitOpen     = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
-)
 
 // ── 客户端错误类别（协议无关语义；协议形状渲染在 relay_error.go）────────────
 
@@ -149,9 +138,9 @@ func failSpec(err error) failDecision {
 	// 流已提交：无法 failover，一律不可重试。
 	var committed *streamCommittedError
 	if errors.As(err, &committed) {
-		d := failDecision{ErrKind: errKindStreamInterrupt, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+		d := failDecision{ErrKind: shared.ErrKindStreamInterrupt, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
 		if errors.Is(err, context.Canceled) {
-			d.ErrKind = errKindClientCancel // 包装的用户取消仍归用户行为
+			d.ErrKind = shared.ErrKindClientCancel // 包装的用户取消仍归用户行为
 		} else {
 			// 半途失败仍是模型不健康（假流 / 静默超时 / 断连），普通阈值计入熔断，
 			// 否则持续假死的模型永远开不了路。
@@ -163,7 +152,7 @@ func failSpec(err error) failDecision {
 	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
 	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度。
 	if errors.Is(err, context.Canceled) {
-		return failDecision{ErrKind: errKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+		return failDecision{ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
 	}
 	// 等头假死：连响应头都不吐的目标在一个超时窗口内自愈概率极低，
 	// 同目标重试只会再等满一轮超时——换下一家 + 熔断快速开路 + 504。
@@ -172,7 +161,7 @@ func failSpec(err error) failDecision {
 	if errors.As(err, &hte) {
 		return failDecision{
 			Retryable: true, StallNoHeader: true, BreakerFail: true,
-			ErrKind:   errKindNetwork, // Transport 层网络失败
+			ErrKind:   shared.ErrKindNetwork, // Transport 层网络失败
 			Status:    http.StatusGatewayTimeout,
 			RelayKind: relayErrAPI,
 		}
@@ -182,7 +171,7 @@ func failSpec(err error) failDecision {
 	if errors.As(err, &stall) {
 		return failDecision{
 			Retryable: true, StallMidStream: true, BreakerFail: true,
-			ErrKind:   errKindWatchdog,
+			ErrKind:   shared.ErrKindWatchdog,
 			Status:    http.StatusGatewayTimeout,
 			RelayKind: relayErrAPI,
 		}
@@ -193,7 +182,7 @@ func failSpec(err error) failDecision {
 		retryable := se.status >= 500 || se.status == 429
 		return failDecision{
 			Retryable: retryable, BreakerFail: retryable,
-			ErrKind:    errKindUpstream,
+			ErrKind:    shared.ErrKindUpstream,
 			Status:     se.status,
 			RelayKind:  relayErrorKindByStatus(se.status),
 			RetryAfter: se.retryAfter,
@@ -202,7 +191,7 @@ func failSpec(err error) failDecision {
 	// 协议转换 / 请求改写失败：客户端请求体或渠道配置问题，重试无意义。
 	var convErr *convertError
 	if errors.As(err, &convErr) {
-		return failDecision{ErrKind: errKindConvert, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+		return failDecision{ErrKind: shared.ErrKindConvert, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
 	}
 	// 网络层失败（dial 失败 / 连接重置 / 非流式总超时的 *url.Error 包装）。
 	var ne net.Error
@@ -213,11 +202,11 @@ func failSpec(err error) failDecision {
 			// net.Error——按网络归因，但状态码提为 504 与上游明确拒绝区分。
 			status = http.StatusGatewayTimeout
 		}
-		return failDecision{Retryable: true, BreakerFail: true, ErrKind: errKindNetwork, Status: status, RelayKind: relayErrAPI}
+		return failDecision{Retryable: true, BreakerFail: true, ErrKind: shared.ErrKindNetwork, Status: status, RelayKind: relayErrAPI}
 	}
 	// 裸 DeadlineExceeded 不会走到独立分支：context.DeadlineExceeded 自带
 	// Timeout/Temporary 方法，本就满足 net.Error，由上方网络分支覆盖。
-	return failDecision{ErrKind: errKindInternal, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+	return failDecision{ErrKind: shared.ErrKindInternal, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
 }
 
 // ── 旧判定名薄委托：语义唯一实现在 failSpec ─────────────────────────────────

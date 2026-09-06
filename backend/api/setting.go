@@ -16,14 +16,16 @@ func registerSettingRoutes(r *gin.RouterGroup) {
 	g.GET("", getSettings)
 	g.PUT("/currency", setCurrency)
 	g.PUT("/sync-interval", setSyncInterval)
+	g.PUT("/log-retention-days", setLogRetentionDays)
 	g.POST("/sync-now", syncAllChannels)
 }
 
 func getSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"currency":      shared.GetCurrency(),
-		"sync_interval": shared.GetSyncInterval(),
-		"last_sync_at":  shared.GetLastSyncAt(),
+		"currency":           shared.GetCurrency(),
+		"sync_interval":      shared.GetSyncInterval(),
+		"last_sync_at":       shared.GetLastSyncAt(),
+		"log_retention_days": shared.GetLogRetentionDays(),
 	})
 }
 
@@ -55,6 +57,22 @@ func setSyncInterval(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"sync_interval": shared.GetSyncInterval()})
+}
+
+// setLogRetentionDays 更新日志保留天数（0 = 禁用自动清理）。
+func setLogRetentionDays(c *gin.Context) {
+	var req struct {
+		LogRetentionDays *int `json:"log_retention_days" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
+		return
+	}
+	if err := shared.SetLogRetentionDays(*req.LogRetentionDays); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"log_retention_days": shared.GetLogRetentionDays()})
 }
 
 // syncAllChannels 立即同步所有开启自动同步的渠道。
