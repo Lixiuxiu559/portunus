@@ -351,7 +351,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
   const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
   const status = dirty
     ? { color: 'warning', label: '有未保存改动' }
-    : /3061|portunus/i.test(curBase)
+    : /306[01]|13060|portunus/i.test(curBase)
       ? { color: 'success', label: '已指向 Portunus' }
       : { color: 'default', label: '未指向 Portunus' };
 
@@ -530,7 +530,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
 export default function Clients() {
   const [client, setClient] = useState('claude');
-  const serverUrl = window.api?.getServerUrl?.() || 'http://localhost:3061';
+  const serverUrl = window.api?.getServerUrl?.() || 'http://localhost:13060';
 
   const panels = [
     {

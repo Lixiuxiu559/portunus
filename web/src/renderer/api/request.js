@@ -3,8 +3,8 @@ import { toast } from '@heroui/react';
 
 /**
  * 全局 axios 实例
- * - 开发模式：baseURL /api（Vite 代理到后端 localhost:3061）
- * - 生产模式：baseURL http://localhost:3061/api（直连 Go sidecar）
+ * - 开发模式：baseURL /api（Vite 代理到后端 localhost:3060）
+ * - 生产模式：baseURL http://localhost:13060/api（直连 Go sidecar）
  * - timeout: 30s
  *
  * 后端响应约定（管理 API，Gin）：
@@ -13,7 +13,7 @@ import { toast } from '@heroui/react';
  */
 const isProd = typeof window !== 'undefined' && window.location.protocol === 'file:';
 // 生产模式：从 preload 读取配置的后端地址；开发模式：用 Vite proxy
-const serverUrl = isProd ? (window.api?.getServerUrl?.() || 'http://localhost:3061') : '';
+const serverUrl = isProd ? (window.api?.getServerUrl?.() || 'http://localhost:13060') : '';
 const BASE_URL = isProd ? `${serverUrl}/api` : '/api';
 
 const request = axios.create({

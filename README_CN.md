@@ -72,11 +72,11 @@ GOPROXY=https://goproxy.cn,direct go mod tidy   # 网络直连超时可用国内
 go run .
 ```
 
-服务默认监听 `0.0.0.0:3061`，数据库为 SQLite（落 `data/` 目录）。首次运行会自动生成 `config.json`，所有配置项均可通过 `PORTUNUS_*` 环境变量覆盖（如 `PORTUNUS_SERVER_PORT`、`PORTUNUS_DATABASE_PATH`）。
+服务默认监听 `0.0.0.0:3060`，数据库为 SQLite（落 `data/` 目录）。首次运行会自动生成 `config.json`，所有配置项均可通过 `PORTUNUS_*` 环境变量覆盖（如 `PORTUNUS_SERVER_PORT`、`PORTUNUS_DATABASE_PATH`）。
 
 ### 本地开发（管理后台）
 
-管理后台位于 `web/`（Electron + React + Vite）。开发时需先启动后端，Vite 会把 `/api`、`/v1` 代理到后端 `localhost:3061`。
+管理后台位于 `web/`（Electron + React + Vite）。开发时需先启动后端，Vite 会把 `/api`、`/v1` 代理到后端 `localhost:3060`。
 
 **环境要求:** Node.js 20+ 与 pnpm
 
@@ -90,6 +90,10 @@ pnpm run dev        # 或 Electron 桌面窗口（自动等待后端就绪）
 ```
 
 后端测试：`go test ./...`。
+
+## 👥 贡献者
+
+- **liuchang**
 
 ## 📖 更多文档
 

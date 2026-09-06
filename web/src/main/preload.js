@@ -1,7 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// 后端固定本机（sidecar 打包或外部后端都在 127.0.0.1:3061）
-const SERVER_URL = 'http://localhost:3061';
+// 后端固定本机；端口按模式区分：开发 3060（外部 go run），打包正式版 13060（sidecar）
+const isDevEnv = process.env.NODE_ENV === 'development';
+const SERVER_URL = isDevEnv ? 'http://localhost:3060' : 'http://localhost:13060';
 
 contextBridge.exposeInMainWorld('api', {
   // ─── 应用信息 ───

@@ -72,11 +72,11 @@ GOPROXY=https://goproxy.cn,direct go mod tidy
 go run .
 ```
 
-The server listens on `0.0.0.0:3061` by default, with a SQLite database under `data/`. A `config.json` is auto-generated on first run; every option can be overridden via `PORTUNUS_*` environment variables (e.g. `PORTUNUS_SERVER_PORT`, `PORTUNUS_DATABASE_PATH`).
+The server listens on `0.0.0.0:3060` by default, with a SQLite database under `data/`. A `config.json` is auto-generated on first run; every option can be overridden via `PORTUNUS_*` environment variables (e.g. `PORTUNUS_SERVER_PORT`, `PORTUNUS_DATABASE_PATH`).
 
 ### Development (Management UI)
 
-The management UI lives in `web/` (Electron + React + Vite). Start the backend first; the dev server proxies `/api` and `/v1` to the backend at `localhost:3061`.
+The management UI lives in `web/` (Electron + React + Vite). Start the backend first; the dev server proxies `/api` and `/v1` to the backend at `localhost:3060`.
 
 **Requirements:** Node.js 20+ and pnpm
 
@@ -90,6 +90,10 @@ pnpm run dev        # or an Electron desktop window (waits for the backend autom
 ```
 
 Backend tests: `go test ./...`.
+
+## 👥 Contributors
+
+- **liuchang**
 
 ## 📖 More Docs
 

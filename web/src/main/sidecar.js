@@ -3,7 +3,7 @@
 // 打包模式（app.isPackaged）：
 //   Go 后端二进制随安装包分发在 extraResources 的 bin/ 下，由本模块 spawn 拉起，
 //   通过 PORTUNUS_* 环境变量把「数据库落 userData」「监听地址按 networkMode」
-//   「端口 3061」注入，避免后端读 CWD 下的相对路径（打包后 CWD 不可控）。
+//   「端口 13060」注入，避免后端读 CWD 下的相对路径（打包后 CWD 不可控）。
 //
 // 开发模式：后端由开发者用 go run / go build 单独启动，这里只轮询等它就绪。
 
@@ -14,7 +14,11 @@ const fs = require('fs');
 const http = require('http');
 const appConfig = require('./app-config');
 
-const SERVER_PORT = 3061;
+// 端口按模式错开：开发模式走外部 go run 后端（3060），
+// 打包正式版的内置后端用 13060——两者同时跑（边开发边用正式版）不抢端口。
+const SERVER_PORT_DEV = 3060;
+const SERVER_PORT_PROD = 13060;
+const SERVER_PORT = isPackaged ? SERVER_PORT_PROD : SERVER_PORT_DEV;
 const isPackaged = app.isPackaged;
 
 let child = null;
@@ -76,7 +80,7 @@ function spawnBackend() {
 
   const env = {
     ...process.env,
-    // 监听范围随用户设置；端口固定 3061（渲染层与外部客户端工具都按它连）
+    // 监听范围随用户设置；端口按模式固定（开发 3060 / 打包 13060），渲染层与外部客户端工具都按它连
     PORTUNUS_SERVER_HOST: hostFor(appConfig.getNetworkMode()),
     PORTUNUS_SERVER_PORT: String(SERVER_PORT),
     // 数据库落 userData（升级时 app 目录会被整体替换，userData 不会丢）
