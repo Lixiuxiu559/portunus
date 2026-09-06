@@ -81,9 +81,22 @@ jobs:
         with:
           path: artifacts
 
+      - name: 收集发版资产
+        run: |
+          # 只上传发版必需资产：dist-electron 里混着 Electron 运行时杂散文件
+          # （locale.pak 等），全量上传会撞 GitHub secondary rate limit；
+          # 且 win/mac 两个 artifact 有同名小文件，互相覆盖触发 race condition 重试。
+          # 排除 *unpacked*（win-unpacked/Portunus.exe 是几百 MB 的解包本体，不发）。
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o \
+            -name "*.blockmap" -o -name "latest.yml" -o -name "latest-mac.yml" \) \
+            -not -path "*unpacked*" -exec cp {} release-assets/ \;
+          ls -la release-assets
+
       - name: 创建 draft release 并上传产物
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           generate_release_notes: true
-          files: artifacts/**/*
+          files: release-assets/*
