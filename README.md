@@ -91,10 +91,6 @@ pnpm run dev        # or an Electron desktop window (waits for the backend autom
 
 Backend tests: `go test ./...`.
 
-## 👥 Contributors
-
-- **liuchang**
-
 ## 📖 More Docs
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture, core concepts & design decisions

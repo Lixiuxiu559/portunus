@@ -91,10 +91,6 @@ pnpm run dev        # 或 Electron 桌面窗口（自动等待后端就绪）
 
 后端测试：`go test ./...`。
 
-## 👥 贡献者
-
-- **liuchang**
-
 ## 📖 更多文档
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — 架构、核心概念与设计决策
