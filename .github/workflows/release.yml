@@ -98,8 +98,9 @@ jobs:
             -name "*.blockmap" -o -name "latest.yml" -o -name "latest-mac.yml" -o -name "latest-linux.yml" \) \
             -not -path "*unpacked*" -exec cp {} release-assets/ \;
           # 固定文件名副本：README 的免绕安装命令依赖 latest/download/<固定名> 永远指向最新版
+          # 注意：electron-builder 的 ${arch} 在 linux 平台输出 x86_64（win/mac 才是 x64/arm64）
           cp release-assets/Portunus-*-mac-arm64.zip release-assets/Portunus-mac-arm64.zip
-          cp release-assets/Portunus-*-linux-x64.AppImage release-assets/Portunus-linux-x64.AppImage
+          cp release-assets/Portunus-*-linux-x86_64.AppImage release-assets/Portunus-linux-x64.AppImage
           ls -la release-assets
 
       - name: 创建 draft release 并上传产物
