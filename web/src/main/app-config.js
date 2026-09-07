@@ -44,4 +44,9 @@ function setNetworkMode(mode) {
   return cfg;
 }
 
-module.exports = { read, getNetworkMode, setNetworkMode };
+/** 注册 config IPC 通道到主进程（仅纯读 get-network-mode；set 因需重启后端编排留 main.js）。 */
+function register(ipcMain) {
+  ipcMain.handle('config:get-network-mode', () => getNetworkMode());
+}
+
+module.exports = { register, read, getNetworkMode, setNetworkMode };

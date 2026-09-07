@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
-const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
+const { forwardEvents, checkForUpdates, register: registerUpdate } = require('./updater');
 const { createBackend } = require('./sidecar');
 const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
@@ -116,16 +116,19 @@ function createWindow() {
   // 更新检查已移到 loadRenderer 的 loadFile 成功后（见彼处注释）
 }
 
-// ─── IPC：应用信息 ───
+// ─── IPC：无编排依赖的家族由各模块 register 收口 ───
+// update:* → updater.register；client-config:* → client-config.register；
+// config:get-network-mode → app-config.register。这些模块 electron-free，
+// register 只注入 ipcMain，注册与实现同模块（locality）。
+registerUpdate(ipcMain);
+clientConfig.register(ipcMain);
+appConfig.register(ipcMain);
+
+// ─── IPC：应用信息（依赖 electron app，留 main.js）───
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('app:platform', () => process.platform);
 
-// ─── IPC：更新操作 ───
-ipcMain.handle('update:check', () => checkForUpdates());
-ipcMain.handle('update:download', () => downloadUpdate());
-ipcMain.handle('update:install', () => quitAndInstall());
-
-// ─── IPC：打开外部链接 ───
+// ─── IPC：打开外部链接（依赖 electron shell，留 main.js）───
 ipcMain.handle('open-external', (_event, url) => {
   // 仅允许 http/https，防止被渲染进程滥用打开任意协议
   if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
@@ -134,9 +137,7 @@ ipcMain.handle('open-external', (_event, url) => {
   return Promise.reject(new Error('不支持的链接'));
 });
 
-// ─── IPC：网络监听范围（后端 sidecar）───
-ipcMain.handle('config:get-network-mode', () => appConfig.getNetworkMode());
-
+// ─── IPC：网络监听范围（编排：落盘 + 重启后端，留 main.js）───
 ipcMain.handle('config:set-network-mode', async (_event, mode) => {
   const normalized = mode === 'lan' ? 'lan' : 'local';
   appConfig.setNetworkMode(normalized);
@@ -147,28 +148,6 @@ ipcMain.handle('config:set-network-mode', async (_event, mode) => {
   }
   return { ok: true, networkMode: normalized, restarted };
 });
-
-// ─── IPC：客户端配置文件读写（Claude Code / Codex）───
-// 统一包成 { ok, data | error }，避免主进程异常直接冒泡到渲染层。
-function wrapClientConfig(fn) {
-  return async (_event, ...args) => {
-    try {
-      return { ok: true, data: await fn(...args) };
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) };
-    }
-  };
-}
-
-ipcMain.handle('client-config:paths', wrapClientConfig(() => clientConfig.getPaths()));
-ipcMain.handle('client-config:read-claude', wrapClientConfig(() => clientConfig.readClaude()));
-ipcMain.handle('client-config:read-codex', wrapClientConfig(() => clientConfig.readCodex()));
-ipcMain.handle('client-config:read-backup-claude', wrapClientConfig(() => clientConfig.readBackupClaude()));
-ipcMain.handle('client-config:read-backup-codex', wrapClientConfig(() => clientConfig.readBackupCodex()));
-ipcMain.handle('client-config:save-claude', wrapClientConfig((t) => clientConfig.saveClaude(t)));
-ipcMain.handle('client-config:save-codex', wrapClientConfig((t) => clientConfig.saveCodex(t)));
-ipcMain.handle('client-config:rollback-claude', wrapClientConfig(() => clientConfig.rollbackClaude()));
-ipcMain.handle('client-config:rollback-codex', wrapClientConfig(() => clientConfig.rollbackCodex()));
 
 app.whenReady().then(() => {
   // 开发模式下把 Dock 图标换成我们的 logo（macOS 专属；app.dock 仅 ready 后可用）

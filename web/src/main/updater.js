@@ -73,4 +73,11 @@ function quitAndInstall() {
   autoUpdater.quitAndInstall();
 }
 
-module.exports = { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall };
+/** 注册 update IPC 通道到主进程。 */
+function register(ipcMain) {
+  ipcMain.handle('update:check', () => checkForUpdates());
+  ipcMain.handle('update:download', () => downloadUpdate());
+  ipcMain.handle('update:install', () => quitAndInstall());
+}
+
+module.exports = { forwardEvents, register, checkForUpdates, downloadUpdate, quitAndInstall };

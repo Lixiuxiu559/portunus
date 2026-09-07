@@ -145,7 +145,32 @@ function rollbackCodex() {
   return rollback(codexPath());
 }
 
+/**
+ * 注册 client-config IPC 通道到主进程（ipcMain 注入，保持本模块 electron-free）。
+ * 统一包成 { ok, data | error }，避免主进程异常直接冒泡到渲染层。
+ */
+function register(ipcMain) {
+  const wrap = (fn) => async (_event, ...args) => {
+    try {
+      return { ok: true, data: await fn(...args) };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  };
+
+  ipcMain.handle('client-config:paths', wrap(() => getPaths()));
+  ipcMain.handle('client-config:read-claude', wrap(() => readClaude()));
+  ipcMain.handle('client-config:read-codex', wrap(() => readCodex()));
+  ipcMain.handle('client-config:read-backup-claude', wrap(() => readBackupClaude()));
+  ipcMain.handle('client-config:read-backup-codex', wrap(() => readBackupCodex()));
+  ipcMain.handle('client-config:save-claude', wrap((t) => saveClaude(t)));
+  ipcMain.handle('client-config:save-codex', wrap((t) => saveCodex(t)));
+  ipcMain.handle('client-config:rollback-claude', wrap(() => rollbackClaude()));
+  ipcMain.handle('client-config:rollback-codex', wrap(() => rollbackCodex()));
+}
+
 module.exports = {
+  register,
   getPaths,
   readClaude,
   readCodex,
