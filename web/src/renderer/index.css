@@ -885,3 +885,14 @@ header .theme-switch {
 .editor-foot .savetime { margin-left: auto; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .editor-foot .unsaved { color: var(--warning); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
 .editor-foot .unsaved .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); }
+
+/* ============================================================
+   主题切换圆形揭示（ThemeToggle 的 View Transition）
+   禁用默认交叉淡入淡出，由 JS 对 ::view-transition-new(root)
+   做 clip-path 圆形扩散；旧主题快照静止在底层
+   ============================================================ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
