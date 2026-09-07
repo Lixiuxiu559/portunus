@@ -197,8 +197,7 @@ export default function Logs() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between mb-4">
-        <Typography type="h2">调用日志</Typography>
+      <div className="flex items-center justify-end mb-4">
         <Button
           variant="secondary"
           size="md"

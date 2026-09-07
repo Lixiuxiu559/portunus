@@ -187,8 +187,6 @@ export default function Settings() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-6">
-      <Typography type="h2">系统设置</Typography>
-
       {/* 渠道同步 */}
       <Card className="gap-4 p-5">
         <Card.Header className="p-0">

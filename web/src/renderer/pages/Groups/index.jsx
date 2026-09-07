@@ -105,8 +105,7 @@ export default function Groups() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <Typography type="h2">分组管理</Typography>
+      <div className="flex items-center justify-end mb-4 shrink-0">
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"

@@ -589,7 +589,6 @@ export default function Clients() {
     return (
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-1 space-y-4">
-          <Typography type="h2">客户端配置</Typography>
           <Card className="gap-4 p-5">
             <Card.Content className="flex items-center gap-2 text-muted">
               <Info className="size-5 shrink-0" />
@@ -607,12 +606,9 @@ export default function Clients() {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="px-1 flex flex-col gap-5">
-          <div>
-            <Typography type="h2">客户端配置</Typography>
-            <Typography type="body" className="text-muted mt-1.5 max-w-[65ch]">
-              把 Portunus 配成 Claude Code / Codex 的上游；下方直接编辑配置文件源码，保存即原子写入，写前自动备份。
-            </Typography>
-          </div>
+          <Typography type="body" className="text-muted max-w-[65ch]">
+            把 Portunus 配成 Claude Code / Codex 的上游；下方直接编辑配置文件源码，保存即原子写入，写前自动备份。
+          </Typography>
 
           <Tabs selectedKey={client} onSelectionChange={setClient} className="w-fit">
             <Tabs.ListContainer>
