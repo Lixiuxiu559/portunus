@@ -65,6 +65,8 @@ git push origin vX.Y.Z
    - **重发时 draft 里有上一轮遗留的杂散资产** → softprops 对已存在的 draft 只追加不清理；重发前先清点资产数量，多余的手动删（`gh api -X DELETE repos/{owner}/{repo}/releases/assets/{id}`，加 sleep 防限流）。
    - **release job 报 403 / resource not accessible** → 仓库 Settings → Actions → General → Workflow permissions 被锁死，需允许写；workflow 内已声明 `contents: write`，个人仓库默认没问题。
    - **构建失败** → `gh run view <run-id> --log-failed` 看哪个平台挂了。常见：`pnpm install --frozen-lockfile` 与 pnpm-lock.yaml 不匹配、Go 编译错误。
+   - **release job 报 `cp: cannot stat 'release-assets/...': No such file or directory`** → 固定名副本通配符与实际产物名不符。electron-builder 的 `${arch}` 各平台输出不一致：win→`x64`、mac→`arm64`、**linux→`x86_64`**——改 `artifactName` 或写通配符时以构建日志里 `building target=... file=...` 的实际产物名为准，别按统一规则想当然（v0.2.1 实测踩过：本地只验 mac，linux 到 CI 才暴露）。
+   - **盯 CI 用 `gh run watch --exit-status | tail` 这类管道会吞失败退出码** → 管道的退出码取自最后一个命令，构建失败也显示"全绿"。watch 直跑不接管道，或输出重定向落文件后再读退出码（v0.2.1 实测踩过）。
    - **mac 报签名错误** → 不应发生（workflow 已设 `CSC_IDENTITY_AUTO_DISCOVERY: false`），发生说明 workflow 被改过。
 3. 修复后重发：删掉远端 tag 重新打（`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`），从阶段 2 闸 1 重新走。CI 支持手动触发（workflow_dispatch）做纯构建演练——不出 release，产物在 Actions 页面下载。
 
@@ -77,8 +79,10 @@ git push origin vX.Y.Z
 | Windows 安装包（`*.exe`，NSIS） | 客户首次安装 + win 自动更新 |
 | `latest.yml` + `*.blockmap` | **Windows 自动更新的必需品**，缺了 win 客户端检测不到更新 |
 | macOS DMG（`*.dmg`） | 客户首次安装 / mac 手动更新 |
-| macOS ZIP（`*.zip`） | 将来 mac 签名后自动更新用 |
+| macOS ZIP（`*.zip`） | 将来 mac 签名后自动更新用；另有固定名副本 `Portunus-mac-arm64.zip` 供 README 免绕命令直装 |
 | `latest-mac.yml` | mac 更新元数据 |
+| Linux AppImage（`*.AppImage`） | Linux 分发；固定名副本 `Portunus-linux-x64.AppImage` 供 README 免绕命令 |
+| `latest-linux.yml` | linux 更新元数据 |
 
 向用户展示清单，建议（尤其首次发版）下载安装包本机实测。用户确认后发布：
 
