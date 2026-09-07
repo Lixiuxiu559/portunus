@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Typography, Chip, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
 import { Plus, Trash2, RotateCw, X, Search, Pencil } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
-import EditModelModal from './EditModelModal';
+import EditModelEditor from './EditModelEditor';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, updateModel, createModel, deleteModel, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
+import ExpandEditor from '../../components/ExpandEditor';
+import { captureCardRect } from '../../utils/expandRect';
 
 // 价格格式化：避免科学计数法（如 1e-7），最多 8 位小数并去掉尾零
 function formatPrice(v) {
@@ -25,6 +27,8 @@ export default function Models() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  // 展开编辑器的起点：点编辑按钮时记录的卡片矩形
+  const [editRect, setEditRect] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   // 首次/查询失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
@@ -240,7 +244,7 @@ export default function Models() {
             {models.map((m) => {
               const channelName = channelMap[m.channel_id] || m.channel_id;
               return (
-              <Card key={m.id} className="gap-4 p-5">
+              <Card key={m.id} data-expand-card className="gap-4 p-5">
                 {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与渠道/分组卡同模式 */}
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   {/* 模型名单行截断：长模型名（无空格 token）不换行，同网格行内价格区对齐 */}
@@ -248,7 +252,13 @@ export default function Models() {
                     {m.name}
                   </Typography>
                   <div className="flex items-center gap-1 shrink-0">
-                    <IconButton label={`编辑模型 ${m.name}`} onClick={() => setEditTarget(m)}>
+                    <IconButton
+                      label={`编辑模型 ${m.name}`}
+                      onClick={(e) => {
+                        setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
+                        setEditTarget(m);
+                      }}
+                    >
                       <Pencil className="size-4" />
                     </IconButton>
                     <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger>
@@ -333,13 +343,35 @@ export default function Models() {
         channels={channels}
         onSubmit={handleCreate}
       />
-      <EditModelModal
-        model={editTarget}
-        channels={channels}
-        isOpen={editTarget !== null}
-        onOpenChange={(open) => { if (!open) setEditTarget(null); }}
-        onSubmit={handleUpdate}
-      />
+      {editTarget && (
+        <ExpandEditor
+          triggerRect={editRect}
+          onExited={() => setEditTarget(null)}
+          width={560}
+          ariaLabel="编辑模型价格"
+          title={
+            <Typography className="font-medium text-lg truncate" title={editTarget.name}>
+              {editTarget.name}
+            </Typography>
+          }
+          status={
+            <Chip variant="soft" size="sm" className="min-w-0 max-w-[60%]">
+              <span className="truncate" title={channelMap[editTarget.channel_id] || editTarget.channel_id}>
+                {channelMap[editTarget.channel_id] || editTarget.channel_id}
+              </span>
+            </Chip>
+          }
+        >
+          {({ requestClose }) => (
+            <EditModelEditor
+              model={editTarget}
+              channelName={channelMap[editTarget.channel_id] || editTarget.channel_id}
+              onClose={requestClose}
+              onSubmit={handleUpdate}
+            />
+          )}
+        </ExpandEditor>
+      )}
       <DeleteModelModal
         model={deleteTarget}
         isOpen={deleteTarget !== null}

@@ -6,8 +6,10 @@ import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck } from 'lu
 import { listGroups, updateGroup, deleteGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ConfirmModal from '../../components/ConfirmModal';
+import ExpandEditor from '../../components/ExpandEditor';
+import { captureCardRect } from '../../utils/expandRect';
 import CreateGroupModal from './CreateGroupModal';
-import EditGroupModal from './EditGroupModal';
+import EditGroupEditor from './EditGroupEditor';
 import DeleteGroupModal from './DeleteGroupModal';
 import AddGroupItemModal from './AddGroupItemModal';
 
@@ -24,6 +26,8 @@ export default function Groups() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  // 展开编辑器的起点：点编辑按钮时记录的卡片矩形
+  const [editRect, setEditRect] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [addItemTarget, setAddItemTarget] = useState(null);
   // 待确认移除的分组项（行内 X 触发确认，防误触丢配置）
@@ -147,7 +151,7 @@ export default function Groups() {
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => (
-            <Card key={g.id} className="gap-4 p-5 h-[24rem]">
+            <Card key={g.id} data-expand-card className="gap-4 p-5 h-[24rem]">
               <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   <Typography className="font-medium text-lg">{g.name}</Typography>
@@ -156,7 +160,13 @@ export default function Groups() {
                   </Chip>
                 </div>
                 <div className="flex items-center gap-1">
-                  <IconButton label={`编辑分组 ${g.name}`} onClick={() => setEditTarget(g)}>
+                  <IconButton
+                    label={`编辑分组 ${g.name}`}
+                    onClick={(e) => {
+                      setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
+                      setEditTarget(g);
+                    }}
+                  >
                     <Pencil className="size-4" />
                   </IconButton>
                   <IconButton label={`删除分组 ${g.name}`} onClick={() => setDeleteTarget(g)} danger>
@@ -293,12 +303,30 @@ export default function Groups() {
         channels={channels}
         models={models}
       />
-      <EditGroupModal
-        group={editTarget}
-        isOpen={editTarget !== null}
-        onOpenChange={(open) => { if (!open) setEditTarget(null); }}
-        onUpdated={() => fetchAll(true)}
-      />
+      {editTarget && (
+        <ExpandEditor
+          triggerRect={editRect}
+          onExited={() => setEditTarget(null)}
+          width={420}
+          ariaLabel="编辑分组"
+          title={
+            <Typography className="font-medium text-lg">{editTarget.name}</Typography>
+          }
+          status={
+            <Chip size="sm" variant="soft">
+              {STRATEGIES.find((s) => s.key === editTarget.strategy)?.label || editTarget.strategy}
+            </Chip>
+          }
+        >
+          {({ requestClose }) => (
+            <EditGroupEditor
+              group={editTarget}
+              onClose={requestClose}
+              onUpdated={() => fetchAll(true)}
+            />
+          )}
+        </ExpandEditor>
+      )}
       <DeleteGroupModal
         group={deleteTarget}
         isOpen={deleteTarget !== null}

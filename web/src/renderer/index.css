@@ -413,11 +413,23 @@ html.dark .tooltip {
 }
 
 /*
- * 弹窗进场柔化：默认 150ms 偏脆，拉长到 220ms 更接近 Apple sheet 的从容感。
- * 只调时长不换曲线，避免和 HeroUI 的 animate-in 体系打架。
+ * 弹窗进场强化：HeroUI 默认只有 fade + 5% 缩放（桌面无上滑），玻璃弹窗上几乎无感知。
+ * 从触发按钮方向展开（origin 由 modalOrigin.js 设置）：0.90→1 放大 + 10px 上浮，
+ * 缓出曲线让减速段足够长、过程可感知（过冲曲线前段太陡，100ms 就到位等于没动）。
+ * 退出更快（150ms），进慢出快不拖沓。只覆盖 --tw-enter-* 变量与时长曲线，不换 keyframes，
+ * 保留 HeroUI 的 motion-reduce:animate-none 降级；带 [data-placement] 是为了压过 placement 变体。
  */
-.modal__dialog[data-entering="true"] {
-  animation-duration: 220ms;
+.modal__container[data-entering="true"],
+.modal__container[data-entering="true"][data-placement] {
+  --tw-enter-scale: 0.9;
+  --tw-enter-translate-y: 10px;
+  animation-duration: 1000ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal__container[data-exiting="true"],
+.modal__backdrop[data-exiting="true"] {
+  animation-duration: 350ms;
 }
 
 /*
@@ -895,4 +907,161 @@ header .theme-switch {
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+/* ============================================================
+   卡片展开编辑器（ExpandEditor）：FLIP 从卡片原位生长成编辑器面板
+   ============================================================
+   面板只动 transform / border-radius / box-shadow（GPU 合成，无布局抖动）；
+   起止阴影用同结构三层列表保证可插值，头部/卡片视觉连续，body 延迟淡入。
+   z-index 40：盖住内容层（z-10），低于 HeroUI Modal（z-50），
+   嵌套的二次确认弹窗（删除模型等）仍能浮在其上。
+   ============================================================ */
+:root {
+  --dur-expand: 380ms;
+  --dur-collapse: 260ms;
+  --ease-expand: cubic-bezier(0.22, 1, 0.36, 1); /* 缓出减速，spring 感 */
+  --ease-collapse: cubic-bezier(0.4, 0, 1, 1);    /* 加速离场，更快不拖沓 */
+  --expand-radius-end: 1rem;
+  --expand-shadow-start:
+    0 2px 8px rgb(0 0 0 / 6%),
+    0 4px 16px rgb(0 0 0 / 4%),
+    0 0 0 0 rgb(0 0 0 / 0);
+}
+
+.expand-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.expand-editor__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--background) 42%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity var(--dur-expand) var(--ease-expand);
+}
+
+.expand-editor.is-open .expand-editor__scrim {
+  opacity: 1;
+}
+
+.expand-editor.is-closing .expand-editor__scrim {
+  opacity: 0;
+  transition-duration: var(--dur-collapse);
+  transition-timing-function: var(--ease-collapse);
+}
+
+html.dark .expand-editor__scrim {
+  background: color-mix(in oklch, black 38%, transparent);
+}
+
+.expand-editor__panel {
+  position: relative;
+  width: min(var(--panel-w, 720px), calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--expand-radius-end);
+  outline: none;
+  /* 玻璃材质（同卡片/弹窗体系）；去掉 inset 高光以保持 box-shadow 层数一致可插值 */
+  background-color: color-mix(in oklch, var(--surface) 82%, transparent);
+  background-image: var(--glass-noise);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--glass-shadow-float);
+  transition:
+    transform var(--dur-expand) var(--ease-expand),
+    border-radius var(--dur-expand) var(--ease-expand),
+    box-shadow var(--dur-expand) var(--ease-expand);
+  will-change: transform, border-radius, box-shadow;
+}
+
+html.dark .expand-editor__panel {
+  background-color: color-mix(in oklch, var(--surface) 80%, transparent);
+}
+
+.expand-editor__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+
+.expand-editor__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.expand-editor__status {
+  flex-shrink: 0;
+}
+
+.expand-editor__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  color: var(--muted);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.expand-editor__close:hover {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.expand-editor__body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 240ms var(--ease-expand),
+    transform 240ms var(--ease-expand);
+  transition-delay: 180ms; /* 面板展开大半后再淡入，避免一上来就是完整表单 */
+}
+
+.expand-editor.is-open .expand-editor__body {
+  opacity: 1;
+  transform: none;
+}
+
+.expand-editor.is-closing .expand-editor__body {
+  opacity: 0;
+  transform: translateY(6px);
+  transition-delay: 0ms;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-collapse);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expand-editor__panel,
+  .expand-editor__scrim,
+  .expand-editor__body {
+    transition: none !important;
+  }
+
+  .expand-editor__body {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+  }
 }

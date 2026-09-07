@@ -3,9 +3,11 @@ import { Button, Typography, Card, Chip, Spinner, toast } from '@heroui/react';
 import { Plus, Trash2, RefreshCw, Pencil, RotateCw } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
-import EditChannelModal from './EditChannelModal';
+import EditChannelEditor from './EditChannelEditor';
 import ProviderIcon from '../../components/ProviderIcon';
 import IconButton from '../../components/IconButton';
+import ExpandEditor from '../../components/ExpandEditor';
+import { captureCardRect } from '../../utils/expandRect';
 import { listChannels, syncChannel } from '../../api';
 
 export default function Channels() {
@@ -15,6 +17,8 @@ export default function Channels() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  // 展开编辑器的起点：点编辑按钮时记录的卡片矩形
+  const [editRect, setEditRect] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
   // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
@@ -93,7 +97,7 @@ export default function Channels() {
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {channels.map((ch) => (
-              <Card key={ch.id} className="gap-4 p-5">
+              <Card key={ch.id} data-expand-card className="gap-4 p-5">
                 {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与分组卡同模式 */}
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
@@ -110,7 +114,13 @@ export default function Channels() {
                     >
                       <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
                     </IconButton>
-                    <IconButton label={`编辑渠道 ${ch.name}`} onClick={() => setEditTarget(ch)}>
+                    <IconButton
+                      label={`编辑渠道 ${ch.name}`}
+                      onClick={(e) => {
+                        setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
+                        setEditTarget(ch);
+                      }}
+                    >
                       <Pencil className="size-4" />
                     </IconButton>
                     <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger>
@@ -152,14 +162,34 @@ export default function Channels() {
         }}
         onDeleted={() => fetchChannels(true)}
       />
-      <EditChannelModal
-        channel={editTarget}
-        isOpen={editTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditTarget(null);
-        }}
-        onUpdated={() => fetchChannels(true)}
-      />
+      {editTarget && (
+        <ExpandEditor
+          triggerRect={editRect}
+          onExited={() => setEditTarget(null)}
+          ariaLabel="编辑渠道"
+          title={
+            <>
+              <ProviderIcon type={editTarget.type} className="size-6 shrink-0" />
+              <Typography className="font-medium text-lg truncate" title={editTarget.name}>
+                {editTarget.name}
+              </Typography>
+            </>
+          }
+          status={
+            <Chip variant="soft" size="sm">
+              {editTarget.type.replace(/_/g, ' ')}
+            </Chip>
+          }
+        >
+          {({ requestClose }) => (
+            <EditChannelEditor
+              channel={editTarget}
+              onClose={requestClose}
+              onUpdated={() => fetchChannels(true)}
+            />
+          )}
+        </ExpandEditor>
+      )}
     </div>
   );
 }
