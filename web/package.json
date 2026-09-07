@@ -29,22 +29,24 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "artifactName": "Portunus-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "icon": "build/icons/icon.ico",
       "target": [
         "nsis",
         "zip"
-      ]
+      ],
+      "artifactName": "Portunus-${version}-windows-${arch}.${ext}"
     },
     "linux": {
       "icon": "build/icons",
       "executableName": "Portunus",
       "target": [
-        "AppImage",
-        "deb"
-      ]
+        "AppImage"
+      ],
+      "artifactName": "Portunus-${version}-linux-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
