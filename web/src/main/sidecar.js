@@ -120,6 +120,14 @@ function restartServer() {
  */
 async function startServer() {
   if (isPackaged) {
+    // 测试钩子（仅测试用，勿在生产环境设置）：延迟拉起后端，放大「窗口先加载、
+    // 后端后就绪」的启动竞态窗口，供 scripts/startup-race-check.mjs 确定性复现。
+    // 默认 0 无行为变化；只作用冷启动，不影响 restartServer。
+    const delayMs = Number(process.env.PORTUNUS_SIDECAR_DELAY_MS || 0);
+    if (delayMs > 0) {
+      console.log(`[sidecar] 测试钩子：延迟 ${delayMs}ms 再启动后端`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     return spawnBackend();
   }
   console.log('[sidecar] 开发模式：等待外部后端就绪...');

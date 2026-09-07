@@ -1,5 +1,8 @@
 import axios from 'axios';
 import { toast } from '@heroui/react';
+import { shouldRetryNetworkError, RETRY_INTERVAL_MS, RETRY_MAX_ATTEMPTS } from './retryPolicy';
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * 全局 axios 实例
@@ -35,7 +38,19 @@ request.interceptors.response.use(
     // 后端无 R 包装，直接返回业务数据
     return response.data;
   },
-  (error) => {
+  async (error) => {
+    // 网络层失败的有限静默重试：兜底启动竞态与网络模式切换（restartServer）的短暂窗口。
+    // 只重试「请求根本没到达后端」的连接类失败（重发无副作用）；超时 / 取消 /
+    // HTTP 4xx/5xx 不重试；超限后走下方统一报错。重试期间不 toast 不 console.error。
+    const config = error?.config;
+    const attempt = (config?.__retryCount ?? 0) + 1;
+    if (config && shouldRetryNetworkError(error, attempt)) {
+      config.__retryCount = attempt;
+      console.warn(`[HTTP Retry] 第 ${attempt}/${RETRY_MAX_ATTEMPTS} 次: ${config.url}`);
+      await sleep(RETRY_INTERVAL_MS);
+      return request(config); // 重走完整拦截器链
+    }
+
     // 网络层 / 业务错误
     const httpStatus = error.response?.status;
     const serverMsg = error.response?.data?.error;

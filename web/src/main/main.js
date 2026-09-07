@@ -31,6 +31,33 @@ process.on('uncaughtException', (err) => {
 
 let mainWindow = null;
 
+// 打包模式下渲染层内容加载的门控：后端就绪（或启动失败降级）后由 whenReady 放行。
+let releaseRenderer = () => {};
+const rendererReady = new Promise((resolve) => {
+  releaseRenderer = resolve;
+});
+
+/**
+ * 加载渲染层内容。dev 走 Vite dev server 并开 DevTools；打包走本地 file 产物。
+ * 打包模式下本函数由 rendererReady 门控触发（见 createWindow / whenReady）。
+ */
+function loadRenderer(win) {
+  if (isDev) {
+    win.loadURL('http://localhost:5173');
+    win.webContents.openDevTools({ mode: 'detach' });
+    return;
+  }
+  // 内容加载完成后再触发更新检查：门控拉长了「页面未加载」的窗口，若仍在
+  // createWindow 时机调用，autoUpdater 事件会发到监听器尚未注册的页面而丢失。
+  // 仅生产模式检查（dev 无 app-update.yml，调了只会报错）。
+  win
+    .loadFile(path.join(__dirname, '../../dist/renderer/index.html'))
+    .then(() => checkForUpdates())
+    .catch(() => {
+      // 静默失败：loadFile 失败或更新检查失败都不阻塞主流程
+    });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -53,10 +80,16 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // 开发模式行为保持不变：立即加载，外部后端起没起都不等
+    loadRenderer(mainWindow);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
+    // 打包模式：窗口壳先显示（保留原设计意图），内容等后端就绪后再加载，
+    // 消除「渲染层先发请求、后端尚未监听」的启动竞态红 toast。
+    // 捕获窗口引用：gate 未放行期间关窗再 activate 重建时，只加载新窗口、跳过已销毁旧窗口。
+    const win = mainWindow;
+    rendererReady.then(() => {
+      if (!win.isDestroyed()) loadRenderer(win);
+    });
   }
 
   // 页面加载完成后探测 preload 桥是否注入成功（诊断 window.api / window.clientConfig）
@@ -70,12 +103,7 @@ function createWindow() {
   // 更新事件转发 dev 下也要注册：否则渲染层点"检查更新"后，
   // checking / error 事件到不了 UI，看起来就是"点了没反应"。
   forwardEvents(mainWindow);
-  // 启动自动更新检查（仅生产模式；dev 无 app-update.yml，调了只会报错）
-  if (!isDev) {
-    checkForUpdates().catch(() => {
-      // 静默失败
-    });
-  }
+  // 更新检查已移到 loadRenderer 的 loadFile 成功后（见彼处注释）
 }
 
 // ─── IPC：应用信息 ───
@@ -141,13 +169,18 @@ app.whenReady().then(() => {
   // 先创建窗口，让用户看到 UI
   createWindow();
 
-  // 后台拉起 Go 后端（打包模式 spawn 子进程；开发模式等外部后端），不阻塞窗口显示
+  // 后台拉起 Go 后端（打包模式 spawn 子进程；开发模式等外部后端），不阻塞窗口显示。
+  // 打包模式：就绪（或失败降级）后才放行渲染层内容加载；失败也必须放行——
+  // 让渲染层照常报错，而不是永久白屏。dev 模式不走门控分支，放行是无害空操作。
   startServer()
     .then(() => {
       console.log('[main] 后端服务已就绪');
     })
     .catch((err) => {
       console.error('[main] 后端服务启动失败:', err.message);
+    })
+    .finally(() => {
+      releaseRenderer();
     });
 });
 
