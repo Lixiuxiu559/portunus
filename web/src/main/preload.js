@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const { addressOf } = require('./server-address');
+const { UPDATE_CHANNEL_NAMES } = require('./update-channels');
 
 // 后端固定本机；端口按模式区分：开发 3060（外部 go run），打包正式版 13060（sidecar）。
 // 地址由 server-address 纯模块唯一产出（url 恒回环 127.0.0.1，与监听 host 解耦）。
@@ -16,17 +17,9 @@ contextBridge.exposeInMainWorld('api', {
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
 
-  // 监听更新事件
+  // 监听更新事件（channel 白名单来自 update-channels 单一来源）
   onUpdateEvent: (channel, callback) => {
-    const validChannels = [
-      'update:checking',
-      'update:available',
-      'update:not-available',
-      'update:download-progress',
-      'update:downloaded',
-      'update:error',
-    ];
-    if (validChannels.includes(channel)) {
+    if (UPDATE_CHANNEL_NAMES.includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => callback(...args));
     }
   },

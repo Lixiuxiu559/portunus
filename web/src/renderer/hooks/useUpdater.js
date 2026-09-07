@@ -49,8 +49,8 @@ export function useUpdater() {
     });
   }, []);
 
-  // 点击必须有反馈：promise 的 rejection 直接落到 error 状态，
-  // 不能只依赖 update:error 事件（事件管道可能没注册，dev 下就是黑洞）。
+  // 点击必须有反馈：invoke promise 的 rejection 是可靠错误通道，
+  // 与 update:error 事件互补（后者依赖 forwardEvents 事件管道）。
   const check = useCallback(
     () =>
       window.api?.checkForUpdate?.().catch((err) => {

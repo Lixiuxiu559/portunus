@@ -1,5 +1,6 @@
 const { autoUpdater } = require('electron-updater');
 const { BrowserWindow } = require('electron');
+const { UPDATE_CHANNELS } = require('./update-channels');
 
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -17,34 +18,32 @@ autoUpdater.autoInstallOnAppQuit = true;
 //   2) 把 latest.yml + 安装包放到国内可达的静态地址，把该地址根喂给 MIRROR_FEED_URL。
 const MIRROR_FEED_URL = process.env.PORTUNUS_UPDATE_MIRROR || '';
 
+let currentWindow = null;
+let forwarded = false;
+
 /**
- * 将更新事件转发到渲染进程
+ * 将更新事件转发到渲染进程。
+ * 幂等：监听器只注册一次（首次调用），后续调用仅更新目标窗口引用——
+ * 避免 mac 关窗重建（activate → createWindow）时累积指向已销毁窗口的监听器。
  * @param {BrowserWindow} win
  */
 function forwardEvents(win) {
-  autoUpdater.on('checking-for-update', () => {
-    win.webContents.send('update:checking');
-  });
+  currentWindow = win;
+  if (forwarded) return;
+  forwarded = true;
 
-  autoUpdater.on('update-available', (info) => {
-    win.webContents.send('update:available', info);
-  });
+  const send = (channel, ...args) => {
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      currentWindow.webContents.send(channel, ...args);
+    }
+  };
 
-  autoUpdater.on('update-not-available', (info) => {
-    win.webContents.send('update:not-available', info);
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    win.webContents.send('update:download-progress', progress);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    win.webContents.send('update:downloaded', info);
-  });
-
-  autoUpdater.on('error', (err) => {
-    win.webContents.send('update:error', err.message);
-  });
+  autoUpdater.on('checking-for-update', () => send(UPDATE_CHANNELS.checking));
+  autoUpdater.on('update-available', (info) => send(UPDATE_CHANNELS.available, info));
+  autoUpdater.on('update-not-available', (info) => send(UPDATE_CHANNELS.notAvailable, info));
+  autoUpdater.on('download-progress', (progress) => send(UPDATE_CHANNELS.downloadProgress, progress));
+  autoUpdater.on('update-downloaded', (info) => send(UPDATE_CHANNELS.downloaded, info));
+  autoUpdater.on('error', (err) => send(UPDATE_CHANNELS.error, err.message));
 }
 
 /**
