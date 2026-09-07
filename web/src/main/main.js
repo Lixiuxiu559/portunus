@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
 const { forwardEvents, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater');
-const { startServer, stopServer, restartServer } = require('./sidecar');
+const { createBackend } = require('./sidecar');
+const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
 const clientConfig = require('./client-config');
 
@@ -31,15 +32,23 @@ process.on('uncaughtException', (err) => {
 
 let mainWindow = null;
 
-// 打包模式下渲染层内容加载的门控：后端就绪（或启动失败降级）后由 whenReady 放行。
-let releaseRenderer = () => {};
-const rendererReady = new Promise((resolve) => {
-  releaseRenderer = resolve;
+// 后端守护（sidecar）单例：生命周期状态机。环境（二进制路径 / 数据库目录 / 端口 /
+// 监听 host）在 main 进程组装；sidecar 模块本身 electron-free（见 sidecar.js）。
+const backend = createBackend({
+  binPath: app.isPackaged
+    ? path.join(process.resourcesPath, 'bin', process.platform === 'win32' ? 'portunus.exe' : 'portunus')
+    : null,
+  dataDir: path.join(app.getPath('userData'), 'data'),
+  port: addressOf({ isPackaged: app.isPackaged }).port,
+  // 监听 host 随 networkMode 变，spawn 时现算（restart 后重读）
+  host: () => hostFor(appConfig.getNetworkMode()),
+  // 冷启动延迟：供 e2e 脚本（scripts/startup-race-check.mjs）注入放大启动竞态窗口
+  delayMs: Number(process.env.PORTUNUS_SIDECAR_DELAY_MS || 0),
 });
 
 /**
  * 加载渲染层内容。dev 走 Vite dev server 并开 DevTools；打包走本地 file 产物。
- * 打包模式下本函数由 rendererReady 门控触发（见 createWindow / whenReady）。
+ * 打包模式下本函数由 backend.ready 门控触发（见 createWindow）。
  */
 function loadRenderer(win) {
   if (isDev) {
@@ -83,11 +92,12 @@ function createWindow() {
     // 开发模式行为保持不变：立即加载，外部后端起没起都不等
     loadRenderer(mainWindow);
   } else {
-    // 打包模式：窗口壳先显示（保留原设计意图），内容等后端就绪后再加载，
-    // 消除「渲染层先发请求、后端尚未监听」的启动竞态红 toast。
+    // 打包模式：窗口壳先显示（保留原设计意图），内容等后端就绪（或失败降级）后再加载，
+    // 消除「渲染层先发请求、后端尚未监听」的启动竞态红 toast。ready 恒 settle，
+    // 失败也放行——让渲染层照常报错而非永久白屏。
     // 捕获窗口引用：gate 未放行期间关窗再 activate 重建时，只加载新窗口、跳过已销毁旧窗口。
     const win = mainWindow;
-    rendererReady.then(() => {
+    backend.ready.then(() => {
       if (!win.isDestroyed()) loadRenderer(win);
     });
   }
@@ -133,7 +143,7 @@ ipcMain.handle('config:set-network-mode', async (_event, mode) => {
   // 打包模式：监听范围变了要重启后端子进程才生效；开发模式后端是外部的，仅落盘。
   const restarted = app.isPackaged;
   if (restarted) {
-    await restartServer();
+    await backend.restart();
   }
   return { ok: true, networkMode: normalized, restarted };
 });
@@ -170,18 +180,16 @@ app.whenReady().then(() => {
   createWindow();
 
   // 后台拉起 Go 后端（打包模式 spawn 子进程；开发模式等外部后端），不阻塞窗口显示。
-  // 打包模式：就绪（或失败降级）后才放行渲染层内容加载；失败也必须放行——
-  // 让渲染层照常报错，而不是永久白屏。dev 模式不走门控分支，放行是无害空操作。
-  startServer()
-    .then(() => {
+  // 打包模式：ready settle（就绪或失败降级）后才放行渲染层内容加载；失败也必须放行——
+  // 让渲染层照常报错，而不是永久白屏。dev 模式不走门控分支。
+  backend.start();
+  backend.ready.then(() => {
+    if (backend.state === 'ready') {
       console.log('[main] 后端服务已就绪');
-    })
-    .catch((err) => {
-      console.error('[main] 后端服务启动失败:', err.message);
-    })
-    .finally(() => {
-      releaseRenderer();
-    });
+    } else {
+      console.error('[main] 后端服务启动失败:', backend.error);
+    }
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -189,7 +197,7 @@ app.on('window-all-closed', () => {
   // 后端是 gateway，终端里的 Claude Code 可能仍在调用，不能因关窗断连。
   // 真正退出走 Cmd+Q / Dock 右键退出，before-quit 会停后端。
   if (process.platform !== 'darwin') {
-    stopServer();
+    backend.stop();
     app.quit();
   }
 });
@@ -201,5 +209,5 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  stopServer();
+  backend.stop();
 });

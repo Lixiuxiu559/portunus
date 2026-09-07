@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { addressOf } = require('./server-address');
 
-// 后端固定本机；端口按模式区分：开发 3060（外部 go run），打包正式版 13060（sidecar）
-const isDevEnv = process.env.NODE_ENV === 'development';
-const SERVER_URL = isDevEnv ? 'http://localhost:3060' : 'http://localhost:13060';
+// 后端固定本机；端口按模式区分：开发 3060（外部 go run），打包正式版 13060（sidecar）。
+// 地址由 server-address 纯模块唯一产出（url 恒回环 127.0.0.1，与监听 host 解耦）。
+const SERVER_URL = addressOf({ isPackaged: process.env.NODE_ENV !== 'development' }).url;
 
 contextBridge.exposeInMainWorld('api', {
   // ─── 应用信息 ───

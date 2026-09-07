@@ -2,7 +2,7 @@
  * 网络层失败重试的纯决策逻辑（不依赖 axios / HeroUI，便于 node:test 表驱动单测）。
  *
  * 背景：打包版启动时后端 sidecar 由主进程异步拉起（已由 main.js 门控缓解，这里是
- * 兜底），网络模式切换 restartServer 也有 ~300ms + 子进程启动的无服务窗口。
+ * 兜底），网络模式切换会重启后端（sidecar restart），也有端口释放 + 子进程启动的无服务窗口。
  * 浏览器 XHR 连接失败时 axios 抛 AxiosError(message='Network Error', code='ERR_NETWORK')，
  * 无 error.response。这类失败做有限次静默重试，超限才走 request.js 的 toast 报错。
  */

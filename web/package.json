@@ -64,7 +64,7 @@
     "build:mac": "pnpm run build:go && pnpm run build:renderer && electron-builder --mac dmg zip --arm64",
     "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis zip --x64",
     "start": "electron .",
-    "test": "node --test \"src/renderer/**/*.test.js\"",
+    "test": "node --test \"src/**/*.test.js\"",
     "test:e2e": "node scripts/startup-race-check.mjs"
   },
   "dependencies": {

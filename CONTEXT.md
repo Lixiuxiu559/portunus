@@ -18,5 +18,7 @@ Portunus 的领域语言，给架构审视与后续设计提供命名。Go 类�
 | 失败处置 failDecision | `gateway.failSpec` | 一次上游尝试失败的统一判定：错误值 → 处置决定（是否重试 / 两档假死 / 熔断喂法 / 归因 errKind / 客户端状态码与错误类别）。失败语义唯一权威，收敛于 `gateway/fail.go` 一张查表；重试循环、熔断 defer、状态码裁决、日志归因都读它。 |
 | API Key | `shared.APIKey` | 对外 /v1 接口的鉴权凭据，也用于日志/费用归属。 |
 | 调用日志 Log | `shared.Log` | 一次调用的记录（分组/渠道/模型/状态/token/费用/耗时）。实体与失败归因词表（ErrKind 取值）归 shared；错误→类别的判定归 gateway.failSpec；写入经 gateway Deps.LogWrite 注入；查询/统计/清理在 shared（log_query.go，管理端消费），保留期由 cron 每小时自动清理（log_retention_days 可配，0=禁用）。 |
+| 后端守护 sidecar | `web/src/main/sidecar.js` | Electron 主进程内、生命周期受控的 Go 后端。状态机 starting → ready → failed → stopped，`ready` 恒 settle（失败也 resolve、绝不 reject，失败经 `state='failed'` + `error` 表达）。electron-free：环境（binPath/dataDir/port/host）经 `createBackend(deps)` 注入，spawn/ping/portFree 三个 adapter 生产走内置默认、测试覆盖。 |
+| 服务地址 server-address | `web/src/main/server-address.js` | 后端地址唯一来源（纯模块）：{host 监听, port, url 内部回环, baseURL}。host 随 networkMode（lan→0.0.0.0 / local→127.0.0.1），url 恒 127.0.0.1 与 host 解耦；port 按模式固定（开发 3060 / 打包 13060）。 |
 
 依赖方向：`api` / `gateway` / `cron` → `router` / `channel` / `model` / `group` / `protocol` → `shared`。

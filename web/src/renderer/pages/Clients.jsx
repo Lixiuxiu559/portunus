@@ -530,7 +530,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
 export default function Clients() {
   const [client, setClient] = useState('claude');
-  const serverUrl = window.api?.getServerUrl?.() || 'http://localhost:13060';
+  const serverUrl = window.api?.getServerUrl?.();
 
   const panels = [
     {

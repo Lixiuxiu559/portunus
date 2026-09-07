@@ -6,8 +6,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * 全局 axios 实例
- * - 开发模式：baseURL /api（Vite 代理到后端 localhost:3060）
- * - 生产模式：baseURL http://localhost:13060/api（直连 Go sidecar）
+ * - 开发模式：baseURL /api（Vite 代理到后端 3060）
+ * - 生产模式：baseURL {serverUrl}/api（直连 Go sidecar，地址经 preload 从 server-address 取）
  * - timeout: 30s
  *
  * 后端响应约定（管理 API，Gin）：
@@ -16,7 +16,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 const isProd = typeof window !== 'undefined' && window.location.protocol === 'file:';
 // 生产模式：从 preload 读取配置的后端地址；开发模式：用 Vite proxy
-const serverUrl = isProd ? (window.api?.getServerUrl?.() || 'http://localhost:13060') : '';
+const serverUrl = isProd ? window.api?.getServerUrl?.() : '';
 const BASE_URL = isProd ? `${serverUrl}/api` : '/api';
 
 const request = axios.create({
@@ -39,7 +39,7 @@ request.interceptors.response.use(
     return response.data;
   },
   async (error) => {
-    // 网络层失败的有限静默重试：兜底启动竞态与网络模式切换（restartServer）的短暂窗口。
+    // 网络层失败的有限静默重试：兜底启动竞态与网络模式切换（后端重启）的短暂窗口。
     // 只重试「请求根本没到达后端」的连接类失败（重发无副作用）；超时 / 取消 /
     // HTTP 4xx/5xx 不重试；超限后走下方统一报错。重试期间不 toast 不 console.error。
     const config = error?.config;
