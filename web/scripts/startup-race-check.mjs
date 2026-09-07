@@ -21,6 +21,7 @@ import { existsSync, mkdtempSync, renameSync, readdirSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import serverAddress from '../src/main/server-address.js';
 
 // ─── 参数 ───
 const argv = process.argv.slice(2);
@@ -33,7 +34,9 @@ const delayMs = Number(argOf('--delay-ms', '3000'));
 const windowMs = Number(argOf('--window-ms', '12000'));
 const mode = argOf('--mode', 'normal'); // normal | degraded
 const CDP_PORT = 9333;
-const BACKEND_PORT = 13060;
+// 后端端口单一来源：与 server-address.js 的 PROD_PORT 对齐（e2e 只针对打包版 13060）。
+const BACKEND_PORT = serverAddress.PROD_PORT;
+const BACKEND_API_RE = new RegExp(`:${BACKEND_PORT}/api`);
 
 const webRoot = path.resolve(import.meta.dirname, '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -144,11 +147,11 @@ function onCdpMessage(raw) {
   }
   if (method === 'Network.responseReceived') {
     const url = params.response?.url || '';
-    if (/:13060\/api/.test(url) && params.response.status < 400) stats.apiOk++;
+    if (BACKEND_API_RE.test(url) && params.response.status < 400) stats.apiOk++;
   }
   if (method === 'Network.loadingFailed') {
     const url = urlByRequestId.get(`${sessionId}:${params.requestId}`) || '';
-    if (/:13060\/api/.test(url)) stats.apiFail++;
+    if (BACKEND_API_RE.test(url)) stats.apiFail++;
   }
 }
 
