@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
 import { Plus, X, RefreshCw } from 'lucide-react';
-import { createChannel, previewModels } from '../../api';
+import { createChannel, previewModels, syncChannel } from '../../api';
 
 // 协议类型与后端 protocol.Provider 保持一致
 const providerOptions = [
@@ -74,17 +74,23 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
     if (!formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
-      await createChannel({
+      const ch = await createChannel({
         name: form.name.trim(),
         type: form.type,
         base_url: form.base_url.trim(),
         key: form.key.trim(),
         auto_sync: form.auto_sync,
       });
+      // 创建成功即自动同步一次模型，省去手动点同步；同步失败不影响渠道已建的事实
+      try {
+        const res = await syncChannel(ch.id);
+        toast.success(`渠道已创建，同步到 ${res.added ?? 0} 个模型`);
+      } catch (syncErr) {
+        toast.warning(`渠道已创建，但模型同步失败：${syncErr.message || '未知原因'}，可点渠道卡片上的同步按钮重试`);
+      }
       setForm(emptyForm);
       onOpenChange(false);
       onCreated?.();
-      toast.success('渠道创建成功');
     } catch (e) {
       toast.danger(e.message || '创建失败');
     } finally {
