@@ -197,18 +197,6 @@ export default function Logs() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-end mb-4">
-        <Button
-          variant="secondary"
-          size="md"
-          aria-label="刷新日志"
-          onPress={() => fetchLogs(true)}
-          isPending={refreshing}
-        >
-          <RotateCw className="size-4" />
-        </Button>
-      </div>
-
       {/* 统计卡片 */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
@@ -327,6 +315,18 @@ export default function Logs() {
           }}
         >
           <Search className="size-4" /> 查询
+        </Button>
+
+        {/* 全局刷新靠右：与筛选同行，不再独占一行 */}
+        <Button
+          size="md"
+          variant="secondary"
+          aria-label="刷新日志"
+          onPress={() => fetchLogs(true)}
+          isPending={refreshing}
+          className="ml-auto"
+        >
+          <RotateCw className="size-4" />
         </Button>
       </div>
 

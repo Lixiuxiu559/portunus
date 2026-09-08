@@ -139,26 +139,8 @@ export default function Models() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-end mb-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="md"
-            onPress={() => performSearch(queryChannel, queryName, page)}
-            isPending={loading || refreshing}
-            aria-label="刷新模型列表"
-          >
-            <RotateCw className="size-4" />
-          </Button>
-          <Button variant="primary" size="md" onPress={() => setShowCreate(true)}>
-            <Plus className="size-4" />
-            新增模型
-          </Button>
-        </div>
-      </div>
-
-      {/* 筛选区：名称 + 渠道，点击查询按钮后按条件请求后端 */}
-      <div className="model-filters flex items-center gap-2 mb-3 shrink-0">
+      {/* 筛选区：名称 + 渠道，点击查询按钮后按条件请求后端；全局动作（刷新/新增）靠右同行 */}
+      <div className="model-filters flex flex-wrap items-center gap-2 mb-3 shrink-0">
         <TextField
           size="sm"
           value={draftName}
@@ -209,10 +191,27 @@ export default function Models() {
             </ListBox>
           </Select.Popover>
         </Select>
-        <Button variant="primary" size="sm" onPress={handleSearch} isPending={loading || refreshing}>
+        <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}>
           <Search className="size-4" />
           查询
         </Button>
+
+        {/* 全局动作靠右：刷新 + 新增同行；新增模型是页面唯一主 CTA，查询降为 secondary */}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onPress={() => performSearch(queryChannel, queryName, page)}
+            isPending={loading || refreshing}
+            aria-label="刷新模型列表"
+          >
+            <RotateCw className="size-4" />
+          </Button>
+          <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}>
+            <Plus className="size-4" />
+            新增模型
+          </Button>
+        </div>
       </div>
 
       {loading ? (
