@@ -7,7 +7,7 @@ description: Portunus 发版流程：升版本号、打 tag、触发 GitHub Acti
 
 把仓库当前代码做成 Windows + macOS 安装包并发布。核心链路：
 
-**前置检查 → 定版本号 → push + tag（闸 1）→ 盯 CI → draft 验收（闸 2）→ publish**
+**前置检查 → 定版本号 → push + tag（闸 1）→ 盯 CI → 更新说明 + draft 验收（闸 2）→ publish**
 
 ## 硬约束（违反会造成线上更新异常）
 
@@ -70,7 +70,29 @@ git push origin vX.Y.Z
    - **mac 报签名错误** → 不应发生（workflow 已设 `CSC_IDENTITY_AUTO_DISCOVERY: false`），发生说明 workflow 被改过。
 3. 修复后重发：删掉远端 tag 重新打（`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`），从阶段 2 闸 1 重新走。CI 支持手动触发（workflow_dispatch）做纯构建演练——不出 release，产物在 Actions 页面下载。
 
-## 阶段 4：draft 验收【确认闸 2】
+## 阶段 4：更新说明 + draft 验收【确认闸 2】
+
+### 4.1 整理本次更新说明，写入 draft
+
+Release 页面要让客户一眼看懂"这版更新了什么"，不能只发一个空壳 tag。
+
+1. 确定提交范围（本地此时已打好本次 tag）：
+
+   ```bash
+   git tag --sort=-creatordate | head -2   # 第 1 个是本次 vX.Y.Z，第 2 个是上一个 tag
+   git log <上一个tag>..vX.Y.Z --oneline --no-merges
+   ```
+
+2. 整理成**面向客户的中文更新说明**：commit message 是写给开发者的（`fix(web): xxx`），照抄上去客户看不懂——要转述成人话，按 **新功能 / 问题修复 / 体验优化** 分组；`chore(release)` 版本号提交不列。结合会话上下文（这一版做了什么）归纳，比逐条机械翻译提交更好。
+3. 写入 draft（用 `--notes-file`，避免 shell 转义问题）：
+
+   ```bash
+   gh release edit vX.Y.Z --notes-file /tmp/portunus-release-notes-vX.Y.Z.md
+   ```
+
+   提示：可在阶段 3 盯 CI 等待期间先把说明草稿整理好，CI 一完成即可写入。
+
+### 4.2 验收 draft
 
 `gh release view vX.Y.Z --json isDraft,assets` 核对产物齐全。预期资产（文件名以实际输出为准，关键看**类别**全不全）：
 
@@ -84,7 +106,7 @@ git push origin vX.Y.Z
 | Linux AppImage（`*.AppImage`） | Linux 分发；固定名副本 `Portunus-linux-x64.AppImage` 供 README 免绕命令 |
 | `latest-linux.yml` | linux 更新元数据 |
 
-向用户展示清单，建议（尤其首次发版）下载安装包本机实测。用户确认后发布：
+向用户展示**更新说明全文 + 资产清单**，说明文字有不妥当场改。建议（尤其首次发版）下载安装包本机实测。用户确认后发布：
 
 ```bash
 gh release edit vX.Y.Z --draft=false
