@@ -268,10 +268,9 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
   // 请求模型下拉 + 1M 勾选（各槽位共用）；无 1M 的槽位用等宽隐形占位保持对齐
   const renderModelControls = (slot, m) => {
-    const opts = [
-      ...modelOptions,
-      ...(m.base && !modelOptions.some((o) => o.id === m.base) ? [{ id: m.base, label: m.base }] : []),
-    ];
+    // 选项只有"不映射 + 分组"。当前映射值不在分组里（分组已删 / env 手写）时，
+    // 以禁用项展示悬空状态——可见、不可再选，不自动清洗用户手写的配置。
+    const dangling = m.base && !modelOptions.some((o) => o.id === m.base);
     return (
       <div className="mm-model">
         <div className="mm-select-wrap">
@@ -286,7 +285,12 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
             }}
           >
             <option value="">— 不映射 —</option>
-            {opts.map((o) => (
+            {dangling && (
+              <option value={m.base} disabled>
+                {m.base}（分组不存在）
+              </option>
+            )}
+            {modelOptions.map((o) => (
               <option key={o.id} value={o.id}>{o.label}</option>
             ))}
           </select>
