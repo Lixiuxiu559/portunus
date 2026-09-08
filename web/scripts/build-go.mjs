@@ -21,7 +21,8 @@ const targetArch = argv[1] || (process.arch === 'arm64' ? 'arm64' : 'amd64');
 
 // GOOS / 输出目录键 映射
 const goos = targetOs === 'windows' ? 'windows' : targetOs === 'darwin' ? 'darwin' : 'linux';
-const osKey = goos === 'darwin' ? 'mac' : goos; // electron-builder 用 mac 而非 darwin
+// electron-builder 的 ${os} 宏：darwin→mac、windows→win、linux→linux
+const osKey = goos === 'darwin' ? 'mac' : goos === 'windows' ? 'win' : 'linux';
 const binName = goos === 'windows' ? 'portunus.exe' : 'portunus';
 const outDir = join(webRoot, 'bin', osKey);
 

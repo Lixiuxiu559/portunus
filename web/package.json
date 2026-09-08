@@ -40,6 +40,10 @@
       ],
       "artifactName": "Portunus-${version}-windows-${arch}.${ext}"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "linux": {
       "icon": "build/icons",
       "executableName": "Portunus",
