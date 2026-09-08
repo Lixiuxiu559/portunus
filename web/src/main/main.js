@@ -5,6 +5,7 @@ const { createBackend } = require('./sidecar');
 const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
 const clientConfig = require('./client-config');
+const { createTray } = require('./tray');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -31,6 +32,14 @@ process.on('uncaughtException', (err) => {
 });
 
 let mainWindow = null;
+// 托盘"退出"走 app.quit() 置位；Windows 点 X 期间为 false，close 据此决定隐藏还是放行
+let isQuitting = false;
+
+// 单实例锁：托盘常驻后用户可能再次双击 exe，第二实例必须直接退出并唤醒已有实例弹窗
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
 // 后端守护（sidecar）单例：生命周期状态机。环境（二进制路径 / 数据库目录 / 端口 /
 // 监听 host）在 main 进程组装；sidecar 模块本身 electron-free（见 sidecar.js）。
@@ -114,6 +123,26 @@ function createWindow() {
   // checking / error 事件到不了 UI，看起来就是"点了没反应"。
   forwardEvents(mainWindow);
   // 更新检查已移到 loadRenderer 的 loadFile 成功后（见彼处注释）
+
+  // Windows：点 X 隐藏到托盘而非退出——后端是网关，关窗不能断服；
+  // 真正退出（托盘菜单 / app.quit）时 isQuitting 已置位，走正常关闭。
+  mainWindow.on('close', (e) => {
+    if (process.platform === 'win32' && !isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
+}
+
+/** 显示主窗口（托盘/第二实例唤醒共用）：最小化先还原，销毁则重建。 */
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 // ─── IPC：无编排依赖的家族由各模块 register 收口 ───
@@ -155,6 +184,12 @@ app.whenReady().then(() => {
     app.dock?.setIcon(appIcon);
   }
 
+  // 系统托盘/菜单栏常驻图标（win + mac）：关窗后仍可从托盘恢复窗口或退出。
+  // linux 不建托盘（AppImage 指示器兼容性差），保持关窗即退出的原行为。
+  if (process.platform !== 'linux') {
+    createTray({ showMainWindow, quit: () => app.quit() });
+  }
+
   // 先创建窗口，让用户看到 UI
   createWindow();
 
@@ -174,11 +209,19 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   // macOS：关窗仅收起窗口、app 留在 Dock，后端继续运行——
   // 后端是 gateway，终端里的 Claude Code 可能仍在调用，不能因关窗断连。
-  // 真正退出走 Cmd+Q / Dock 右键退出，before-quit 会停后端。
-  if (process.platform !== 'darwin') {
+  // 真正退出走 Cmd+Q / 托盘菜单 / Dock 右键退出，before-quit 会停后端。
+  // Windows：点 X 已被拦截为隐藏到托盘，不会走到这里；窗口真被销毁时
+  // 也不退出——托盘还活着，可恢复窗口或显式退出。
+  // Linux：无托盘兜底，保持关窗即退出。
+  if (process.platform === 'linux') {
     backend.stop();
     app.quit();
   }
+});
+
+// 第二实例唤醒：已在运行时聚焦/恢复主窗口
+app.on('second-instance', () => {
+  showMainWindow();
 });
 
 app.on('activate', () => {
@@ -188,5 +231,6 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   backend.stop();
 });

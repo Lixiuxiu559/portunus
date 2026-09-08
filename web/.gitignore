@@ -4,3 +4,4 @@ dist-electron/
 bin/
 *.local
 .DS_Store
+__pycache__/
