@@ -348,7 +348,7 @@ html.dark .modal__backdrop {
  * 卡内表格/表单保持自身实色底，玻璃只做外层材质。边缘描边给出玻璃厚度轮廓。
  */
 .card {
-  background-color: color-mix(in oklch, var(--surface) 55%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 80%, transparent);
   background-image: var(--glass-noise);
   backdrop-filter: blur(20px) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
@@ -360,7 +360,7 @@ html.dark .modal__backdrop {
 }
 
 html.dark .card {
-  background-color: color-mix(in oklch, var(--surface) 40%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 72%, transparent);
 }
 
 /*
