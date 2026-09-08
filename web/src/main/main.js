@@ -84,6 +84,10 @@ function createWindow() {
     minHeight: 576,
     resizable: true,
     title: 'Portunus',
+    // win/linux 无系统顶栏，Electron 默认在窗口内渲染应用菜单（File Edit View Window 白条）；
+    // 平时隐藏不占空间，按 Alt 可临时呼出（保留 Ctrl+C/V 等菜单快捷键注册）。
+    // mac 忽略此选项（菜单始终在屏幕顶部系统栏）。
+    autoHideMenuBar: true,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     ...(appIcon ? { icon: appIcon } : {}),
