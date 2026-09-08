@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Tabs, Modal, Button, Typography } from '@heroui/react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import useLiquidNav from '../hooks/useLiquidNav';
 import { getNavBlock } from '../utils/navGuard';
 import logo from '../assets/logo.png';
 
@@ -21,6 +22,9 @@ export default function Layout() {
   const [pendingNav, setPendingNav] = useState(null);
 
   const currentTab = tabs.find((t) => location.pathname.startsWith(t.path))?.id || 'channels';
+
+  // 液态玻璃导航：距离感知拉伸 + 点击涟漪（位置流动由 RAC SharedElement + CSS 完成）
+  const liquid = useLiquidNav(currentTab);
 
   const handleTabChange = (key) => {
     const tab = tabs.find((t) => t.id === key);
@@ -55,7 +59,7 @@ export default function Layout() {
             onSelectionChange={handleTabChange}
           >
             <Tabs.ListContainer>
-              <Tabs.List aria-label="导航" className="flex-nowrap">
+              <Tabs.List aria-label="导航" className="flex-nowrap" ref={liquid.listRef}>
                 {tabs.map((tab) => (
                   <Tabs.Tab id={tab.id} key={tab.id}>
                     {tab.label}

@@ -488,15 +488,15 @@ html.dark .tooltip {
 /*
  * 顶部导航 Tabs 玻璃化（Layout.jsx 中挂 nav-tabs 类的那组）：
  * 外壳为玻璃长椭圆（半透明提亮 + 高光描边 + 柔投影）包住全部按钮，保留容器感；
- * 选中胶囊改白色半透明 + 顶部高光（参照 uiverse 液态玻璃导航的 active 处理）；
- * 选中文字亮色下用加深 accent 保对比度，暗色下维持默认近白。
- * 作用域限定 nav-tabs，不影响设置页等其他 Tabs。
+ * 选中胶囊为液态玻璃（材质见下），选中文字亮色下用加深 accent 保对比度，
+ * 暗色下维持默认近白。作用域限定 nav-tabs，不影响设置页等其他 Tabs。
  */
 .nav-tabs .tabs__list-container {
   background: color-mix(in oklch, white 32%, transparent);
   border: 1px solid color-mix(in oklch, white 45%, transparent);
   border-radius: 99rem;
   box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
+  overflow: hidden; /* 点击涟漪裁剪在胶囊圆角内 */
 }
 
 html.dark .nav-tabs .tabs__list-container {
@@ -504,17 +504,141 @@ html.dark .nav-tabs .tabs__list-container {
   border-color: color-mix(in oklch, white 14%, transparent);
 }
 
+/*
+ * 液态玻璃选中胶囊：
+ * 流动机制——HeroUI 的 Tabs.Indicator 是 RAC SharedElement，切页时旧 indicator
+ * 快照 translate/width/height，新 indicator 从旧值过渡到本 tab 值，动画完全由
+ * 下面的 transition 定义。曲线用液态 spring（快启动、长减速、约 1.5% 微过冲，
+ * 粘性液体感而非弹簧振荡）；拉伸/回弹（scale）与点击涟漪由 useLiquidNav 播放。
+ */
+:root {
+  --nav-liquid-spring: linear(
+    0, 0.062 8.1%, 0.216 16.3%, 0.408 25.2%, 0.612 34.8%, 0.79 44.6%,
+    0.912 54%, 0.977 63.2%, 1.008 72.3%, 1.016 78.8%, 1.015 84.3%,
+    1.008 90.1%, 1 97.4%
+  );
+}
+
 .nav-tabs .tabs__indicator {
-  background: color-mix(in oklch, white 55%, transparent);
+  background-color: color-mix(in oklch, white 52%, transparent);
+  background-image: var(--glass-noise);
+  backdrop-filter: blur(6px) saturate(150%);
+  -webkit-backdrop-filter: blur(6px) saturate(150%);
+  /* 四边内高光（上强下弱 = 受光）+ 悬浮投影 + 半像素发丝描边 */
   box-shadow:
-    inset 0 1px 0 color-mix(in oklch, white 60%, transparent),
-    0 4px 12px rgb(0 0 0 / 8%);
+    inset 0 1px 0 color-mix(in oklch, white 65%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 20%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 25%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 25%, transparent),
+    0 2px 10px rgb(0 0 0 / 12%),
+    0 0 0 0.5px color-mix(in oklch, white 38%, transparent);
+  transition:
+    translate 620ms var(--nav-liquid-spring),
+    width 620ms var(--nav-liquid-spring),
+    height 620ms var(--nav-liquid-spring);
+}
+
+/* 顶部 specular 光带：真实受光玻璃的镜面反射 */
+.nav-tabs .tabs__indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 32%),
+    rgb(255 255 255 / 5%) 46%,
+    transparent 62%
+  );
+  pointer-events: none;
 }
 
 html.dark .nav-tabs .tabs__indicator {
-  background: color-mix(in oklch, white 35%, transparent);
-  /* 顶部高光同步减档，去掉外投影（暗色下几乎不可见） */
-  box-shadow: inset 0 1px 0 color-mix(in oklch, white 22%, transparent);
+  background-color: color-mix(in oklch, white 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 24%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 6%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 10%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 10%, transparent),
+    0 2px 10px rgb(0 0 0 / 30%),
+    0 0 0 0.5px color-mix(in oklch, white 12%, transparent);
+}
+
+html.dark .nav-tabs .tabs__indicator::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 12%),
+    rgb(255 255 255 / 2%) 46%,
+    transparent 62%
+  );
+}
+
+/* 首次出现（无前快照可循）从液滴凝出成胶囊 */
+.nav-tabs .tabs__indicator[data-entering='true'] {
+  animation: nav-liquid-condense 320ms var(--ease-out);
+}
+
+@keyframes nav-liquid-condense {
+  from {
+    opacity: 0;
+    scale: 0.72 0.64;
+  }
+}
+
+/*
+ * 点击液态扩散：从指针落点泛起一圈微光，挂在胶囊容器内被圆角裁剪，
+ * 由 useLiquidNav 生成，动画结束自删。
+ * 亮色用深色暗晕（液体按压的表面张力变形，白光在浅粉玻璃上不可见），
+ * 暗色用白色高光（暗玻璃上白光才是反光语义）。
+ */
+.nav-tabs .nav-liquid-ripple {
+  position: absolute;
+  z-index: 2;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgb(66 32 18 / 14%) 0%,
+    rgb(66 32 18 / 6%) 42%,
+    transparent 68%
+  );
+  animation: nav-liquid-ripple 480ms var(--ease-out) forwards;
+}
+
+html.dark .nav-tabs .nav-liquid-ripple {
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 22%) 0%,
+    rgb(255 255 255 / 8%) 42%,
+    transparent 68%
+  );
+}
+
+@keyframes nav-liquid-ripple {
+  from {
+    transform: scale(0.24);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* 减弱动态：流动/凝出/涟漪全部停用，切换退化为直接落位 */
+@media (prefers-reduced-motion: reduce) {
+  .nav-tabs .tabs__indicator,
+  .nav-tabs .tabs__indicator[data-entering='true'] {
+    transition: none;
+    animation: none;
+  }
+
+  .nav-tabs .nav-liquid-ripple {
+    display: none;
+  }
 }
 
 .nav-tabs .tabs__tab[data-selected="true"] {
