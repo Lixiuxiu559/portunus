@@ -22,9 +22,11 @@ type LogFilter struct {
 	PageSize  int
 }
 
-// LogStats 是日志汇总统计。
+// LogStats 是日志汇总统计。费用按日志快照的货币分桶累计（无汇率换算）；
+// 存量日志与空 currency 记入 USD 桶。
 type LogStats struct {
-	TotalCost      float64 `json:"total_cost"`
+	TotalCostUSD   float64 `json:"total_cost_usd"`
+	TotalCostCNY   float64 `json:"total_cost_cny"`
 	InputTokens    int64   `json:"input_tokens"`
 	OutputTokens   int64   `json:"output_tokens"`
 	TotalRequests  int64   `json:"total_requests"`
@@ -53,7 +55,11 @@ func ListLogs(f LogFilter) ([]Log, int64, error) {
 func LogStatsBy(f LogFilter) (LogStats, error) {
 	var s LogStats
 	err := applyLogFilter(LogDB.Model(&Log{}), f).
-		Select("COALESCE(SUM(cost),0) AS total_cost, COALESCE(SUM(input_token),0) AS input_tokens, COALESCE(SUM(output_token),0) AS output_tokens, COUNT(*) AS total_requests").
+		Select(`COALESCE(SUM(CASE WHEN currency = 'CNY' THEN cost ELSE 0 END),0) AS total_cost_cny,
+			COALESCE(SUM(CASE WHEN currency = 'CNY' THEN 0 ELSE cost END),0) AS total_cost_usd,
+			COALESCE(SUM(input_token),0) AS input_tokens,
+			COALESCE(SUM(output_token),0) AS output_tokens,
+			COUNT(*) AS total_requests`).
 		Scan(&s).Error
 	if err != nil {
 		return s, err

@@ -274,7 +274,9 @@ export default function Models() {
                         {channelName}
                       </span>
                     </Chip>
-                    <span className="shrink-0 text-xs text-muted">USD / 1M tokens</span>
+                    <span className="shrink-0 text-xs text-muted">
+                      {m.currency === 'CNY' ? '¥' : '$'} / 1M tokens
+                    </span>
                   </div>
                   {/* 价格两行制：标签左值右同行，2×2 压成两行；列内值右对齐 + tabular-nums 成数字纵列 */}
                   <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">

@@ -29,7 +29,7 @@ func SyncFromChannel(ch *channel.Channel) (int, error) {
 		if count > 0 {
 			continue
 		}
-		m := Model{ChannelID: ch.ID, Name: name}
+		m := Model{ChannelID: ch.ID, Name: name, Currency: CurrencyUSD}
 		m.ApplyDefaultPrice()
 		if err := shared.DB.Create(&m).Error; err != nil {
 			return added, err

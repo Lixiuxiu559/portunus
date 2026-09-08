@@ -166,8 +166,11 @@ export default function Logs() {
       dataIndex: 'cost',
       key: 'cost',
       width: '100px',
-      render: (val) => (
-        <span className="text-center font-mono block">${Number(val || 0).toFixed(6)}</span>
+      // 前缀按该条日志快照的货币；空 currency（存量）视为 USD
+      render: (val, record) => (
+        <span className="text-center font-mono block">
+          {record?.currency === 'CNY' ? '¥' : '$'}{Number(val || 0).toFixed(6)}
+        </span>
       ),
     },
     {
@@ -197,10 +200,11 @@ export default function Logs() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* 统计卡片 */}
+      {/* 统计卡片：费用按货币分桶累计（无汇率换算，两个口径各自成立） */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-          <StatCard label="总费用" value={`$${Number(stats.total_cost || 0).toFixed(4)}`} />
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
+          <StatCard label="美元费用" value={`$${Number(stats.total_cost_usd || 0).toFixed(4)}`} />
+          <StatCard label="人民币费用" value={`¥${Number(stats.total_cost_cny || 0).toFixed(4)}`} />
           <StatCard label="总请求" value={String(stats.total_requests || 0)} />
           <StatCard label="输入 Token" value={formatNum(stats.input_tokens)} />
           <StatCard label="输出 Token" value={formatNum(stats.output_tokens)} />

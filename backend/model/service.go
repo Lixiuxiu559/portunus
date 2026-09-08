@@ -20,6 +20,7 @@ var ErrChannelNotFound = &shared.StatusError{Status: 400, Message: "渠道不存
 type CreateRequest struct {
 	ChannelID       int64    `json:"channel_id" binding:"required"`
 	Name            string   `json:"name" binding:"required"`
+	Currency        Currency `json:"currency"`          // 计价货币；缺省 USD
 	InputPrice      *float64 `json:"input_price"`       // 不传则用内置默认价
 	OutputPrice     *float64 `json:"output_price"`      // 不传则用内置默认价
 	CacheReadPrice  *float64 `json:"cache_read_price"`  // 不传则用内置默认价
@@ -28,12 +29,13 @@ type CreateRequest struct {
 
 // UpdateRequest 更新模型请求，仅包含需要变更的字段。
 type UpdateRequest struct {
-	ChannelID       *int64   `json:"channel_id"`
-	Name            *string  `json:"name"`
-	InputPrice      *float64 `json:"input_price"`
-	OutputPrice     *float64 `json:"output_price"`
-	CacheReadPrice  *float64 `json:"cache_read_price"`
-	CacheWritePrice *float64 `json:"cache_write_price"`
+	ChannelID       *int64    `json:"channel_id"`
+	Name            *string   `json:"name"`
+	Currency        *Currency `json:"currency"`
+	InputPrice      *float64  `json:"input_price"`
+	OutputPrice     *float64  `json:"output_price"`
+	CacheReadPrice  *float64  `json:"cache_read_price"`
+	CacheWritePrice *float64  `json:"cache_write_price"`
 }
 
 // Response 是模型的对外响应。
@@ -41,6 +43,7 @@ type Response struct {
 	ID              int64     `json:"id"`
 	ChannelID       int64     `json:"channel_id"`
 	Name            string    `json:"name"`
+	Currency        Currency  `json:"currency"`
 	InputPrice      float64   `json:"input_price"`
 	OutputPrice     float64   `json:"output_price"`
 	CacheReadPrice  float64   `json:"cache_read_price"`
@@ -55,6 +58,7 @@ func (m *Model) ToResponse() Response {
 		ID:              m.ID,
 		ChannelID:       m.ChannelID,
 		Name:            m.Name,
+		Currency:        m.Currency,
 		InputPrice:      m.InputPrice,
 		OutputPrice:     m.OutputPrice,
 		CacheReadPrice:  m.CacheReadPrice,
@@ -110,11 +114,19 @@ func Create(req CreateRequest) (*Model, error) {
 	if !ok {
 		return nil, ErrChannelNotFound
 	}
+	currency := CurrencyUSD
+	if req.Currency != "" {
+		if !req.Currency.Valid() {
+			return nil, ErrInvalid
+		}
+		currency = req.Currency
+	}
 
 	def := defaultPrice[req.Name]
 	m := Model{
 		ChannelID:       req.ChannelID,
 		Name:            req.Name,
+		Currency:        currency,
 		InputPrice:      resolvePrice(req.InputPrice, def.Input),
 		OutputPrice:     resolvePrice(req.OutputPrice, def.Output),
 		CacheReadPrice:  resolvePrice(req.CacheReadPrice, def.CacheRead),
@@ -147,6 +159,12 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 			return nil, ErrChannelNotFound
 		}
 		m.ChannelID = *req.ChannelID
+	}
+	if req.Currency != nil {
+		if !req.Currency.Valid() {
+			return nil, ErrInvalid
+		}
+		m.Currency = *req.Currency
 	}
 	if req.InputPrice != nil {
 		m.InputPrice = *req.InputPrice

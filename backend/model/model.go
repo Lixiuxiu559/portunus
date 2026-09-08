@@ -2,21 +2,35 @@ package model
 
 import "time"
 
+// Currency 是模型计价货币：价格与调用费用按此货币记账与统计。
+type Currency string
+
+const (
+	CurrencyUSD Currency = "USD"
+	CurrencyCNY Currency = "CNY"
+)
+
+// Valid 校验货币枚举。
+func (c Currency) Valid() bool {
+	return c == CurrencyUSD || c == CurrencyCNY
+}
+
 // Model 是渠道拉回的一个可用模型，价格是它的属性。
 type Model struct {
 	ID              int64     `gorm:"primaryKey" json:"id"`
 	ChannelID       int64     `gorm:"not null;uniqueIndex:idx_channel_model" json:"channel_id"`
 	Name            string    `gorm:"not null;uniqueIndex:idx_channel_model" json:"name"`
-	InputPrice      float64   `json:"input_price"`       // 输入价（每 1M token）
-	OutputPrice     float64   `json:"output_price"`      // 输出价（每 1M token）
-	CacheReadPrice  float64   `json:"cache_read_price"`  // 缓存输入价（每 1M token）
-	CacheWritePrice float64   `json:"cache_write_price"` // 缓存输出价（每 1M token）
+	Currency        Currency  `gorm:"not null;default:USD" json:"currency"` // 计价货币；存量行由列默认值填 USD
+	InputPrice      float64   `json:"input_price"`                          // 输入价（每 1M token）
+	OutputPrice     float64   `json:"output_price"`                         // 输出价（每 1M token）
+	CacheReadPrice  float64   `json:"cache_read_price"`                     // 缓存输入价（每 1M token）
+	CacheWritePrice float64   `json:"cache_write_price"`                    // 缓存输出价（每 1M token）
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Price 是模型的四维价格，用于内置价格表。
-// 单位：每 1M token；货币由全局设置 currency 决定（USD / CNY）。
+// 单位：每 1M token；货币为模型自身 Currency（内置默认价均为 USD 语义）。
 type Price struct {
 	Input      float64
 	Output     float64

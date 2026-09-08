@@ -14,7 +14,6 @@ import (
 func registerSettingRoutes(r *gin.RouterGroup) {
 	g := r.Group("/settings")
 	g.GET("", getSettings)
-	g.PUT("/currency", setCurrency)
 	g.PUT("/sync-interval", setSyncInterval)
 	g.PUT("/log-retention-days", setLogRetentionDays)
 	g.POST("/sync-now", syncAllChannels)
@@ -22,26 +21,10 @@ func registerSettingRoutes(r *gin.RouterGroup) {
 
 func getSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"currency":           shared.GetCurrency(),
 		"sync_interval":      shared.GetSyncInterval(),
 		"last_sync_at":       shared.GetLastSyncAt(),
 		"log_retention_days": shared.GetLogRetentionDays(),
 	})
-}
-
-func setCurrency(c *gin.Context) {
-	var req struct {
-		Currency shared.Currency `json:"currency" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
-		return
-	}
-	if err := shared.SetCurrency(req.Currency); err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"currency": shared.GetCurrency()})
 }
 
 func setSyncInterval(c *gin.Context) {

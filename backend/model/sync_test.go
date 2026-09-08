@@ -83,6 +83,12 @@ func TestSyncFromChannel(t *testing.T) {
 	if c := byName["some-custom-model"]; c.InputPrice != 0 || c.OutputPrice != 0 {
 		t.Errorf("未匹配模型价格应为 0: %+v", c)
 	}
+	// 同步拉回的模型默认 USD 计价
+	for _, m := range ms {
+		if m.Currency != CurrencyUSD {
+			t.Errorf("同步模型 %s 货币 = %q, want USD", m.Name, m.Currency)
+		}
+	}
 
 	// 重复同步不应重复插入
 	added2, err := SyncFromChannel(&ch)

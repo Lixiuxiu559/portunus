@@ -6,24 +6,10 @@ import (
 	"time"
 )
 
-// Currency 是费用计价的货币单位，仅支持人民币与美元。
-type Currency string
-
-const (
-	CurrencyUSD Currency = "USD" // 美元
-	CurrencyCNY Currency = "CNY" // 人民币
-)
-
-// Valid 校验货币是否受支持。
-func (c Currency) Valid() bool {
-	return c == CurrencyUSD || c == CurrencyCNY
-}
-
 // SettingKey 是全局设置项。
 type SettingKey string
 
 const (
-	SettingKeyCurrency         SettingKey = "currency"           // 费用计价货币
 	SettingKeySyncInterval     SettingKey = "sync_interval"      // 自动同步间隔（分钟，0 = 关闭）
 	SettingKeyLastSyncAt       SettingKey = "last_sync_at"       // 上次同步时间（Unix 秒，0 = 从未）
 	SettingKeyLogRetentionDays SettingKey = "log_retention_days" // 调用日志保留天数（0 = 不自动清理）
@@ -38,7 +24,6 @@ type Setting struct {
 // DefaultSettings 返回全局默认设置。
 func DefaultSettings() []Setting {
 	return []Setting{
-		{Key: SettingKeyCurrency, Value: string(CurrencyUSD)},
 		{Key: SettingKeySyncInterval, Value: "360"},
 		{Key: SettingKeyLastSyncAt, Value: "0"},
 		{Key: SettingKeyLogRetentionDays, Value: "30"},
@@ -59,26 +44,6 @@ func EnsureDefaultSettings() error {
 		}
 	}
 	return nil
-}
-
-// GetCurrency 返回当前货币设置；未初始化或缺失时回退 USD。
-func GetCurrency() Currency {
-	if DB == nil {
-		return CurrencyUSD
-	}
-	var s Setting
-	if err := DB.First(&s, SettingKeyCurrency).Error; err != nil {
-		return CurrencyUSD
-	}
-	return Currency(s.Value)
-}
-
-// SetCurrency 更新货币设置。
-func SetCurrency(c Currency) error {
-	if !c.Valid() {
-		return &StatusError{Status: 400, Message: fmt.Sprintf("不支持的货币: %s", c)}
-	}
-	return saveSetting(SettingKeyCurrency, string(c))
 }
 
 // SyncIntervalDefault 是自动同步间隔的默认值（分钟）。

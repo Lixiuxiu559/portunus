@@ -16,14 +16,15 @@ import (
 // 写入动作由 Deps.LogWrite 注入（生产 LogDB.Create，测试内存收集）。
 func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
 	entry := shared.Log{
-		APIKeyID:     apiKeyID,
-		GroupName:    g.Name,
-		ChannelID:    t.Channel.ID,
-		ModelName:    t.Model.Name,
-		Status:       status,
-		Success:      success,
-		Stream:       stream,
-		RequestID:    requestID,
+		APIKeyID:  apiKeyID,
+		GroupName: g.Name,
+		ChannelID: t.Channel.ID,
+		ModelName: t.Model.Name,
+		Currency:  string(t.Model.Currency), // 费用货币快照：模型此后改价/改币/删除均不影响历史账
+		Status:    status,
+		Success:   success,
+		Stream:    stream,
+		RequestID: requestID,
 		DurationMs:   durationMs,
 		FirstTokenMs: firstTokenMs,
 	}

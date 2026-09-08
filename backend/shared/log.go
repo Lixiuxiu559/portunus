@@ -14,7 +14,8 @@ type Log struct {
 	GroupName       string    `gorm:"index" json:"group_name"`
 	ChannelID       int64     `gorm:"index" json:"channel_id"`
 	ModelName       string    `gorm:"index" json:"model_name"`
-	Status          int       `json:"status"` // 上游返回的 HTTP 状态码
+	Currency        string    `gorm:"size:8" json:"currency"` // 费用货币快照（写入时取自模型；空视为 USD）
+	Status          int       `json:"status"`                 // 上游返回的 HTTP 状态码
 	Success         bool      `gorm:"index" json:"success"`
 	Stream          bool      `gorm:"index" json:"stream"`                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
 	RequestID       string    `gorm:"size:32;index" json:"request_id,omitempty"` // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐

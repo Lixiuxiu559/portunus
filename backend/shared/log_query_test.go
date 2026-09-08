@@ -71,8 +71,11 @@ func TestLogStatsBy(t *testing.T) {
 	if s.InputTokens != 30 || s.OutputTokens != 15 {
 		t.Errorf("token 统计不对: in=%d out=%d", s.InputTokens, s.OutputTokens)
 	}
-	if math.Abs(s.TotalCost-0.3) > 1e-9 {
-		t.Errorf("TotalCost = %f, want 0.3", s.TotalCost)
+	if math.Abs(s.TotalCostUSD-0.3) > 1e-9 {
+		t.Errorf("TotalCostUSD = %f, want 0.3", s.TotalCostUSD)
+	}
+	if s.TotalCostCNY != 0 {
+		t.Errorf("TotalCostCNY = %f, want 0", s.TotalCostCNY)
 	}
 	if s.RecentRequests != 2 {
 		t.Errorf("RecentRequests = %d, want 2", s.RecentRequests)
