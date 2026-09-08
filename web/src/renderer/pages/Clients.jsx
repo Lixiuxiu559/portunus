@@ -530,7 +530,8 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
 export default function Clients() {
   const [client, setClient] = useState('claude');
-  const serverUrl = window.api?.getServerUrl?.();
+  // 纯浏览器开发时 window.api 不存在，兜底空串避免下方 defaultBase 拼 URL 时崩溃
+  const serverUrl = window.api?.getServerUrl?.() ?? '';
 
   const panels = [
     {
