@@ -243,11 +243,11 @@ html.dark .bg-decor .blob {
   --glass-edge: 40%; /* 1px 边缘高光描边强度 */
   --glass-hairline: 8%; /* 边缘外圈暗发丝线强度（内亮外暗双圈 = 玻璃厚度） */
   --glass-shadow:
-    0 8px 32px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 6%); /* 悬浮投影 */
+    0 8px 32px oklch(60% 0.055 34 / 22%), 0 2px 8px oklch(60% 0.055 34 / 12%); /* 悬浮投影（暖色相随背景，避免纯黑影与暖背景割裂） */
   /* 弹窗级悬浮投影：最高悬浮层需要近接触影 + 远环境影分层撑起 elevation */
   --glass-shadow-float:
-    0 24px 64px rgb(0 0 0 / 18%), 0 8px 20px rgb(0 0 0 / 10%),
-    0 2px 6px rgb(0 0 0 / 8%);
+    0 24px 64px oklch(55% 0.06 34 / 26%), 0 8px 20px oklch(55% 0.06 34 / 14%),
+    0 2px 6px oklch(55% 0.06 34 / 10%);
   /* 磨砂颗粒：真实玻璃的微噪声散射，消除大面积纯 blur 平面的"塑料感" */
   --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 }
@@ -258,10 +258,10 @@ html.dark {
   --glass-edge: 10%;
   --glass-hairline: 40%;
   --glass-shadow:
-    0 8px 32px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
+    0 8px 32px oklch(15% 0.03 265 / 55%), 0 2px 8px oklch(15% 0.03 265 / 38%);
   --glass-shadow-float:
-    0 24px 64px rgb(0 0 0 / 55%), 0 8px 20px rgb(0 0 0 / 35%),
-    0 2px 6px rgb(0 0 0 / 25%);
+    0 24px 64px oklch(12% 0.03 265 / 60%), 0 8px 20px oklch(12% 0.03 265 / 40%),
+    0 2px 6px oklch(12% 0.03 265 / 30%);
 }
 
 /*
