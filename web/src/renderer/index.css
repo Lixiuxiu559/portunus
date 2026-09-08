@@ -1250,7 +1250,15 @@ html.dark .expand-editor__panel {
 }
 
 .expand-editor__status {
-  flex-shrink: 0;
+  /* 渠道徽章：允许收缩 + 上限 55%，超长时 chip 内部走省略号，
+     而不是把 status 无限撑开导致 identity 挤没、chip 右缘被面板裁掉一半 */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+}
+
+.expand-editor__status [class*="chip"] {
+  max-width: 100%;
 }
 
 .expand-editor__close {
