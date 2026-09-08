@@ -861,6 +861,17 @@ html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) 
 }
 
 /*
+ * 全局隐藏滚动条：任何滚动条不占视觉空间，滚动能力保留（滚轮/触控板）。
+ * 桌面端以滚轮/触控板为主要滚动方式，舍弃滚动条拖拽不影响可用性。
+ */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * 表格（DataTable）表头圆角修正：
  * HeroUI Table secondary 变体给表头列(surface-secondary 实色)设置了独立圆角，
  * 当它与外层 rounded-2xl 圆角容器叠加时，圆角半径不一致会在左上/左下角
