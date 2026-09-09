@@ -11,12 +11,22 @@ const os = require('os');
 const { parse: parseToml } = require('smol-toml');
 
 // 目标文件不存在时的默认模板（最简起步内容）。
+// Codex 模板四键缺一不可（研究依据 docs/research/cc-switch-codex-config.md §3/§5.1）：
+// 无 base_url 会静默回落 api.openai.com，无鉴权键则不发 Authorization 头必 401；
+// base_url / experimental_bearer_token 预置空壳是为了让客户端页的正则点改能命中。
 const CLAUDE_DEFAULT = '{\n  "env": {}\n}\n';
 const CODEX_DEFAULT = [
   'model_provider = "portunus"',
+  '# model 必须是 portunus 分组里真实存在的模型名',
+  'model = "在此填入 portunus 中的模型名"',
+  'model_reasoning_effort = "high"',
+  'disable_response_storage = true',
   '',
   '[model_providers.portunus]',
   'name = "Portunus"',
+  'base_url = "http://127.0.0.1:3060/v1"',
+  'wire_api = "responses"',
+  'experimental_bearer_token = ""',
   '',
 ].join('\n') + '\n';
 

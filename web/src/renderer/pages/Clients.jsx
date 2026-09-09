@@ -3,6 +3,7 @@ import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'luc
 import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
 import { setNavBlock } from '../utils/navGuard';
+import { readCodexKey, readActiveProviderId, upsertCodexKey } from '../utils/codexToml';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -23,10 +24,6 @@ const MODEL_SLOTS = [
 function parseModel(val) {
   if (typeof val === 'string' && val.slice(-4) === '[1M]') return { base: val.slice(0, -4), onem: true };
   return { base: val || '', onem: false };
-}
-
-function esc(s) {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 function rightNow() {
@@ -52,30 +49,44 @@ function readClaudeEnv(t) {
     return {};
   }
 }
-function readCodexBase(t) {
-  const m = t.match(/^\s*base_url\s*=\s*"([^"]*)"/m);
-  return m ? m[1] : '';
-}
-function readCodexToken(t) {
-  const m = t.match(/^\s*experimental_bearer_token\s*=\s*"([^"]*)"/m);
-  return m ? m[1] : '';
+// Codex 读取锚定激活 provider 段（model_provider 指向的表），不读全文第一个匹配
+const readCodexBase = (t) => readCodexKey(t, 'base_url');
+const readCodexToken = (t) => readCodexKey(t, 'experimental_bearer_token');
+
+// 把单个 env 键写回 settings.json（JSON round-trip，与 applyModels 同套路）。
+// 键缺失自动补进 env（避免正则不命中静默丢改动）；解析失败返回 null 由调用方报告。
+function setClaudeEnv(t, key, value) {
+  let obj;
+  try {
+    obj = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) obj = {};
+  const env = obj.env && typeof obj.env === 'object' && !Array.isArray(obj.env) ? obj.env : {};
+  if (value) env[key] = value;
+  else delete env[key];
+  obj.env = env;
+  return JSON.stringify(obj, null, 2);
 }
 
-// 把 base_url 写回源码（正则点改，保留其余内容）
-function applyBaseUrl(t, lang, baseUrl) {
+// 统一的键写回：JSON 写 env.<jsonKey>，TOML 写激活段 <tomlKey>。
+// 返回 { text, ok, reason }：ok=false 时 reason 说明原因，调用方须警告而非假成功。
+function applyKey(t, lang, jsonKey, tomlKey, value) {
   if (lang === 'json') {
-    return t.replace(/("ANTHROPIC_BASE_URL"\s*:\s*)"[^"]*"/, `$1"${esc(baseUrl)}"`);
+    const next = setClaudeEnv(t, jsonKey, value);
+    return next === null
+      ? { text: t, ok: false, reason: 'settings.json 不是合法 JSON，未能写入' }
+      : { text: next, ok: true, reason: '' };
   }
-  return t.replace(/^(\s*base_url\s*=\s*)"[^"]*"/m, `$1"${esc(baseUrl)}"`);
+  const r = upsertCodexKey(t, tomlKey, value);
+  return r.ok
+    ? { ...r, reason: '' }
+    : { ...r, reason: '未找到激活的 [model_providers.*] 段，请先在编辑器里补全 provider 段骨架' };
 }
 
-// 把令牌写回源码（支持显式清空）
-function applyToken(t, lang, token) {
-  if (lang === 'json') {
-    return t.replace(/("ANTHROPIC_AUTH_TOKEN"\s*:\s*)"[^"]*"/, `$1"${esc(token)}"`);
-  }
-  return t.replace(/^(\s*experimental_bearer_token\s*=\s*)"[^"]*"/m, `$1"${esc(token)}"`);
-}
+const applyBaseUrl = (t, lang, baseUrl) => applyKey(t, lang, 'ANTHROPIC_BASE_URL', 'base_url', baseUrl);
+const applyToken = (t, lang, token) => applyKey(t, lang, 'ANTHROPIC_AUTH_TOKEN', 'experimental_bearer_token', token);
 
 // 把模型映射写回源码 env（JSON round-trip）
 function applyModels(t, models) {
@@ -233,8 +244,10 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
   const handleFillUrl = () => {
     setBaseUrl(defaultBase);
-    writeText((prev) => applyBaseUrl(prev, lang, defaultBase));
-    toast.success('已填写 Portunus URL');
+    const r = applyBaseUrl(text, lang, defaultBase);
+    writeText(() => r.text);
+    if (r.ok) toast.success('已填写 Portunus URL');
+    else toast.danger(r.reason);
   };
 
   const handleImportToken = async () => {
@@ -245,8 +258,10 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
         return;
       }
       setToken(k.key);
-      writeText((prev) => applyToken(prev, lang, k.key));
-      toast.success('已导入 Portunus 令牌');
+      const r = applyToken(text, lang, k.key);
+      writeText(() => r.text);
+      if (r.ok) toast.success('已导入 Portunus 令牌');
+      else toast.danger(r.reason);
     } catch {
       // toast 由 request 拦截器统一提示
     }
@@ -353,11 +368,14 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
   };
 
   const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
+  const activeProvider = lang === 'toml' ? readActiveProviderId(text) : null;
   const status = dirty
     ? { color: 'warning', label: '有未保存改动' }
-    : /306[01]|13060|portunus/i.test(curBase)
-      ? { color: 'success', label: '已指向 Portunus' }
-      : { color: 'default', label: '未指向 Portunus' };
+    : activeProvider && activeProvider !== 'portunus'
+      ? { color: 'warning', label: `激活 provider：${activeProvider}（非 portunus）` }
+      : /306[01]|13060|portunus/i.test(curBase)
+        ? { color: 'success', label: '已指向 Portunus' }
+        : { color: 'default', label: '未指向 Portunus' };
 
   return (
     <Card className="gap-4 p-5">
@@ -395,7 +413,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
               value={baseUrl}
               onChange={(v) => {
                 setBaseUrl(v);
-                writeText((prev) => applyBaseUrl(prev, lang, v));
+                writeText((prev) => applyBaseUrl(prev, lang, v).text);
               }}
               className="flex-1"
             >
@@ -410,7 +428,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
               value={token}
               onChange={(v) => {
                 setToken(v);
-                writeText((prev) => applyToken(prev, lang, v));
+                writeText((prev) => applyToken(prev, lang, v).text);
               }}
               autoComplete="off"
               className="flex-1"
@@ -576,7 +594,7 @@ export default function Clients() {
       icon: <Braces className="size-4" />,
       hint: (
         <>
-          写入 <span className="font-mono">[model_providers.portunus]</span> 段并激活 <span className="font-mono">model_provider = &quot;portunus&quot;</span>，其余 provider 原样保留。
+          模板已预置 <span className="font-mono">[model_providers.portunus]</span> 骨架（含 <span className="font-mono">wire_api = &quot;responses&quot;</span>）；UI 只点改激活 provider 段的 <span className="font-mono">base_url</span> 与令牌两个键，缺键自动补，其余内容原样保留。
         </>
       ),
       config: hasElectron
