@@ -65,3 +65,45 @@ export function upsertCodexKey(t, key, value) {
   const prefix = at === sec.headerEnd ? '\n' : '';
   return { text: t.slice(0, at) + prefix + line + t.slice(at), ok: true };
 }
+
+// 顶层区域 = 首个行首 `[` 之前（段内键不算顶层；缩进段头属正则点改已知局限，实际文件不缩进）
+function topLevelRegionEnd(t) {
+  const idx = t.search(/^\[/m);
+  return idx === -1 ? t.length : idx;
+}
+
+/** 读顶层键的双引号字符串值（model 等，位于首个段头之前）；无键返回 ''。 */
+export function readTopLevelKey(t, key) {
+  const region = t.slice(0, topLevelRegionEnd(t));
+  const m = region.match(new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"((?:[^"\\\\]|\\\\.)*)"`, 'm'));
+  return m ? unescToml(m[1]) : '';
+}
+
+/**
+ * 顶层键写入：已有则原位替换，缺失则插到顶层区域末尾（首个段头之前；无段头则追加末尾）。
+ * value 为 null 删除该键整行。顶层写入恒可行，故无 ok 标记。
+ */
+export function upsertTopLevelKey(t, key, value) {
+  const regionEnd = topLevelRegionEnd(t);
+  const region = t.slice(0, regionEnd);
+  const valueRe = new RegExp(`^([ \\t]*${key}[ \\t]*=[ \\t]*)"(?:[^"\\\\]|\\\\.)*"`, 'm');
+  if (valueRe.test(region)) {
+    const newRegion =
+      value === null
+        ? region.replace(
+            new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"(?:[^"\\\\]|\\\\.)*"[ \\t]*(?:\\r?\\n|$)`, 'm'),
+            '',
+          )
+        : region.replace(valueRe, (_, p1) => `${p1}"${escToml(value)}"`);
+    return { text: newRegion + t.slice(regionEnd) };
+  }
+  if (value === null) return { text: t };
+  const line = `${key} = "${escToml(value)}"\n`;
+  if (regionEnd === t.length) {
+    return { text: t + (t.endsWith('\n') ? '' : '\n') + line };
+  }
+  // 贴着最后一个顶层键插（回退区域尾部空行），段头前的空行分隔保留
+  const trimmedEnd = region.replace(/[ \t\r\n]+$/, '').length;
+  const at = trimmedEnd === 0 ? 0 : trimmedEnd + (t[trimmedEnd] === '\r' ? 2 : 1);
+  return { text: t.slice(0, at) + line + t.slice(at) };
+}

@@ -38,6 +38,27 @@ function codexPath() {
   return path.join(os.homedir(), '.codex', 'config.toml');
 }
 
+function codexAuthPath() {
+  return path.join(os.homedir(), '.codex', 'auth.json');
+}
+
+/**
+ * 只读 ~/.codex/auth.json 的 OPENAI_API_KEY（Codex 的另一鉴权来源，优先级低于
+ * config.toml 的 experimental_bearer_token）。portunus 永不写此文件，保护官方登录态。
+ */
+function readCodexAuth() {
+  const file = codexAuthPath();
+  if (!fs.existsSync(file)) {
+    return { exists: false, key: '' };
+  }
+  try {
+    const obj = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return { exists: true, key: typeof obj.OPENAI_API_KEY === 'string' ? obj.OPENAI_API_KEY : '' };
+  } catch {
+    return { exists: true, key: '', error: 'auth.json 不是合法 JSON' };
+  }
+}
+
 /** 两个配置文件路径（供 UI 展示）。 */
 function getPaths() {
   return { claude: claudePath(), codex: codexPath() };
@@ -171,6 +192,7 @@ function register(ipcMain) {
   ipcMain.handle('client-config:paths', wrap(() => getPaths()));
   ipcMain.handle('client-config:read-claude', wrap(() => readClaude()));
   ipcMain.handle('client-config:read-codex', wrap(() => readCodex()));
+  ipcMain.handle('client-config:read-codex-auth', wrap(() => readCodexAuth()));
   ipcMain.handle('client-config:read-backup-claude', wrap(() => readBackupClaude()));
   ipcMain.handle('client-config:read-backup-codex', wrap(() => readBackupCodex()));
   ipcMain.handle('client-config:save-claude', wrap((t) => saveClaude(t)));
@@ -184,6 +206,7 @@ module.exports = {
   getPaths,
   readClaude,
   readCodex,
+  readCodexAuth,
   readBackupClaude,
   readBackupCodex,
   saveClaude,

@@ -3,7 +3,7 @@ import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'luc
 import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
 import CodeEditor from '../components/CodeEditor';
 import { setNavBlock } from '../utils/navGuard';
-import { readCodexKey, readActiveProviderId, upsertCodexKey } from '../utils/codexToml';
+import { readCodexKey, readActiveProviderId, upsertCodexKey, readTopLevelKey, upsertTopLevelKey } from '../utils/codexToml';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -52,6 +52,11 @@ function readClaudeEnv(t) {
 // Codex 读取锚定激活 provider 段（model_provider 指向的表），不读全文第一个匹配
 const readCodexBase = (t) => readCodexKey(t, 'base_url');
 const readCodexToken = (t) => readCodexKey(t, 'experimental_bearer_token');
+
+// auth.json key 的默认遮蔽展示（眼睛可展开全文）
+function maskKey(k) {
+  return k.length > 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : k;
+}
 
 // 把单个 env 键写回 settings.json（JSON round-trip，与 applyModels 同套路）。
 // 键缺失自动补进 env（避免正则不命中静默丢改动）；解析失败返回 null 由调用方报告。
@@ -112,14 +117,17 @@ function applyModels(t, models) {
   return JSON.stringify(obj, null, 2);
 }
 
-function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defaultBase, icon, hint, active = true }) {
+function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, modelSelect, defaultBase, icon, hint, active = true }) {
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
   const [savedAt, setSavedAt] = useState('');
   const [baseUrl, setBaseUrl] = useState(defaultBase);
   const [token, setToken] = useState('');
+  const [model, setModel] = useState('');
   const [models, setModels] = useState({});
   const [modelOptions, setModelOptions] = useState([]);
+  const [codexAuth, setCodexAuth] = useState(null);
+  const [showAuthKey, setShowAuthKey] = useState(false);
   const [backupExists, setBackupExists] = useState(false);
   const [backupText, setBackupText] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -153,6 +161,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
     } else {
       setBaseUrl(readCodexBase(t));
       setToken(readCodexToken(t));
+      if (modelSelect) setModel(readTopLevelKey(t, 'model'));
     }
   };
 
@@ -188,6 +197,11 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
     } else {
       setBackupText(null);
     }
+    // Codex 面板：只读展示 auth.json 的鉴权 key（portunus 不写该文件）
+    if (lang === 'toml') {
+      const ra = await window.clientConfig.readCodexAuth();
+      setCodexAuth(ra && ra.ok ? ra.data : null);
+    }
   };
 
   // 获取分组列表作为模型映射选项；返回是否成功（挂载时静默调用，失败不打扰）
@@ -204,7 +218,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
   useEffect(() => {
     if (hasElectron) {
       load();
-      if (modelSlots) fetchModels();
+      if (modelSlots || modelSelect) fetchModels();
     }
     return () => clearTimeout(parseTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -272,6 +286,12 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
     const ok = await fetchModels();
     if (ok) toast.success('已获取模型列表');
     setFetching(false);
+  };
+
+  // Codex 请求模型下拉：写入顶层 model 键；清空 = 删除该键（回落 Codex 内置默认）
+  const handleModelSelect = (v) => {
+    setModel(v);
+    writeText((prev) => upsertTopLevelKey(prev, 'model', v === '' ? null : v).text);
   };
 
   const setSlot = (slotId, patch) => {
@@ -369,6 +389,8 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
 
   const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
   const activeProvider = lang === 'toml' ? readActiveProviderId(text) : null;
+  const authValue = codexAuth?.key || '';
+  const authDisplay = !authValue ? '' : showAuthKey ? authValue : maskKey(authValue);
   const status = dirty
     ? { color: 'warning', label: '有未保存改动' }
     : activeProvider && activeProvider !== 'portunus'
@@ -447,6 +469,53 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, defa
             </Button>
             <Button variant="secondary" onPress={handleImportToken} className="shrink-0">从 Portunus 导入</Button>
           </div>
+          {modelSelect && (
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1">
+                <Label>请求模型</Label>
+                <div className="mm-select-wrap">
+                  <select
+                    className="mm-select"
+                    aria-label="Codex 请求模型"
+                    value={model}
+                    onChange={(e) => handleModelSelect(e.target.value)}
+                  >
+                    <option value="">— 不设置 —</option>
+                    {model && !modelOptions.some((o) => o.id === model) && (
+                      <option value={model} disabled>
+                        {model}（分组不存在）
+                      </option>
+                    )}
+                    {modelOptions.map((o) => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching} className="shrink-0">
+                <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
+                获取模型
+              </Button>
+            </div>
+          )}
+          {lang === 'toml' && (
+            <div className="flex items-end gap-2">
+              <TextField isDisabled value={authDisplay} className="flex-1">
+                <Label>auth.json 鉴权（只读）</Label>
+                <Input spellCheck={false} />
+              </TextField>
+              <Button
+                variant="secondary"
+                onPress={() => setShowAuthKey((v) => !v)}
+                className="shrink-0"
+                isDisabled={!authValue}
+                aria-label={showAuthKey ? '隐藏 auth.json 鉴权' : '显示 auth.json 鉴权'}
+                title={showAuthKey ? '隐藏 auth.json 鉴权' : '显示 auth.json 鉴权'}
+              >
+                {showAuthKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </Button>
+            </div>
+          )}
           <Typography type="body-sm" className="text-muted">{hint}</Typography>
         </div>
 
@@ -590,11 +659,12 @@ export default function Clients() {
       lang: 'toml',
       path: '~/.codex/config.toml',
       modelSlots: null,
+      modelSelect: true,
       defaultBase: `${serverUrl.replace(/\/+$/, '')}/v1`,
       icon: <Braces className="size-4" />,
       hint: (
         <>
-          模板已预置 <span className="font-mono">[model_providers.portunus]</span> 骨架（含 <span className="font-mono">wire_api = &quot;responses&quot;</span>）；UI 只点改激活 provider 段的 <span className="font-mono">base_url</span> 与令牌两个键，缺键自动补，其余内容原样保留。
+          令牌写入激活 provider 段的 <span className="font-mono">experimental_bearer_token</span>，鉴权优先级高于 auth.json 的 OPENAI_API_KEY（只读展示，portunus 永不改写它，以保护官方登录态）；请求模型写入顶层 <span className="font-mono">model</span> 键。
         </>
       ),
       config: hasElectron

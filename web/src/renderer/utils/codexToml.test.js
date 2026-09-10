@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readActiveProviderId, readCodexKey, upsertCodexKey } from './codexToml.js';
+import {
+  readActiveProviderId,
+  readCodexKey,
+  upsertCodexKey,
+  readTopLevelKey,
+  upsertTopLevelKey,
+} from './codexToml.js';
 
 // Codex config.toml「激活 provider 段」定位与点改的回归测试（node --test，运行：cd web && pnpm test）。
 // 语义对齐 Codex CLI 0.145.0：base_url / experimental_bearer_token 只在 model_provider
@@ -124,4 +130,60 @@ test('upsertCodexKey：段头是文件最后一行（无尾随换行）也能插
   const r = upsertCodexKey('model_provider = "p"\n[model_providers.p]', 'base_url', 'https://x/v1');
   assert.equal(r.ok, true);
   assert.equal(r.text, 'model_provider = "p"\n[model_providers.p]\nbase_url = "https://x/v1"\n');
+});
+
+// ─── 顶层键（model 等，位于首个段头之前的区域）───
+
+test('readTopLevelKey：读顶层键，不读段内同名键', () => {
+  assert.equal(readTopLevelKey(PORTUNUS_TOML, 'model'), 'gpt-5.6');
+  assert.equal(readTopLevelKey(MULTI_TOML, 'model'), '');
+  // base_url 只存在于段内 → 顶层读不到
+  assert.equal(readTopLevelKey(MULTI_TOML, 'base_url'), '');
+});
+
+test('readTopLevelKey：值含转义引号可读回', () => {
+  const t = 'model = "a\\"b\\c"\n[model_providers.p]\nbase_url = "x"\n';
+  assert.equal(readTopLevelKey(t, 'model'), 'a"b\\c');
+});
+
+test('upsertTopLevelKey：已有键原位替换，段内内容逐字节保留', () => {
+  const r = upsertTopLevelKey(PORTUNUS_TOML, 'model', 'gpt-5.7');
+  assert.equal(
+    r.text,
+    PORTUNUS_TOML.replace('model = "gpt-5.6"', 'model = "gpt-5.7"'),
+  );
+});
+
+test('upsertTopLevelKey：缺键插到首个段头之前，段内同名键不受影响', () => {
+  const t = [
+    'model_provider = "custom"',
+    '',
+    '[model_providers.custom]',
+    'model = "decoy"',
+    'base_url = "https://x/v1"',
+  ].join('\n') + '\n';
+  const r = upsertTopLevelKey(t, 'model', 'm1');
+  assert.equal(
+    r.text,
+    [
+      'model_provider = "custom"',
+      'model = "m1"',
+      '',
+      '[model_providers.custom]',
+      'model = "decoy"',
+      'base_url = "https://x/v1"',
+    ].join('\n') + '\n',
+  );
+});
+
+test('upsertTopLevelKey：无段头文件追加到末尾（无尾随换行先补）', () => {
+  const r = upsertTopLevelKey('model_provider = "portunus"', 'model', 'm1');
+  assert.equal(r.text, 'model_provider = "portunus"\nmodel = "m1"\n');
+});
+
+test('upsertTopLevelKey：null 删除已有键，缺键原样返回', () => {
+  const r = upsertTopLevelKey(PORTUNUS_TOML, 'model', null);
+  assert.equal(r.text, PORTUNUS_TOML.replace('model = "gpt-5.6"\n', ''));
+  const r2 = upsertTopLevelKey(MULTI_TOML, 'model', null);
+  assert.equal(r2.text, MULTI_TOML);
 });

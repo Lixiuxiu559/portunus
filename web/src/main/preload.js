@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('clientConfig', {
   getPaths: () => ipcRenderer.invoke('client-config:paths'),
   readClaude: () => ipcRenderer.invoke('client-config:read-claude'),
   readCodex: () => ipcRenderer.invoke('client-config:read-codex'),
+  readCodexAuth: () => ipcRenderer.invoke('client-config:read-codex-auth'),
   readBackupClaude: () => ipcRenderer.invoke('client-config:read-backup-claude'),
   readBackupCodex: () => ipcRenderer.invoke('client-config:read-backup-codex'),
   saveClaude: (text) => ipcRenderer.invoke('client-config:save-claude', text),
