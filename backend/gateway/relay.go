@@ -228,7 +228,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	// 装配上游请求：协议转换 + 模型名替换 + thinking 注入都在 protocol 内完成
 	// （模型名落哪个字段、thinking 哪个上游消费，是协议知识，归 protocol）。
 	upBody, err := protocol.ComposeUpstreamRequest(clientProto, t.Channel.Type, originalBody,
-		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking})
+		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking, ThinkingCompat: t.Channel.ThinkingCompat})
 	if err != nil {
 		return nil, 0, &convertError{err}
 	}

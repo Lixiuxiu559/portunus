@@ -14,45 +14,49 @@ var ErrInvalid = &shared.StatusError{Status: 400, Message: "渠道字段不合�
 
 // CreateRequest 创建渠道请求。
 type CreateRequest struct {
-	Name     string            `json:"name" binding:"required"`
-	Type     protocol.Provider `json:"type" binding:"required"`
-	BaseURL  string            `json:"base_url" binding:"required"`
-	Key      string            `json:"key" binding:"required"`
-	AutoSync *bool             `json:"auto_sync"`
+	Name           string            `json:"name" binding:"required"`
+	Type           protocol.Provider `json:"type" binding:"required"`
+	BaseURL        string            `json:"base_url" binding:"required"`
+	Key            string            `json:"key" binding:"required"`
+	AutoSync       *bool             `json:"auto_sync"`
+	ThinkingCompat *bool             `json:"thinking_compat"`
 }
 
 // UpdateRequest 更新渠道请求，仅包含需要变更的字段。
 type UpdateRequest struct {
-	Name     *string            `json:"name"`
-	Type     *protocol.Provider `json:"type"`
-	BaseURL  *string            `json:"base_url"`
-	Key      *string            `json:"key"`
-	AutoSync *bool              `json:"auto_sync"`
+	Name           *string            `json:"name"`
+	Type           *protocol.Provider `json:"type"`
+	BaseURL        *string            `json:"base_url"`
+	Key            *string            `json:"key"`
+	AutoSync       *bool              `json:"auto_sync"`
+	ThinkingCompat *bool              `json:"thinking_compat"`
 }
 
 // Response 是渠道的对外响应，Key 已脱敏。
 type Response struct {
-	ID        int64             `json:"id"`
-	Name      string            `json:"name"`
-	Type      protocol.Provider `json:"type"`
-	BaseURL   string            `json:"base_url"`
-	Key       string            `json:"key"`
-	AutoSync  bool              `json:"auto_sync"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	ID             int64             `json:"id"`
+	Name           string            `json:"name"`
+	Type           protocol.Provider `json:"type"`
+	BaseURL        string            `json:"base_url"`
+	Key            string            `json:"key"`
+	AutoSync       bool              `json:"auto_sync"`
+	ThinkingCompat bool              `json:"thinking_compat"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
 }
 
 // ToResponse 将实体转为脱敏后的响应。
 func (c *Channel) ToResponse() Response {
 	return Response{
-		ID:        c.ID,
-		Name:      c.Name,
-		Type:      c.Type,
-		BaseURL:   c.BaseURL,
-		Key:       maskKey(c.Key),
-		AutoSync:  c.AutoSync,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		ID:             c.ID,
+		Name:           c.Name,
+		Type:           c.Type,
+		BaseURL:        c.BaseURL,
+		Key:            maskKey(c.Key),
+		AutoSync:       c.AutoSync,
+		ThinkingCompat: c.ThinkingCompat,
+		CreatedAt:      c.CreatedAt,
+		UpdatedAt:      c.UpdatedAt,
 	}
 }
 
@@ -102,6 +106,9 @@ func Create(req CreateRequest) (*Channel, error) {
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync
 	}
+	if req.ThinkingCompat != nil {
+		c.ThinkingCompat = *req.ThinkingCompat
+	}
 	if !c.Valid() {
 		return nil, ErrInvalid
 	}
@@ -131,6 +138,9 @@ func Update(id int64, req UpdateRequest) (*Channel, error) {
 	}
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync
+	}
+	if req.ThinkingCompat != nil {
+		c.ThinkingCompat = *req.ThinkingCompat
 	}
 	if !c.Valid() {
 		return nil, ErrInvalid

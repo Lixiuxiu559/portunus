@@ -20,6 +20,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
     type: channel?.type || 'openai',
     base_url: channel?.base_url || '',
     key: '',
+    thinking_compat: channel?.thinking_compat || false,
   });
   const [models, setModels] = useState([]);
   const [syncing, setSyncing] = useState(false);
@@ -70,6 +71,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
         name: form.name.trim(),
         type: form.type,
         base_url: form.base_url.trim(),
+        thinking_compat: form.thinking_compat,
       };
       // key 仅在用户填写时更新
       if (form.key.trim()) {
@@ -151,6 +153,23 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
             <Input placeholder="留空则不更新" />
           </TextField>
         </div>
+
+        {/* thinking 兼容垫片：仅对 openai 兼容上游生效 */}
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.thinking_compat}
+            onChange={(e) => set('thinking_compat')(e.target.checked)}
+          />
+          <span className="text-muted">
+            thinking 兼容垫片
+            <span className="block text-xs text-muted">
+              上游是 DeepSeek V4 等严格思考模型时开启：多轮对话的 assistant 历史缺思考内容时自动注入占位，避免 400
+              「reasoning_content must be passed back」。
+            </span>
+          </span>
+        </label>
 
         {/* 模型列表 */}
         <div className="border-t border-separator pt-4">

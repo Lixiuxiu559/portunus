@@ -48,6 +48,10 @@ func ConvertResponse(from, to Provider, body []byte) ([]byte, error) {
 type UpstreamRequest struct {
 	Model    string          // 上游模型名（渠道侧命名）；空 = 不替换
 	Thinking *ThinkingConfig // -thinking 后缀驱动的思考开关意图；仅 openai 兼容上游消费
+	// ThinkingCompat 渠道级 thinking 兼容垫片：开启后对 openai 兼容上游注入
+	// assistant 历史缺失的 reasoning_content 占位（严格 thinking 上游缺失即 400，
+	// 见 InjectReasoningPlaceholders）。
+	ThinkingCompat bool
 }
 
 // ComposeUpstreamRequest 把客户端请求体装配为发往指定上游的请求体：
@@ -65,6 +69,18 @@ func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) 
 	if !to.Valid() {
 		return nil, fmt.Errorf("未知的目标协议: %s", to)
 	}
+	out, err := composeUpstream(from, to, body, up)
+	if err != nil {
+		return nil, err
+	}
+	// 垫片只作用于 openai 兼容上游：其他协议没有 reasoning_content 形状
+	if up.ThinkingCompat && to == ProviderOpenAI {
+		return InjectReasoningPlaceholders(out)
+	}
+	return out, nil
+}
+
+func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte, error) {
 	if from == to {
 		return rewriteSameProtocol(to, body, up)
 	}

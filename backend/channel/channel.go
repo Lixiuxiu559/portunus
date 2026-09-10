@@ -8,14 +8,17 @@ import (
 
 // Channel 是一个上游供应商的连接配置。
 type Channel struct {
-	ID        int64             `gorm:"primaryKey" json:"id"`
-	Name      string            `gorm:"unique;not null" json:"name"`
-	Type      protocol.Provider `json:"type"`
-	BaseURL   string            `json:"base_url"` // 仅基础地址，具体路径由协议层补全
-	Key       string            `json:"key"`      // 上游访问凭据
-	AutoSync  bool              `gorm:"default:true" json:"auto_sync"` // 是否参与自动模型同步
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	ID       int64             `gorm:"primaryKey" json:"id"`
+	Name     string            `gorm:"unique;not null" json:"name"`
+	Type     protocol.Provider `json:"type"`
+	BaseURL  string            `json:"base_url"`                      // 仅基础地址，具体路径由协议层补全
+	Key      string            `json:"key"`                           // 上游访问凭据
+	AutoSync bool              `gorm:"default:true" json:"auto_sync"` // 是否参与自动模型同步
+	// ThinkingCompat thinking 兼容垫片：上游是严格 thinking 模型（DeepSeek V4 等）
+	// 时开启，assistant 历史缺 reasoning_content 会注入占位，避免多轮 400。
+	ThinkingCompat bool      `gorm:"default:false" json:"thinking_compat"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Valid 校验渠道字段，供创建 / 更新时调用。
