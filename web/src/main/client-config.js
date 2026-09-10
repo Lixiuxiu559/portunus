@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { parse: parseToml } = require('smol-toml');
+const { buildModelCatalog, catalogToRows } = require('./codex-catalog');
 
 // 目标文件不存在时的默认模板（最简起步内容）。
 // Codex 模板四键缺一不可（研究依据 docs/research/cc-switch-codex-config.md §3/§5.1）：
@@ -38,24 +39,60 @@ function codexPath() {
   return path.join(os.homedir(), '.codex', 'config.toml');
 }
 
+// Codex 鉴权文件与 config.toml 同一模型：源码编辑、整写保存（JSON 校验 + 首写备份）。
+// OPENAI_API_KEY 是 portunus 触碰的唯一键（渲染层点改），tokens 等登录材料随源码保留。
+const AUTH_DEFAULT = '{\n  "OPENAI_API_KEY": ""\n}\n';
+
 function codexAuthPath() {
   return path.join(os.homedir(), '.codex', 'auth.json');
 }
 
-/**
- * 只读 ~/.codex/auth.json 的 OPENAI_API_KEY（Codex 的另一鉴权来源，优先级低于
- * config.toml 的 experimental_bearer_token）。portunus 永不写此文件，保护官方登录态。
- */
 function readCodexAuth() {
-  const file = codexAuthPath();
+  return readOrDefault(codexAuthPath(), AUTH_DEFAULT);
+}
+
+function saveCodexAuth(text) {
+  return saveRaw(codexAuthPath(), text, (t) => {
+    try {
+      JSON.parse(t);
+    } catch (e) {
+      throw new Error('auth.json 不是合法 JSON：' + e.message);
+    }
+  });
+}
+
+function readBackupCodexAuth() {
+  return readBackup(codexAuthPath());
+}
+
+function rollbackCodexAuth() {
+  return rollback(codexAuthPath());
+}
+
+const CODEX_CATALOG_FILENAME = 'portunus-model-catalog.json';
+
+/** 生成并原子写入 ~/.codex/portunus-model-catalog.json（Codex /model 菜单的数据源），
+ * 返回绝对路径供 config.toml 的 model_catalog_json 引用。空列表抛错由调用方降级。 */
+function writeCodexCatalog(models) {
+  const catalog = buildModelCatalog(Array.isArray(models) ? models : []);
+  if (!catalog) {
+    throw new Error('模型目录为空，未写入');
+  }
+  const file = path.join(os.homedir(), '.codex', CODEX_CATALOG_FILENAME);
+  atomicWrite(file, JSON.stringify(catalog, null, 2) + '\n');
+  return { ok: true, path: file };
+}
+
+/** 读取 portunus 生成的模型目录并反解析为映射表格行（不存在的文件返回空行集）。 */
+function readCodexCatalog() {
+  const file = path.join(os.homedir(), '.codex', CODEX_CATALOG_FILENAME);
   if (!fs.existsSync(file)) {
-    return { exists: false, key: '' };
+    return { ok: true, rows: [] };
   }
   try {
-    const obj = JSON.parse(fs.readFileSync(file, 'utf-8'));
-    return { exists: true, key: typeof obj.OPENAI_API_KEY === 'string' ? obj.OPENAI_API_KEY : '' };
+    return { ok: true, rows: catalogToRows(fs.readFileSync(file, 'utf-8')) };
   } catch {
-    return { exists: true, key: '', error: 'auth.json 不是合法 JSON' };
+    return { ok: true, rows: [] };
   }
 }
 
@@ -193,6 +230,11 @@ function register(ipcMain) {
   ipcMain.handle('client-config:read-claude', wrap(() => readClaude()));
   ipcMain.handle('client-config:read-codex', wrap(() => readCodex()));
   ipcMain.handle('client-config:read-codex-auth', wrap(() => readCodexAuth()));
+  ipcMain.handle('client-config:save-codex-auth', wrap((t) => saveCodexAuth(t)));
+  ipcMain.handle('client-config:read-backup-codex-auth', wrap(() => readBackupCodexAuth()));
+  ipcMain.handle('client-config:rollback-codex-auth', wrap(() => rollbackCodexAuth()));
+  ipcMain.handle('client-config:write-codex-catalog', wrap((m) => writeCodexCatalog(m)));
+  ipcMain.handle('client-config:read-codex-catalog', wrap(() => readCodexCatalog()));
   ipcMain.handle('client-config:read-backup-claude', wrap(() => readBackupClaude()));
   ipcMain.handle('client-config:read-backup-codex', wrap(() => readBackupCodex()));
   ipcMain.handle('client-config:save-claude', wrap((t) => saveClaude(t)));
@@ -207,6 +249,11 @@ module.exports = {
   readClaude,
   readCodex,
   readCodexAuth,
+  saveCodexAuth,
+  readBackupCodexAuth,
+  rollbackCodexAuth,
+  writeCodexCatalog,
+  readCodexCatalog,
   readBackupClaude,
   readBackupCodex,
   saveClaude,

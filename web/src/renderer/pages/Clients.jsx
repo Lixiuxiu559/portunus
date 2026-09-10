@@ -4,6 +4,7 @@ import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, t
 import CodeEditor from '../components/CodeEditor';
 import { setNavBlock } from '../utils/navGuard';
 import { readCodexKey, readActiveProviderId, upsertCodexKey, readTopLevelKey, upsertTopLevelKey } from '../utils/codexToml';
+import { readAuthApiKey, applyAuthApiKey } from '../utils/authJson';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
 import { getAPIKey } from '../api/apikey';
@@ -51,12 +52,6 @@ function readClaudeEnv(t) {
 }
 // Codex 读取锚定激活 provider 段（model_provider 指向的表），不读全文第一个匹配
 const readCodexBase = (t) => readCodexKey(t, 'base_url');
-const readCodexToken = (t) => readCodexKey(t, 'experimental_bearer_token');
-
-// auth.json key 的默认遮蔽展示（眼睛可展开全文）
-function maskKey(k) {
-  return k.length > 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : k;
-}
 
 // 把单个 env 键写回 settings.json（JSON round-trip，与 applyModels 同套路）。
 // 键缺失自动补进 env（避免正则不命中静默丢改动）；解析失败返回 null 由调用方报告。
@@ -91,7 +86,15 @@ function applyKey(t, lang, jsonKey, tomlKey, value) {
 }
 
 const applyBaseUrl = (t, lang, baseUrl) => applyKey(t, lang, 'ANTHROPIC_BASE_URL', 'base_url', baseUrl);
-const applyToken = (t, lang, token) => applyKey(t, lang, 'ANTHROPIC_AUTH_TOKEN', 'experimental_bearer_token', token);
+
+// 令牌（仅 JSON/Claude）：即时写回 env。TOML/Codex 的 API Key 正典在 auth.json，
+// 编辑只改本地 state、保存时经 saveCodexAuth 落盘（见 handleSave）。
+const applyToken = (t, token) => {
+  const next = setClaudeEnv(t, 'ANTHROPIC_AUTH_TOKEN', token);
+  return next === null
+    ? { text: t, ok: false, reason: 'settings.json 不是合法 JSON，未能写入' }
+    : { text: next, ok: true, reason: '' };
+};
 
 // 把模型映射写回源码 env（JSON round-trip）
 function applyModels(t, models) {
@@ -126,26 +129,36 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
   const [model, setModel] = useState('');
   const [models, setModels] = useState({});
   const [modelOptions, setModelOptions] = useState([]);
-  const [codexAuth, setCodexAuth] = useState(null);
-  const [showAuthKey, setShowAuthKey] = useState(false);
+  // auth.json 源码（API Key 正典文件）：与 config.toml 同一「原文编辑 + 整写保存」模型
+  const [authText, setAuthText] = useState('');
+  const [savedAuthText, setSavedAuthText] = useState('');
+  const [authSavedAt, setAuthSavedAt] = useState('');
+  const [authBackupExists, setAuthBackupExists] = useState(false);
+  const [authBackupText, setAuthBackupText] = useState(null);
+  const [authSaving, setAuthSaving] = useState(false);
+  // 模型映射表格（catalog 行）：本地编辑，保存 config.toml 时统一生成目录文件
+  const [catalogRows, setCatalogRows] = useState([]);
+  const [savedCatalogRows, setSavedCatalogRows] = useState([]);
   const [backupExists, setBackupExists] = useState(false);
   const [backupText, setBackupText] = useState(null);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const [confirmRollback, setConfirmRollback] = useState(false);
-  const [confirmReread, setConfirmReread] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState(null);
+  const [confirmReread, setConfirmReread] = useState(null);
 
   // 源码 → 表单反解析的防抖计时器
   const parseTimer = useRef(null);
 
   const dirty = text !== savedText;
+  const authDirty = authText !== savedAuthText;
+  const catalogDirty = JSON.stringify(catalogRows) !== JSON.stringify(savedCatalogRows);
 
   // 有未保存改动时注册导航守卫：切页前 Layout 拦截确认，防误触丢失
   useEffect(() => {
-    setNavBlock(`client-${id}`, dirty ? '客户端配置' : null);
+    setNavBlock(`client-${id}`, dirty || authDirty || catalogDirty ? '客户端配置' : null);
     return () => setNavBlock(`client-${id}`, null);
-  }, [dirty, id]);
+  }, [dirty, authDirty, catalogDirty, id]);
 
   const parseForm = (t) => {
     if (lang === 'json') {
@@ -160,7 +173,7 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
       setModels(next);
     } else {
       setBaseUrl(readCodexBase(t));
-      setToken(readCodexToken(t));
+      // API Key 框的值是 authText 的投影（readAuthApiKey），不随 config.toml 解析
       if (modelSelect) setModel(readTopLevelKey(t, 'model'));
     }
   };
@@ -197,11 +210,30 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
     } else {
       setBackupText(null);
     }
-    // Codex 面板：只读展示 auth.json 的鉴权 key（portunus 不写该文件）
+    // Codex 面板：auth.json 源码与备份 + 模型映射表格（catalog 文件反解析）
     if (lang === 'toml') {
-      const ra = await window.clientConfig.readCodexAuth();
-      setCodexAuth(ra && ra.ok ? ra.data : null);
+      await loadAuth();
+      const rc = await window.clientConfig.readCodexCatalog();
+      const rows = rc && rc.ok && Array.isArray(rc.rows) ? rc.rows : [];
+      setCatalogRows(rows);
+      setSavedCatalogRows(rows);
     }
+  };
+
+  // 读取 auth.json 原文与备份（独立于 config.toml，可单独重读/回滚）
+  const loadAuth = async () => {
+    const ra = await window.clientConfig.readCodexAuth();
+    if (ra && ra.ok) {
+      const { text: at } = ra.data;
+      setAuthText(at);
+      setSavedAuthText(at);
+      setAuthBackupExists(ra.data.backupExists);
+      setAuthSavedAt(rightNow());
+    } else {
+      toast.danger((ra && ra.error) || '读取 auth.json 失败');
+    }
+    const rb = await window.clientConfig.readBackupCodexAuth();
+    setAuthBackupText(rb && rb.ok && rb.data && rb.data.exists ? rb.data.text : null);
   };
 
   // 获取分组列表作为模型映射选项；返回是否成功（挂载时静默调用，失败不打扰）
@@ -226,34 +258,70 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
 
   const handleSave = async () => {
     setSaving(true);
-    const r = await config.save(text);
+    // Codex：映射表格非空则生成模型目录（Codex /model 菜单的数据源）并注入指针键；
+    // 目录生成失败仅告警，不阻塞 config.toml 保存；表格为空则不动用户自管的目录
+    let t = text;
+    if (lang === 'toml' && catalogRows.some((r) => r.model)) {
+      const rc = await window.clientConfig.writeCodexCatalog(catalogRows);
+      if (rc && rc.ok) {
+        t = upsertTopLevelKey(t, 'model_catalog_json', rc.data.path).text;
+        // 网关不保证支持 web_search hosted tool，声明目录即禁用，别给 Codex 一个死工具
+        t = upsertTopLevelKey(t, 'web_search', 'disabled').text;
+        setText(t);
+        setSavedCatalogRows(catalogRows);
+      } else {
+        toast.danger(`${(rc && rc.error) || '模型目录生成失败'} · config.toml 保存不受影响`);
+      }
+    }
+    const r = await config.save(t);
     setSaving(false);
     if (r && r.ok) {
-      setSavedText(text);
+      setSavedText(t);
       setSavedAt(rightNow());
       setBackupExists(!!(r.data && r.data.backupExists));
       toast.success('配置已原子写入');
-      parseForm(text);
+      parseForm(t);
     } else {
       toast.danger(`${(r && r.error) || '保存失败'} · 可修正后重试，或点「重新读取」恢复磁盘版本`);
     }
   };
 
-  const performRollback = async () => {
-    const r = await config.rollback();
+  // auth.json 独立保存：JSON 校验 + 首写备份 + 原子写（主进程）
+  const handleAuthSave = async () => {
+    setAuthSaving(true);
+    const r = await window.clientConfig.saveCodexAuth(authText);
+    setAuthSaving(false);
     if (r && r.ok) {
-      setConfirmRollback(false);
-      toast.success('已从 .portunus.bak 回滚到接入前配置');
-      await load();
+      setSavedAuthText(authText);
+      setAuthSavedAt(rightNow());
+      setAuthBackupExists(!!(r.data && r.data.backupExists));
+      toast.success('auth.json 已原子写入');
+    } else {
+      toast.danger(`${(r && r.error) || 'auth.json 保存失败'} · 可修正后重试，或点「重新读取」恢复磁盘版本`);
+    }
+  };
+
+  const performRollback = async (target) => {
+    const r = target === 'auth' ? await window.clientConfig.rollbackCodexAuth() : await config.rollback();
+    if (r && r.ok) {
+      setConfirmRollback(null);
+      toast.success(target === 'auth' ? '已从 .portunus.bak 回滚 auth.json' : '已从 .portunus.bak 回滚到接入前配置');
+      if (target === 'auth') await loadAuth();
+      else await load();
     } else {
       toast.danger((r && r.error) || '回滚失败');
     }
   };
 
-  const performReread = async () => {
-    setConfirmReread(false);
-    await load();
-    toast.success('已从磁盘重新读取');
+  const performReread = async (target) => {
+    setConfirmReread(null);
+    if (target === 'auth') {
+      await loadAuth();
+      toast.success('已从磁盘重新读取 auth.json');
+    } else {
+      await load();
+      toast.success('已从磁盘重新读取');
+    }
   };
 
   const handleFillUrl = () => {
@@ -271,11 +339,19 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
         toast.danger('暂无令牌，请先到「设置」获取');
         return;
       }
-      setToken(k.key);
-      const r = applyToken(text, lang, k.key);
-      writeText(() => r.text);
-      if (r.ok) toast.success('已导入 Portunus 令牌');
-      else toast.danger(r.reason);
+      if (lang === 'json') {
+        setToken(k.key);
+        const r = applyToken(text, k.key);
+        writeText(() => r.text);
+        if (!r.ok) {
+          toast.danger(r.reason);
+          return;
+        }
+        toast.success('已导入 Portunus 令牌');
+      } else {
+        setAuthText((prev) => applyAuthApiKey(prev, k.key));
+        toast.success('已点改 auth.json 源码，保存后生效');
+      }
     } catch {
       // toast 由 request 拦截器统一提示
     }
@@ -293,6 +369,40 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
     setModel(v);
     writeText((prev) => upsertTopLevelKey(prev, 'model', v === '' ? null : v).text);
   };
+
+  // 模型映射表格：增删改均为本地态，保存 config.toml 时统一落成目录文件
+  const handleAddRow = () => setCatalogRows((prev) => [...prev, { model: '', displayName: '', contextWindow: null }]);
+
+  const handleAddAllGroups = () =>
+    setCatalogRows((prev) => {
+      const have = new Set(prev.map((r) => r.model));
+      return [
+        ...prev,
+        ...modelOptions.filter((o) => !have.has(o.id)).map((o) => ({ model: o.id, displayName: '', contextWindow: null })),
+      ];
+    });
+
+  const handleRemoveRow = (i) => setCatalogRows((prev) => prev.filter((_, j) => j !== i));
+
+  const handleRowChange = (i, patch) =>
+    setCatalogRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  // 默认请求模型下拉选项 = 模型映射行 ∪ 分组列表（cc-switch 同源合并，映射行优先去重）
+  const defaultModelOptions = (() => {
+    const seen = new Set();
+    const opts = [];
+    for (const r of catalogRows) {
+      if (!r.model || seen.has(r.model)) continue;
+      seen.add(r.model);
+      opts.push({ id: r.model, label: r.displayName || r.model });
+    }
+    for (const o of modelOptions) {
+      if (seen.has(o.id)) continue;
+      seen.add(o.id);
+      opts.push(o);
+    }
+    return opts;
+  })();
 
   const setSlot = (slotId, patch) => {
     const next = { ...models, [slotId]: { ...(models[slotId] || { base: '', onem: false, name: '' }), ...patch } };
@@ -389,8 +499,6 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
 
   const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
   const activeProvider = lang === 'toml' ? readActiveProviderId(text) : null;
-  const authValue = codexAuth?.key || '';
-  const authDisplay = !authValue ? '' : showAuthKey ? authValue : maskKey(authValue);
   const status = dirty
     ? { color: 'warning', label: '有未保存改动' }
     : activeProvider && activeProvider !== 'portunus'
@@ -447,15 +555,20 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
           <div className="flex items-end gap-2">
             <TextField
               type={showToken ? 'text' : 'password'}
-              value={token}
+              value={lang === 'json' ? token : readAuthApiKey(authText)}
               onChange={(v) => {
-                setToken(v);
-                writeText((prev) => applyToken(prev, lang, v).text);
+                // JSON 即时写回 env；TOML 点改 auth.json 源码里的 OPENAI_API_KEY 值
+                if (lang === 'json') {
+                  setToken(v);
+                  writeText((prev) => applyToken(prev, v).text);
+                } else {
+                  setAuthText((prev) => applyAuthApiKey(prev, v));
+                }
               }}
               autoComplete="off"
               className="flex-1"
             >
-              <Label>令牌</Label>
+              <Label>API Key</Label>
               <Input spellCheck={false} />
             </TextField>
             <Button
@@ -472,48 +585,118 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
           {modelSelect && (
             <div className="flex items-end gap-2">
               <div className="flex flex-1 flex-col gap-1">
-                <Label>请求模型</Label>
+                <Label>默认请求模型</Label>
                 <div className="mm-select-wrap">
                   <select
                     className="mm-select"
-                    aria-label="Codex 请求模型"
+                    aria-label="Codex 默认请求模型"
                     value={model}
                     onChange={(e) => handleModelSelect(e.target.value)}
                   >
                     <option value="">— 不设置 —</option>
-                    {model && !modelOptions.some((o) => o.id === model) && (
+                    {model && !defaultModelOptions.some((o) => o.id === model) && (
                       <option value={model} disabled>
-                        {model}（分组不存在）
+                        {model}（不在分组/映射中）
                       </option>
                     )}
-                    {modelOptions.map((o) => (
+                    {defaultModelOptions.map((o) => (
                       <option key={o.id} value={o.id}>{o.label}</option>
                     ))}
                   </select>
                 </div>
               </div>
-              <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching} className="shrink-0">
-                <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
-                获取模型
+            </div>
+          )}
+          {modelSelect && model && catalogRows.length > 0 && !catalogRows.some((r) => r.model === model) && (
+            <div className="flex items-center gap-2">
+              <Typography type="body-sm" className="text-muted">
+                该模型不在模型映射中，Codex 的 /model 菜单不会列出它（直接请求仍然有效）。
+              </Typography>
+              <Button
+                variant="tertiary"
+                size="sm"
+                onPress={() => setCatalogRows((prev) => [...prev, { model, displayName: model, contextWindow: null }])}
+              >
+                加入模型映射
               </Button>
             </div>
           )}
-          {lang === 'toml' && (
-            <div className="flex items-end gap-2">
-              <TextField isDisabled value={authDisplay} className="flex-1">
-                <Label>auth.json 鉴权（只读）</Label>
-                <Input spellCheck={false} />
-              </TextField>
-              <Button
-                variant="secondary"
-                onPress={() => setShowAuthKey((v) => !v)}
-                className="shrink-0"
-                isDisabled={!authValue}
-                aria-label={showAuthKey ? '隐藏 auth.json 鉴权' : '显示 auth.json 鉴权'}
-                title={showAuthKey ? '隐藏 auth.json 鉴权' : '显示 auth.json 鉴权'}
-              >
-                {showAuthKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </Button>
+          {modelSelect && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <Typography type="body-sm" className="text-muted">
+                  模型映射（Codex /model 菜单，保存 config.toml 时生成）
+                </Typography>
+                <div className="flex gap-2">
+                  <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching}>
+                    <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
+                    获取模型
+                  </Button>
+                  <Button variant="tertiary" size="sm" onPress={handleAddAllGroups} isDisabled={!modelOptions.length}>
+                    全部添加
+                  </Button>
+                  <Button variant="tertiary" size="sm" onPress={handleAddRow}>添加行</Button>
+                </div>
+              </div>
+              {catalogRows.length === 0 ? (
+                <Typography type="body-sm" className="text-muted">
+                  先「获取模型」再「全部添加」，或「添加行」逐个选择；显示名 / 上下文留空用默认值。
+                </Typography>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {catalogRows.map((row, i) => (
+                    <div className="flex items-center gap-2" key={i}>
+                      <div className="mm-select-wrap w-48 shrink-0">
+                        <select
+                          className="mm-select"
+                          aria-label={`映射行 ${i + 1} 请求模型`}
+                          value={row.model}
+                          onChange={(e) => handleRowChange(i, { model: e.target.value })}
+                        >
+                          <option value="">— 请选择 —</option>
+                          {row.model && !modelOptions.some((o) => o.id === row.model) && (
+                            <option value={row.model} disabled>
+                              {row.model}（分组不存在）
+                            </option>
+                          )}
+                          {modelOptions.map((o) => (
+                            <option key={o.id} value={o.id}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <input
+                        className="mm-input flex-1"
+                        placeholder="显示名（默认=模型名）"
+                        aria-label={`映射行 ${i + 1} 显示名`}
+                        value={row.displayName}
+                        onChange={(e) => handleRowChange(i, { displayName: e.target.value })}
+                        spellCheck={false}
+                      />
+                      <input
+                        className="mm-input w-32 shrink-0"
+                        type="number"
+                        min={1}
+                        placeholder="上下文 128k"
+                        aria-label={`映射行 ${i + 1} 上下文窗口`}
+                        value={row.contextWindow ?? ''}
+                        onChange={(e) => handleRowChange(i, { contextWindow: e.target.value === '' ? null : Number(e.target.value) || null })}
+                      />
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onPress={() => handleRemoveRow(i)}
+                        className="shrink-0"
+                        aria-label={`删除映射行 ${i + 1}`}
+                      >
+                        删除
+                      </Button>
+                    </div>
+                  ))}
+                  <Typography type="body-sm" className="text-muted">
+                    显示名只影响 /model 菜单；上下文留空按 128k 生成。
+                  </Typography>
+                </div>
+              )}
             </div>
           )}
           <Typography type="body-sm" className="text-muted">{hint}</Typography>
@@ -559,30 +742,54 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
           canRollback={backupExists}
           active={active}
           onSave={handleSave}
-          onRollback={() => setConfirmRollback(true)}
-          onReread={dirty ? () => setConfirmReread(true) : performReread}
+          onRollback={() => setConfirmRollback('config')}
+          onReread={dirty ? () => setConfirmReread('config') : () => performReread('config')}
           saving={saving}
         />
+
+        {/* auth.json 源码（API Key 正典，仅 Codex）：与 config.toml 同一编辑模型 */}
+        {lang === 'toml' && (
+          <>
+            <Typography type="body-sm" className="text-muted">
+              auth.json（API Key 正典源码）· 上方 API Key 框改写的就是这里的 OPENAI_API_KEY 值
+            </Typography>
+            <CodeEditor
+              lang="json"
+              fileName="auth.json"
+              text={authText}
+              backupText={authBackupText}
+              onTextChange={(t) => setAuthText(t)}
+              dirty={authDirty}
+              savedAt={authSavedAt}
+              canRollback={authBackupExists}
+              active={active}
+              onSave={handleAuthSave}
+              onRollback={() => setConfirmRollback('auth')}
+              onReread={authDirty ? () => setConfirmReread('auth') : () => performReread('auth')}
+              saving={authSaving}
+            />
+          </>
+        )}
       </Card.Content>
 
-      {/* 重新读取二次确认：有未保存改动时拦截，防止被磁盘内容静默覆盖 */}
-      <Modal.Backdrop isOpen={confirmReread} onOpenChange={setConfirmReread}>
+      {/* 重新读取二次确认：有未保存改动时拦截，防止被磁盘内容静默覆盖（config / auth 双目标） */}
+      <Modal.Backdrop isOpen={!!confirmReread} onOpenChange={(o) => !o && setConfirmReread(null)}>
         <Modal.Container size="sm">
           <Modal.Dialog>
             <Modal.CloseTrigger />
             <Modal.Header>
-              <Modal.Heading>重新读取配置</Modal.Heading>
+              <Modal.Heading>{confirmReread === 'auth' ? '重新读取 auth.json' : '重新读取配置'}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <Typography color="muted">
-                当前有未保存改动，重新读取将用磁盘内容覆盖并丢弃这些改动，确定继续吗？
+                当前{confirmReread === 'auth' ? ' auth.json ' : ' 配置文件 '}有未保存改动，重新读取将用磁盘内容覆盖并丢弃这些改动，确定继续吗？
               </Typography>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">
                 取消
               </Button>
-              <Button variant="danger" onPress={performReread}>
+              <Button variant="danger" onPress={() => performReread(confirmReread)}>
                 丢弃并重新读取
               </Button>
             </Modal.Footer>
@@ -590,8 +797,8 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
         </Modal.Container>
       </Modal.Backdrop>
 
-      {/* 回滚二次确认 */}
-      <Modal.Backdrop isOpen={confirmRollback} onOpenChange={setConfirmRollback}>
+      {/* 回滚二次确认（config / auth 双目标） */}
+      <Modal.Backdrop isOpen={!!confirmRollback} onOpenChange={(o) => !o && setConfirmRollback(null)}>
         <Modal.Container size="sm">
           <Modal.Dialog>
             <Modal.CloseTrigger />
@@ -600,15 +807,16 @@ function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, mode
             </Modal.Header>
             <Modal.Body>
               <Typography color="muted">
-                {dirty ? '当前有未保存改动，回滚后将一并丢弃。' : ''}
-                确定把配置恢复为接入 Portunus 之前的备份（.portunus.bak）吗？
+                {confirmRollback === 'auth'
+                  ? `${authDirty ? '当前 auth.json 有未保存改动，回滚后将一并丢弃。' : ''}确定把 auth.json 恢复为备份（.portunus.bak）吗？`
+                  : `${dirty ? '当前有未保存改动，回滚后将一并丢弃。' : ''}确定把配置恢复为接入 Portunus 之前的备份（.portunus.bak）吗？`}
               </Typography>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">
                 取消
               </Button>
-              <Button variant="danger" onPress={performRollback}>
+              <Button variant="danger" onPress={() => performRollback(confirmRollback)}>
                 回滚
               </Button>
             </Modal.Footer>
@@ -664,7 +872,7 @@ export default function Clients() {
       icon: <Braces className="size-4" />,
       hint: (
         <>
-          令牌写入激活 provider 段的 <span className="font-mono">experimental_bearer_token</span>，鉴权优先级高于 auth.json 的 OPENAI_API_KEY（只读展示，portunus 永不改写它，以保护官方登录态）；请求模型写入顶层 <span className="font-mono">model</span> 键。
+          API Key 框改写的是 <span className="font-mono">~/.codex/auth.json</span> 源码里的 <span className="font-mono">OPENAI_API_KEY</span> 值（下方源码可见，保存整写落盘）；「模型映射」表格策展 Codex /model 菜单（保存 config.toml 时生成 <span className="font-mono">portunus-model-catalog.json</span>）；config.toml 的 <span className="font-mono">experimental_bearer_token</span> 优先级高于 auth.json，手写了它会盖过 API Key 框的值。
         </>
       ),
       config: hasElectron
