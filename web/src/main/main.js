@@ -9,6 +9,14 @@ const { createTray } = require('./tray');
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// dev 与打包版读同一份 package.json（顶层无 productName）→ app.name 同为 "@portunus/web"，
+// userData 与单实例锁全部撞在一起：打包版常驻托盘时，dev 实例请求锁失败秒退（code 0），
+// 打包版反被 second-instance 唤醒到前台。dev 隔离出独立 userData（锁文件按 userData
+// 路径落位，故必须放在 requestSingleInstanceLock 之前）。
+if (isDev) {
+  app.setPath('userData', path.join(app.getPath('userData'), 'dev'));
+}
+
 // 开发模式下应用跑在 node_modules 的 Electron 默认 bundle 里，Dock/任务栏显示的是
 // Electron 官方图标；这里显式换成我们的 logo。打包版由 electron-builder 把
 // build/icons 注入 bundle（见 package.json 的 build.*.icon），不走这条路。
