@@ -6,6 +6,7 @@ import {
 import { Search, RotateCw, X } from 'lucide-react';
 import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/date';
 import DataTable from '../components/DataTable';
+import { buildLogParams } from '../utils/logQuery';
 import { listLogs, getLogStats } from '../api';
 
 const successOptions = [
@@ -48,11 +49,8 @@ export default function Logs() {
     const setRefreshState = isRefresh || logs.data?.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
-      const params = { page: targetPage, page_size: pageSize };
-      if (filters.model_name) params.model_name = filters.model_name;
-      if (filters.success !== 'all') params.success = filters.success;
-      if (filters.range?.start) params.start_time = filters.range.start.toString();
-      if (filters.range?.end) params.end_time = filters.range.end.toString();
+      // 时间参数必须是带时区偏移的 RFC3339（见 utils/logQuery.js 的契约说明）
+      const params = buildLogParams(filters, targetPage, pageSize);
       const [l, s] = await Promise.all([listLogs(params), getLogStats(params)]);
       setLogs(l || { total: 0, data: [] });
       setStats(s);
