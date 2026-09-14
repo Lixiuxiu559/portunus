@@ -416,6 +416,65 @@ func TestConvertRequestAnthropicPureThinkingKept(t *testing.T) {
 	}
 }
 
+// TestConvertRequestAnthropicRedactedThinkingPlaceholder 断言 redacted_thinking
+// 块（Claude Code 加密历史思考，密文在 data 字段、无 thinking 明文）注入占位
+// reasoning_content 而非空串——DeepSeek 等严格 thinking 上游对空 reasoning_content
+// 视同缺失，报 400 "The reasoning_content in the thinking mode must be passed back"。
+func TestConvertRequestAnthropicRedactedThinkingPlaceholder(t *testing.T) {
+	in := `{
+		"model": "deepseek-chat",
+		"messages": [
+			{"role":"user","content":[{"type":"text","text":"hi"}]},
+			{"role":"assistant","content":[
+				{"type":"redacted_thinking","data":"encrypted-blob"},
+				{"type":"text","text":"答案"}
+			]}
+		],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	assistant := msgs[1].(map[string]any)
+	if got, _ := assistant["reasoning_content"].(string); got == "" {
+		t.Errorf("redacted_thinking 应注入占位 reasoning_content，实际为空: %s", out)
+	}
+}
+
+// TestConvertRequestAnthropicMixedThinking 断言明文 thinking 与 redacted_thinking
+// 混排时：明文保留、redacted 补占位，两者共存于 reasoning_content（分隔）。
+func TestConvertRequestAnthropicMixedThinking(t *testing.T) {
+	in := `{
+		"model": "deepseek-chat",
+		"messages": [
+			{"role":"user","content":[{"type":"text","text":"hi"}]},
+			{"role":"assistant","content":[
+				{"type":"redacted_thinking","data":"blob1"},
+				{"type":"thinking","thinking":"明文思考","signature":"sig"},
+				{"type":"text","text":"答案"}
+			]}
+		],
+		"max_tokens": 100
+	}`
+	out, err := ConvertRequest(ProviderAnthropic, ProviderOpenAI, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	m := unmarshalAny(t, out)
+	msgs := sliceAt(t, m, "messages")
+	assistant := msgs[1].(map[string]any)
+	rc, _ := assistant["reasoning_content"].(string)
+	if !strings.Contains(rc, "明文思考") {
+		t.Errorf("明文 thinking 应保留在 reasoning_content: %q", rc)
+	}
+	if !strings.Contains(rc, ReasoningPlaceholder) {
+		t.Errorf("redacted_thinking 应注入占位: %q", rc)
+	}
+}
+
 // TestConvertResponseOpenAIToAnthropicReasoningContent 断言非流式 OpenAI 响应的
 // reasoning_content（DeepSeek 等 thinking 模式的思考内容）被映射为 Anthropic thinking 块，
 // 否则客户端拿不到思考内容，下一轮无法回传，上游报 400 "reasoning_content must be passed back"。

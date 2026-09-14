@@ -274,12 +274,18 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 				hasImage = true
 				contentParts = append(contentParts, part)
 			}
-		case "thinking", "redacted_thinking":
+		case "thinking":
 			// 思考内容映射为 OpenAI 的 reasoning_content 扩展字段。
 			// DeepSeek 等兼容方在 thinking 模式下要求多轮对话把上一轮思考内容
 			// 原样回传（reasoning_content），直接丢弃会导致上游 400：
 			// "The reasoning_content in the thinking mode must be passed back to the API"。
 			out.ReasoningContent += block.Thinking
+		case "redacted_thinking":
+			// Claude Code 把历史思考加密为 redacted_thinking 块：密文在 data 字段、
+			// 无 thinking 明文（cc-switch 同款场景）。拼 block.Thinking 得空串，
+			// 空 reasoning_content 会被严格 thinking 上游视同缺失照样 400——
+			// 注入占位表明「此处曾有思考、内容不可用」，宽容上游忽略该字段。
+			out.ReasoningContent += ReasoningPlaceholder
 		case "tool_use":
 			args := "{}"
 			if block.Input != nil {
