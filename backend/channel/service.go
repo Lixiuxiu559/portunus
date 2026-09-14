@@ -97,11 +97,12 @@ func Exists(id int64) (bool, error) {
 // Create 创建渠道。
 func Create(req CreateRequest) (*Channel, error) {
 	c := Channel{
-		Name:     req.Name,
-		Type:     req.Type,
-		BaseURL:  req.BaseURL,
-		Key:      req.Key,
-		AutoSync: true,
+		Name:           req.Name,
+		Type:           req.Type,
+		BaseURL:        req.BaseURL,
+		Key:            req.Key,
+		AutoSync:       true,
+		ThinkingCompat: true,
 	}
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync

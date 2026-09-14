@@ -16,7 +16,9 @@ type Channel struct {
 	AutoSync bool              `gorm:"default:true" json:"auto_sync"` // 是否参与自动模型同步
 	// ThinkingCompat thinking 兼容垫片：上游是严格 thinking 模型（DeepSeek V4 等）
 	// 时开启，assistant 历史缺 reasoning_content 会注入占位，避免多轮 400。
-	ThinkingCompat bool      `gorm:"default:false" json:"thinking_compat"`
+	// 默认开：宽容上游忽略占位字段，垫片只对缺 reasoning_content 的历史 assistant
+	// 动手（已有内容不覆盖），误开代价仅历史消息多十余字符；漏开则多轮必 400。
+	ThinkingCompat bool      `gorm:"default:true" json:"thinking_compat"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
