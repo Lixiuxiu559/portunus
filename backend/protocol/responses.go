@@ -118,40 +118,7 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 			out.Messages = append(out.Messages, ChatMessage{Role: "user", Content: v})
 		}
 	case []any:
-		// 先收集 function_call 的 call_id → 工具名映射，供 function_call_output 补 name 字段
-		// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。
-		toolNameByID := map[string]string{}
-		for _, item := range v {
-			b, _ := json.Marshal(item)
-			var it InputItem
-			if json.Unmarshal(b, &it) == nil && it.Type == "function_call" {
-				toolNameByID[it.CallID] = it.Name
-			}
-		}
-		// pendingReasoning 缓冲 reasoning item 的思考文本：前向附挂到其后的
-		// function_call / assistant message（Codex 多轮把上一轮 reasoning item
-		// 原样放回 input，DeepSeek 等严格 thinking 上游要求 assistant 历史回传
-		// reasoning_content，缺失即 400 "must be passed back"）。此前 reasoning
-		// item 掉 default 分支生成 role:"" 畸形空消息，思考内容整体丢失。
-		var pendingReasoning string
-		var lastAssistant int = -1
-		for _, item := range v {
-			b, _ := json.Marshal(item)
-			var it InputItem
-			if json.Unmarshal(b, &it) == nil {
-				msg, ok := inputItemToChat(it, toolNameByID, &pendingReasoning)
-				if ok {
-					if msg.Role == "assistant" {
-						lastAssistant = len(out.Messages)
-					}
-					out.Messages = append(out.Messages, msg)
-				}
-			}
-		}
-		// 尾部剩余：其后已无可前向附挂的 assistant 项，回溯附挂最后一条 assistant。
-		if pendingReasoning != "" && lastAssistant >= 0 {
-			out.Messages[lastAssistant].ReasoningContent = appendReasoning(out.Messages[lastAssistant].ReasoningContent, pendingReasoning)
-		}
+		out.Messages = append(out.Messages, responsesItemsToChat(v)...)
 	}
 
 	for _, t := range req.Tools {
@@ -170,63 +137,124 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 	return out, nil
 }
 
-// inputItemToChat 将 Responses 输入项转为 OpenAI ChatMessage。
-// toolNames 是 function_call 的 call_id → 工具名映射，用于给 tool 消息补 name 字段。
-// pendingReasoning 持有尚未归属的思考文本：reasoning item 提取后暂存，前向附挂到
-// 紧随的 assistant 项（function_call 或 message）；user/工具结果等回合边界消息到
-// 达时不消费——reasoning 不跨 user 回合泄漏，交给循环末尾回溯附挂。返回 ok=false
-// 表示无产出（reasoning item 无内容或空 message），不生成空消息。
-func inputItemToChat(it InputItem, toolNames map[string]string, pendingReasoning *string) (msg ChatMessage, ok bool) {
-	switch it.Type {
-	case "reasoning":
-		// summary[] 是官方摘要形态；个别上游放 content[]（reasoning_text 段），
-		// 与响应方向 responsesResponseToOpenAI 的提取对称。encrypted_content
-		// 密文无明文可取（本机 Codex 实测 summary:[] + content:null + 密文），
-		// 提取为空即无产出，不生成消息。
-		var sb strings.Builder
-		for _, s := range it.Summary {
-			sb.WriteString(s.Text)
+// responsesItemsToChat 把 Responses input 数组转成 OpenAI ChatMessage 序列。
+//
+// 关键不变式：一轮里的多个 function_call 是**平铺的独立 item**，必须合并进
+// 同一条 assistant 消息——否则落成
+//
+//	assistant(tool_calls=[call_A])
+//	assistant(tool_calls=[call_B])
+//	tool(call_A)
+//	tool(call_B)
+//
+// 第一条 assistant 的 tool_calls 后面跟的是 assistant 而非 tool，严格上游
+// （DeepSeek 等）报 400 "An assistant message with 'tool_calls' must be followed
+// by tool messages responding to each 'tool_call_id'. (insufficient tool messages
+// following tool_calls message)"。单工具轮不触发、并行（≥2）必触发。
+// 用 pendingToolCalls 缓冲连续 function_call，遇 tool 结果 / 回合边界 / 收尾时
+// flush 成一条 assistant（对齐 cc-switch transform_codex_chat.rs 的 pending 语义）。
+//
+// pendingReasoning 缓冲 reasoning item 的思考文本（Codex 多轮把上一轮 reasoning
+// item 原样放回 input，DeepSeek 等严格 thinking 上游要求 assistant 历史回传
+// reasoning_content，缺失即 400 "must be passed back"）。消费时机与归属：
+//   - 工具批次 flush 时附挂到该条合并 assistant（思考本就属于这一轮）；
+//   - assistant 文本消息到达时前向附挂到它；
+//   - 其余回合边界（user / system）只 flush 工具批次、不动缓冲——reasoning 不
+//     跨 user 回合泄漏，留给末尾回溯附挂最后一条 assistant。
+func responsesItemsToChat(items []any) []ChatMessage {
+	// 先收集 function_call 的 call_id → 工具名映射，供 function_call_output 补 name 字段
+	// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。
+	toolNameByID := map[string]string{}
+	for _, item := range items {
+		b, _ := json.Marshal(item)
+		var it InputItem
+		if json.Unmarshal(b, &it) == nil && it.Type == "function_call" {
+			toolNameByID[it.CallID] = it.Name
 		}
-		if sb.Len() == 0 {
-			for _, s := range it.Content {
-				sb.WriteString(s.Text)
+	}
+
+	var out []ChatMessage
+	var pendingToolCalls []ToolCall
+	var pendingReasoning string
+	lastAssistant := -1
+
+	// flushToolCalls 把缓冲的并行工具调用合并为一条 assistant 消息并附挂 pending 思考。
+	flushToolCalls := func() {
+		if len(pendingToolCalls) == 0 {
+			return
+		}
+		msg := ChatMessage{Role: "assistant", ToolCalls: pendingToolCalls}
+		attachPendingReasoning(&msg, &pendingReasoning)
+		lastAssistant = len(out)
+		out = append(out, msg)
+		pendingToolCalls = nil
+	}
+
+	for _, item := range items {
+		b, _ := json.Marshal(item)
+		var it InputItem
+		if json.Unmarshal(b, &it) != nil {
+			continue
+		}
+		switch it.Type {
+		case "reasoning":
+			// 空文本（encrypted_content-only 的常见形状）不入缓冲，否则会凭空
+			// 追加一段 "\n\n" 分隔符，污染上一段真实思考内容。
+			if text := responsesReasoningText(it); text != "" {
+				pendingReasoning = appendReasoning(pendingReasoning, text)
 			}
-		}
-		if text := strings.TrimSpace(sb.String()); text != "" {
-			if *pendingReasoning != "" {
-				*pendingReasoning += "\n\n"
-			}
-			*pendingReasoning += text
-		}
-		return ChatMessage{}, false
-	case "function_call":
-		msg = ChatMessage{
-			Role: "assistant",
-			ToolCalls: []ToolCall{{
+		case "function_call":
+			// 连续 function_call 累积进同一批，等待 flush 合并成一条 assistant
+			pendingToolCalls = append(pendingToolCalls, ToolCall{
 				ID:       it.CallID,
 				Type:     "function",
 				Function: FunctionCall{Name: it.Name, Arguments: it.Arguments},
-			}},
+			})
+		case "function_call_output":
+			flushToolCalls()
+			name := toolNameByID[it.CallID]
+			out = append(out, ChatMessage{Role: "tool", ToolCallID: it.CallID, Content: it.Output, Name: &name})
+		default: // message
+			// 回合边界（user / system / assistant 文本）到来前先 flush 未决工具批
+			flushToolCalls()
+			role := it.Role
+			if role == "developer" {
+				role = "system"
+			}
+			msg := ChatMessage{Role: role, Content: responsesContentToText(it.Content)}
+			if role == "assistant" {
+				attachPendingReasoning(&msg, &pendingReasoning)
+				if msg.Content == "" && msg.ReasoningContent == "" {
+					continue // 空 assistant 不生成（避免上游 400）
+				}
+				lastAssistant = len(out)
+			}
+			out = append(out, msg)
 		}
-		attachPendingReasoning(&msg, pendingReasoning)
-		return msg, true
-	case "function_call_output":
-		name := toolNames[it.CallID]
-		return ChatMessage{Role: "tool", ToolCallID: it.CallID, Content: it.Output, Name: &name}, true
-	default: // message
-		role := it.Role
-		if role == "developer" {
-			role = "system"
-		}
-		msg = ChatMessage{Role: role, Content: responsesContentToText(it.Content)}
-		if role == "assistant" {
-			attachPendingReasoning(&msg, pendingReasoning)
-		}
-		if msg.Role == "assistant" && msg.Content == "" && msg.ReasoningContent == "" && len(msg.ToolCalls) == 0 {
-			return ChatMessage{}, false // 空 assistant 不生成（避免上游 400）
-		}
-		return msg, true
 	}
+	flushToolCalls()
+
+	// 尾部剩余：其后已无可前向附挂的 assistant 项，回溯附挂最后一条 assistant。
+	if pendingReasoning != "" && lastAssistant >= 0 {
+		out[lastAssistant].ReasoningContent = appendReasoning(out[lastAssistant].ReasoningContent, pendingReasoning)
+	}
+	return out
+}
+
+// responsesReasoningText 提取 reasoning item 的思考文本：优先 summary[] 摘要，
+// 为空时兜底 content[]（reasoning_text 段）。encrypted_content 密文无明文可取
+// （本机 Codex 实测 summary:[] + content:null + 密文），返回空串。
+func responsesReasoningText(it InputItem) string {
+	var sb strings.Builder
+	for _, s := range it.Summary {
+		sb.WriteString(s.Text)
+	}
+	if sb.Len() == 0 {
+		for _, s := range it.Content {
+			sb.WriteString(s.Text)
+		}
+	}
+	return strings.TrimSpace(sb.String())
 }
 
 // attachPendingReasoning 把缓冲的思考文本附挂到 assistant 消息并消费缓冲。
