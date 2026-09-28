@@ -60,7 +60,7 @@ func (m *AnthropicMessage) UnmarshalJSON(data []byte) error {
 
 // ContentBlock 是 Anthropic 消息 content 数组的一个单元。
 type ContentBlock struct {
-	Type      string       `json:"type"` // text / image / tool_use / tool_result / thinking
+	Type      string       `json:"type"` // text / image / tool_use / tool_result / thinking / redacted_thinking
 	Text      string       `json:"text,omitempty"`
 	ID        string       `json:"id,omitempty"`
 	Name      string       `json:"name,omitempty"`        // tool_use
@@ -69,7 +69,12 @@ type ContentBlock struct {
 	Content   any          `json:"content,omitempty"`     // tool_result 结果（字符串或块数组）
 	Source    *ImageSource `json:"source,omitempty"`      // image
 	Thinking  string       `json:"thinking,omitempty"`    // thinking
-	Signature string       `json:"signature,omitempty"`   // thinking 块的签名
+	// Signature 是 thinking 块的签名。本网关在签名里承载 reasoning 桥载荷
+	// （见 reasoning_bridge.go）：客户端原样回传即可无损还原 reasoning_content。
+	Signature string `json:"signature,omitempty"`
+	// Data 是 redacted_thinking 的密文载荷。此前缺此字段导致密文被静默丢弃，
+	// 只能一律回填占位；现在至少能识别出「密文恰是本网关桥载荷」的情形并还原。
+	Data string `json:"data,omitempty"`
 }
 
 // MarshalJSON 按 Anthropic 规范的字段裁剪序列化：text 块始终携带 text
@@ -103,6 +108,9 @@ func (b ContentBlock) MarshalJSON() ([]byte, error) {
 		// thinking / signature 是必填字段，空串时也必须输出（与 text 块的 text 同病根）
 		m["thinking"] = b.Thinking
 		m["signature"] = b.Signature
+	case "redacted_thinking":
+		// data 是 redacted_thinking 的唯一内容字段：密文原样回传才能被上游识别。
+		m["data"] = b.Data
 	}
 	return json.Marshal(m)
 }
@@ -212,7 +220,9 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 
 	// messages → chat messages（一条 anthropic 消息可能拆成多条 OpenAI 消息）
 	for _, m := range req.Messages {
-		out.Messages = append(out.Messages, anthropicMessagesToChat(m, toolNameByID)...)
+		msgs, decoded := anthropicMessagesToChat(m, toolNameByID)
+		out.Messages = append(out.Messages, msgs...)
+		out.bridgeDecoded += decoded // 桥接命中遥测，见 ChatCompletionRequest.bridgeDecoded
 	}
 
 	// tools → function tools
@@ -253,7 +263,9 @@ func anthropicSystemToText(sys any) string {
 // anthropicMessagesToChat 将一条 Anthropic 消息转成若干条 OpenAI ChatMessage。
 // 一条含多个 tool_result 的 user 消息会拆成多条 tool 消息。
 // toolNames 是 assistant.tool_use 的 id→name 映射，用于给 tool 消息补 name 字段。
-func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []ChatMessage {
+// 第二个返回值是本次消息里从块签名成功还原 reasoning_content 的次数（遥测，见
+// ChatCompletionRequest.bridgeDecoded）。
+func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) ([]ChatMessage, int) {
 	var toolResults []ChatMessage
 	var toolImages []any // tool_result 里的图片，转出后拼进紧随的 user 消息
 	var out ChatMessage
@@ -263,6 +275,7 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 	// （多数 OpenAI 兼容上游对字符串形态最稳），有图才升级为内容块数组。
 	var contentParts []any
 	hasImage := false
+	bridgeDecoded := 0
 
 	for _, block := range m.Content {
 		switch block.Type {
@@ -279,13 +292,27 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 			// DeepSeek 等兼容方在 thinking 模式下要求多轮对话把上一轮思考内容
 			// 原样回传（reasoning_content），直接丢弃会导致上游 400：
 			// "The reasoning_content in the thinking mode must be passed back to the API"。
-			out.ReasoningContent += block.Thinking
+			// 优先从 signature 的桥载荷还原：那是本网关写出的原始 reasoning_content，
+			// 逐字节一致——跨轮前缀因此稳定，上游自动前缀缓存才能命中。签名不是桥
+			// 格式（上游原生签名、旧常量 "sig"）时退回 thinking 明文。
+			if rc, ok := DecodeReasoningSignature(block.Signature); ok {
+				out.ReasoningContent += rc
+				bridgeDecoded++
+			} else {
+				out.ReasoningContent += block.Thinking
+			}
 		case "redacted_thinking":
 			// Claude Code 把历史思考加密为 redacted_thinking 块：密文在 data 字段、
 			// 无 thinking 明文（cc-switch 同款场景）。拼 block.Thinking 得空串，
-			// 空 reasoning_content 会被严格 thinking 上游视同缺失照样 400——
-			// 注入占位表明「此处曾有思考、内容不可用」，宽容上游忽略该字段。
-			out.ReasoningContent += ReasoningPlaceholder
+			// 空 reasoning_content 会被严格 thinking 上游视同缺失照样 400。
+			// 密文恰是本网关桥载荷时解码还原（无损、前缀稳定）；否则是上游加密
+			// 内容、无从还原，注入占位表明「此处曾有思考、内容不可用」。
+			if rc, ok := DecodeReasoningSignature(block.Data); ok {
+				out.ReasoningContent += rc
+				bridgeDecoded++
+			} else {
+				out.ReasoningContent += ReasoningPlaceholder
+			}
 		case "tool_use":
 			args := "{}"
 			if block.Input != nil {
@@ -324,19 +351,19 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) []
 		} else if len(textParts) > 0 {
 			toolResults = append(toolResults, ChatMessage{Role: m.Role, Content: strings.Join(textParts, "")})
 		}
-		return toolResults
+		return toolResults, bridgeDecoded
 	}
 	// 既无 text、无图、无 tool_calls、也无思考内容的消息整条丢弃，
 	// 避免生成空的 assistant 消息导致上游 400。
 	if len(textParts) == 0 && !hasImage && len(out.ToolCalls) == 0 && out.ReasoningContent == "" {
-		return nil
+		return nil, bridgeDecoded
 	}
 	if hasImage {
 		out.Content = contentParts
 	} else if len(textParts) > 0 {
 		out.Content = strings.Join(textParts, "")
 	}
-	return []ChatMessage{out}
+	return []ChatMessage{out}, bridgeDecoded
 }
 
 // imageSourceToContentPart 把 Anthropic image 块的 source 转为 OpenAI image_url
@@ -691,7 +718,13 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		// thinking 块，客户端下一轮才能把它原样回传；否则上游 400
 		// "reasoning_content must be passed back"。
 		if rc := choice.Message.ReasoningContent; rc != "" {
-			out.Content = append(out.Content, ContentBlock{Type: "thinking", Thinking: rc, Signature: "sig"})
+			out.Content = append(out.Content, ContentBlock{
+				Type:     "thinking",
+				Thinking: rc,
+				// 签名承载原始 reasoning_content 的桥载荷：客户端下一轮回传时
+				// 逐字节还原，跨轮前缀稳定（见 reasoning_bridge.go）。
+				Signature: EncodeReasoningSignature(rc),
+			})
 		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			out.Content = append(out.Content, ContentBlock{Type: "text", Text: text})

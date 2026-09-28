@@ -12,21 +12,27 @@ import (
 
 // logCall 写一条调用日志。callErr 非 nil 时把失败归因（类别 + 截断原文）一并落库，
 // 让 status=0 / success=0 的日志能区分「用户取消」与「真故障」。
+// clientProto 与 stats 是诊断遥测：前者区分 DSH(openai) 与 Claude Code(anthropic)
+// 的流量，后者记录本次装配的桥接命中数与垫片改写数（见 protocol.ComposeStats）。
 // 暂为同步写入（单条 SQLite insert 开销极小）；后续若成为瓶颈可改为队列异步落库。
 // 写入动作由 Deps.LogWrite 注入（生产 LogDB.Create，测试内存收集）。
-func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
+func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, clientProto protocol.Provider, stats protocol.ComposeStats, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
 	entry := shared.Log{
-		APIKeyID:  apiKeyID,
-		GroupName: g.Name,
-		ChannelID: t.Channel.ID,
-		ModelName: t.Model.Name,
-		Currency:  string(t.Model.Currency), // 费用货币快照：模型此后改价/改币/删除均不影响历史账
-		Status:    status,
-		Success:   success,
-		Stream:    stream,
-		RequestID: requestID,
+		APIKeyID:     apiKeyID,
+		GroupName:    g.Name,
+		ChannelID:    t.Channel.ID,
+		ModelName:    t.Model.Name,
+		Currency:     string(t.Model.Currency), // 费用货币快照：模型此后改价/改币/删除均不影响历史账
+		Status:       status,
+		Success:      success,
+		Stream:       stream,
+		RequestID:    requestID,
 		DurationMs:   durationMs,
 		FirstTokenMs: firstTokenMs,
+		// 诊断遥测（见 shared.Log 同名字段注释）
+		ClientProtocol: string(clientProto),
+		BridgeDecoded:  stats.BridgeDecoded,
+		ShimRewrites:   stats.ShimRewrites,
 	}
 	if callErr != nil {
 		entry.ErrKind = failSpec(callErr).ErrKind

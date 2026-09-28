@@ -47,3 +47,16 @@ test('buildLogParams：两端时间单调（start <= end）', () => {
   const p = buildLogParams({ model_name: '', success: 'all', range: RANGE }, 1, 20);
   assert.ok(new Date(p.start_time) <= new Date(p.end_time));
 });
+
+// client_protocol 是把 DSH(openai) 与 Claude Code(anthropic) 流量分开的关键筛选：
+// 两者共用同一 APIKey，此前日志无此字段，缓存命中率无法按客户端区分。
+test('buildLogParams：client_protocol 映射，all/空值省略', () => {
+  const p = buildLogParams({ model_name: '', success: 'all', client_protocol: 'anthropic', range: null }, 1, 20);
+  assert.equal(p.client_protocol, 'anthropic');
+
+  const all = buildLogParams({ model_name: '', success: 'all', client_protocol: 'all', range: null }, 1, 20);
+  assert.equal('client_protocol' in all, false, '"全部" 不应作为筛选条件发出');
+
+  const absent = buildLogParams({ model_name: '', success: 'all', range: null }, 1, 20);
+  assert.equal('client_protocol' in absent, false, '未设置时不应出现在参数里');
+});

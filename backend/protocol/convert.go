@@ -54,6 +54,21 @@ type UpstreamRequest struct {
 	ThinkingCompat bool
 }
 
+// ComposeStats 是装配上游请求时产生的诊断遥测，随返回值交给调用方写入调用日志。
+// 它不参与请求体、不影响转换语义，只为让「reasoning 桥是否生效」「垫片改写了多少
+// 历史」这两件此前只能靠猜的事变得可测量（写入方 gateway，读法见 shared.Log）。
+type ComposeStats struct {
+	// BridgeDecoded 是从 thinking / redacted_thinking 块签名里成功还原原始
+	// reasoning_content 的次数。跨协议入向（anthropic → openai）才有意义；
+	// 恒为 0 而请求里确有思考块 → 客户端没回传本网关的桥载荷，桥接未生效
+	// （见 reasoning_bridge.go）。
+	BridgeDecoded int
+	// ShimRewrites 是 thinking 兼容垫片注入占位的 assistant 消息条数，即
+	// 「前缀漂移面积」：每改写一条历史消息，其后的上游自动前缀缓存即失效
+	// （见 thinking_compat.go）。
+	ShimRewrites int
+}
+
 // ComposeUpstreamRequest 把客户端请求体装配为发往指定上游的请求体：
 // 协议转换（from != to 经 canonical 中转）+ 上游模型名替换 + thinking 注入。
 // gateway 不再自行改写请求体——模型名与思考开关落在哪个字段是协议知识，
@@ -62,32 +77,40 @@ type UpstreamRequest struct {
 // （DeepSeek/GLM 形状扩展），anthropic 上游靠客户端自带配置透传，gemini
 // 上游无此形状。只写出显式请求的意图、不做任何默认开启——无条件转发
 // thinking 曾导致部分上游 400（见 9a8e785）。
-func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) ([]byte, error) {
+// 第二个返回值是本次装配的诊断遥测（ComposeStats），与请求体一同交给调用方。
+func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) ([]byte, ComposeStats, error) {
+	var stats ComposeStats
 	if !from.Valid() {
-		return nil, fmt.Errorf("未知的源协议: %s", from)
+		return nil, stats, fmt.Errorf("未知的源协议: %s", from)
 	}
 	if !to.Valid() {
-		return nil, fmt.Errorf("未知的目标协议: %s", to)
+		return nil, stats, fmt.Errorf("未知的目标协议: %s", to)
 	}
-	out, err := composeUpstream(from, to, body, up)
+	out, stats, err := composeUpstream(from, to, body, up)
 	if err != nil {
-		return nil, err
+		return nil, stats, err
 	}
 	// 垫片只作用于 openai 兼容上游：其他协议没有 reasoning_content 形状
 	if up.ThinkingCompat && to == ProviderOpenAI {
-		return InjectReasoningPlaceholders(out)
+		out, stats.ShimRewrites, err = InjectReasoningPlaceholders(out)
+		if err != nil {
+			return nil, stats, err
+		}
 	}
-	return out, nil
+	return out, stats, nil
 }
 
-func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte, error) {
+func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte, ComposeStats, error) {
+	var stats ComposeStats
 	if from == to {
-		return rewriteSameProtocol(to, body, up)
+		out, err := rewriteSameProtocol(to, body, up)
+		return out, stats, err
 	}
 	req, err := parseRequestToOpenAI(from, body)
 	if err != nil {
-		return nil, err
+		return nil, stats, err
 	}
+	stats.BridgeDecoded = req.bridgeDecoded
 	if up.Model != "" {
 		req.Model = up.Model
 	}
@@ -97,7 +120,8 @@ func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte
 	if up.Thinking != nil && to == ProviderOpenAI {
 		req.Thinking = up.Thinking
 	}
-	return renderRequestFromOpenAI(to, req)
+	out, err := renderRequestFromOpenAI(to, req)
+	return out, stats, err
 }
 
 // rewriteSameProtocol 同协议直通的顶层覆盖：model / thinking 的外科手术式

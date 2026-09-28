@@ -197,6 +197,8 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	var usage *protocol.Usage
 	var first time.Time  // 流式首包写出时刻，非流式 / 首包前失败为零值
 	var failReason error // committed 分支对外返回 nil 错误，真实失败原因暂存于此供日志归因
+	// stats 是装配上游请求时产生的诊断遥测。在 defer 之前声明，供下面的日志闭包捕获。
+	var stats protocol.ComposeStats
 	defer func() {
 		firstTokenMs := int64(0)
 		if !first.IsZero() {
@@ -207,7 +209,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			logErr = failReason
 		}
 		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
-		s.logCall(apiKeyID, g, t, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
+		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
 		if !success {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
@@ -227,7 +229,9 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	// 装配上游请求：协议转换 + 模型名替换 + thinking 注入都在 protocol 内完成
 	// （模型名落哪个字段、thinking 哪个上游消费，是协议知识，归 protocol）。
-	upBody, err := protocol.ComposeUpstreamRequest(clientProto, t.Channel.Type, originalBody,
+	// 第三个返回值是装配遥测（桥接命中 / 垫片改写），交给 defer 里的日志闭包。
+	var upBody []byte
+	upBody, stats, err = protocol.ComposeUpstreamRequest(clientProto, t.Channel.Type, originalBody,
 		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking, ThinkingCompat: t.Channel.ThinkingCompat})
 	if err != nil {
 		return nil, 0, &convertError{err}

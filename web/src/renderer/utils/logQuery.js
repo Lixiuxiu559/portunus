@@ -7,6 +7,8 @@
 export function buildLogParams(filters, page, pageSize) {
   const params = { page, page_size: pageSize };
   if (filters.model_name) params.model_name = filters.model_name;
+  // 客户端入口协议：把 DSH(openai) 与 Claude Code(anthropic) 的流量分开比较缓存命中率
+  if (filters.client_protocol && filters.client_protocol !== 'all') params.client_protocol = filters.client_protocol;
   if (filters.success !== 'all') params.success = filters.success;
   if (filters.range?.start) params.start_time = toRFC3339(filters.range.start);
   if (filters.range?.end) params.end_time = toRFC3339(filters.range.end);

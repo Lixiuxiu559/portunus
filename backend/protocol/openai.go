@@ -21,6 +21,13 @@ type ChatCompletionRequest struct {
 	// {type,budget_tokens} 形状。仅 openai 渲染把它写进上游请求体，不做任何
 	// 默认开启——无条件转发曾导致部分上游 400（见 9a8e785）。
 	Thinking *ThinkingConfig `json:"thinking,omitempty"`
+
+	// bridgeDecoded 是本次解析中从 thinking / redacted_thinking 块签名里成功还原
+	// 原始 reasoning_content 的次数。这是**解析遥测**，不是请求数据：非导出字段
+	// 不参与序列化，只由 ComposeUpstreamRequest 读出交给调用日志，用于判断
+	// reasoning 桥（reasoning_bridge.go）是否真被客户端回传触发——恒为 0 而请求里
+	// 确有思考块，说明客户端没回传本网关的签名，桥接形同未生效。
+	bridgeDecoded int
 }
 
 // ThinkingConfig 是思考模式配置（Anthropic 与 DeepSeek 等兼容方同形状）。

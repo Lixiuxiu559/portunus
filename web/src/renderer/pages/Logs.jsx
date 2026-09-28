@@ -15,6 +15,17 @@ const successOptions = [
   { id: 'false', label: '失败' },
 ];
 
+// 客户端入口协议（与后端 protocol.Provider 取值一致）。DSH 走 openai、
+// Claude Code 走 anthropic，两者共用同一 APIKey——只有按此筛选才能把它们的
+// 缓存命中率分开比较（存量日志该字段为空，表示未记录）。
+const clientProtocolOptions = [
+  { id: 'all', label: '全部' },
+  { id: 'openai', label: 'OpenAI' },
+  { id: 'anthropic', label: 'Anthropic' },
+  { id: 'openai_responses', label: 'Responses' },
+  { id: 'gemini', label: 'Gemini' },
+];
+
 // 失败类别中文标签（与后端 gateway.classifyErr 的 err_kind 取值对应）
 const errKindLabels = {
   client_cancel: '用户取消',
@@ -39,6 +50,7 @@ export default function Logs() {
 
   const [filters, setFilters] = useState({
     model_name: '',
+    client_protocol: 'all',
     success: 'all',
     range: null,
   });
@@ -97,6 +109,31 @@ export default function Logs() {
       render: (val) => (val ? (
         <span className="block truncate text-center" title={String(val)}>{val}</span>
       ) : '—'),
+    },
+    {
+      title: '客户端 / 桥接',
+      dataIndex: 'client_protocol',
+      key: 'client_protocol',
+      width: '150px',
+      render: (val, record) => {
+        // client_protocol 为空 = 本次改动前的存量日志（未记录入口协议）。
+        // 桥接/垫片计数是判断「缓存问题是否真被修复」的观测点：
+        // 桥接恒为 0 而客户端是 anthropic → Claude Code 没回传网关签名，桥接未生效。
+        const bridge = record?.bridge_decoded || 0;
+        const shim = record?.shim_rewrites || 0;
+        return (
+          <span className="block text-center text-xs">
+            <span className="font-mono">{val || '—'}</span>
+            {(bridge > 0 || shim > 0) && (
+              <span className="block text-muted">
+                {bridge > 0 ? `桥接 ${bridge}` : ''}
+                {bridge > 0 && shim > 0 ? ' · ' : ''}
+                {shim > 0 ? `垫片 ${shim}` : ''}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       title: '输入 Tokens',
@@ -245,6 +282,29 @@ export default function Logs() {
           </Select.Popover>
         </Select>
 
+        <Select
+          name="client_protocol"
+          selectedKey={filters.client_protocol}
+          onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
+          className="w-32"
+        >
+          <Label>客户端</Label>
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {clientProtocolOptions.map((o) => (
+                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+                  {o.label}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+
         <DateRangePicker
           granularity="minute"
           startName="start"
@@ -339,7 +399,7 @@ export default function Logs() {
         loading={loading}
         refreshing={refreshing}
         emptyText={
-          filters.model_name || filters.success !== 'all' || filters.range
+          filters.model_name || filters.client_protocol !== 'all' || filters.success !== 'all' || filters.range
             ? '没有符合条件的日志，可调整或清除筛选'
             : '暂无日志'
         }

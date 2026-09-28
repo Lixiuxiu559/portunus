@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // 本文件定义 Anthropic 流式事件的结构，以及 anthropic ↔ openai 的流式转换状态机。
@@ -167,6 +168,10 @@ type anthropicBlockSink struct {
 	blockOpen bool
 	blockType string // "text" | "thinking"，TextEnd 据此决定是否补签名
 	blockIdx  int
+	// thinkingText 累积本块思考明文。桥签名要用**整块**内容生成
+	// （见 reasoning_bridge.go），而 signature_delta 只能在块收尾时发一次，
+	// 因此思考增量不能边流边丢。
+	thinkingText strings.Builder
 
 	// 并行 tool_use 块：openai tool_calls index → anthropic content block index
 	toolIdx map[int]int
@@ -240,7 +245,10 @@ func (a *anthropicBlockSink) TextDelta(s string) [][]byte {
 }
 
 func (a *anthropicBlockSink) ReasoningDelta(s string) [][]byte {
-	return a.textBlock("thinking", s)
+	// 先开块（开新块会重置累积器），再把本段追加进累积器。
+	out := a.textBlock("thinking", s)
+	a.thinkingText.WriteString(s)
+	return out
 }
 
 // textBlock 打开（或续写）单块。骨架保证类型切换前已回调 TextEnd，此处只管
@@ -252,6 +260,7 @@ func (a *anthropicBlockSink) textBlock(typ, text string) [][]byte {
 		a.blockType = typ
 		a.blockIdx = a.nextIdx
 		a.nextIdx++
+		a.thinkingText.Reset() // 新块开始：清掉上一块的思考累积
 		blk := &ContentBlock{Type: typ}
 		if typ == "text" {
 			// text 块必须含空 "text" 字段，否则客户端拿不到字符串字段。
@@ -271,7 +280,9 @@ func (a *anthropicBlockSink) textBlock(typ, text string) [][]byte {
 // 扩展思考的 thinking 块要带签名才能被客户端在下一轮原样回传（多轮回传才会
 // 带上 reasoning_content，否则 DeepSeek 等 thinking 模式上游报 400
 // "reasoning_content must be passed back"）。签名值上游（DeepSeek 等）不提供，
-// 发非空占位符——部分客户端校验签名非空才肯在下一轮回传思考块。
+// 这里改发**承载整块思考内容的桥载荷**（见 reasoning_bridge.go）：客户端原样
+// 回传时网关逐字节还原 reasoning_content，跨轮前缀稳定，上游前缀缓存才命中。
+// 无可封装内容时退回非空占位符——部分客户端校验签名非空才肯在下一轮回传思考块。
 func (a *anthropicBlockSink) TextEnd() [][]byte {
 	if !a.blockOpen {
 		return nil
@@ -280,12 +291,21 @@ func (a *anthropicBlockSink) TextEnd() [][]byte {
 	if a.blockType == "thinking" {
 		out = append(out, a.evBlock("content_block_delta", a.blockIdx, nil, &StreamDelta{
 			Type:      "signature_delta",
-			Signature: "sig",
+			Signature: a.thinkingSignature(),
 		}))
 	}
 	out = append(out, a.evBlock("content_block_stop", a.blockIdx, nil, nil))
 	a.blockOpen = false
+	a.thinkingText.Reset()
 	return out
+}
+
+// thinkingSignature 返回本块思考内容的桥签名；无内容可封装时退回非空占位。
+func (a *anthropicBlockSink) thinkingSignature() string {
+	if sig := EncodeReasoningSignature(a.thinkingText.String()); sig != "" {
+		return sig
+	}
+	return reasoningSignatureFallback
 }
 
 // ToolStart 为新的并行工具调用分配 anthropic content block index 并发

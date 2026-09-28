@@ -9,26 +9,31 @@ import (
 
 // Log 记录一次对外 LLM 调用的完整信息，供日志查询与费用统计。
 type Log struct {
-	ID              int64     `gorm:"primaryKey" json:"id"`
-	APIKeyID        int64     `gorm:"index" json:"api_key_id"`
-	GroupName       string    `gorm:"index" json:"group_name"`
-	ChannelID       int64     `gorm:"index" json:"channel_id"`
-	ModelName       string    `gorm:"index" json:"model_name"`
-	Currency        string    `gorm:"size:8" json:"currency"` // 费用货币快照（写入时取自模型；空视为 USD）
-	Status          int       `json:"status"`                 // 上游返回的 HTTP 状态码
-	Success         bool      `gorm:"index" json:"success"`
-	Stream          bool      `gorm:"index" json:"stream"`                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
-	RequestID       string    `gorm:"size:32;index" json:"request_id,omitempty"` // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
-	InputToken      int64     `json:"input_token"`
-	OutputToken     int64     `json:"output_token"`
-	CacheReadToken  int64     `json:"cache_read_token"`
-	CacheWriteToken int64     `json:"cache_write_token"`
-	Cost            float64   `json:"cost"`
-	DurationMs      int64     `json:"duration_ms"`
-	FirstTokenMs    int64     `json:"first_token_ms"`     // 流式首包耗时（客户端 TTFT），非流式为 0
-	ErrKind         string    `json:"err_kind,omitempty"` // 失败类别（取值见下方 ErrKind 词表；判定归 gateway.failSpec 的失败处置），成功为空；无查询路径暂不建索引
-	ErrMsg          string    `json:"err_msg,omitempty"`  // 失败原文（截断），成功为空
-	CreatedAt       time.Time `gorm:"index" json:"created_at"`
+	ID              int64   `gorm:"primaryKey" json:"id"`
+	APIKeyID        int64   `gorm:"index" json:"api_key_id"`
+	GroupName       string  `gorm:"index" json:"group_name"`
+	ChannelID       int64   `gorm:"index" json:"channel_id"`
+	ModelName       string  `gorm:"index" json:"model_name"`
+	Currency        string  `gorm:"size:8" json:"currency"` // 费用货币快照（写入时取自模型；空视为 USD）
+	Status          int     `json:"status"`                 // 上游返回的 HTTP 状态码
+	Success         bool    `gorm:"index" json:"success"`
+	Stream          bool    `gorm:"index" json:"stream"`                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
+	RequestID       string  `gorm:"size:32;index" json:"request_id,omitempty"` // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
+	InputToken      int64   `json:"input_token"`
+	OutputToken     int64   `json:"output_token"`
+	CacheReadToken  int64   `json:"cache_read_token"`
+	CacheWriteToken int64   `json:"cache_write_token"`
+	Cost            float64 `json:"cost"`
+	DurationMs      int64   `json:"duration_ms"`
+	FirstTokenMs    int64   `json:"first_token_ms"`     // 流式首包耗时（客户端 TTFT），非流式为 0
+	ErrKind         string  `json:"err_kind,omitempty"` // 失败类别（取值见下方 ErrKind 词表；判定归 gateway.failSpec 的失败处置），成功为空；无查询路径暂不建索引
+	ErrMsg          string  `json:"err_msg,omitempty"`  // 失败原文（截断），成功为空
+	// ── 诊断遥测：把「缓存为什么没命中」从猜测变成可测量 ──────────────────
+	// 写入方是 gateway（值来自 protocol.ComposeStats 与客户端入口协议）。
+	ClientProtocol string    `gorm:"size:16;index" json:"client_protocol,omitempty"` // 客户端入口协议（openai / anthropic / openai_responses / gemini）；空 = 本次改动前的存量日志，未记录
+	BridgeDecoded  int       `json:"bridge_decoded"`                                 // reasoning 桥从 thinking 块签名还原原文的次数。anthropic 入向恒为 0 而请求里确有思考块 → 客户端没回传本网关的签名，桥接未生效（见 protocol/reasoning_bridge.go）
+	ShimRewrites   int       `json:"shim_rewrites"`                                  // thinking 兼容垫片改写的 assistant 消息条数，即被改写的前缀面积（见 protocol/thinking_compat.go）
+	CreatedAt      time.Time `gorm:"index" json:"created_at"`
 }
 
 // ── 失败归因词表（Log.ErrKind 取值），前端与排障按此过滤 ──────────────────

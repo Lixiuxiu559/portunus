@@ -15,11 +15,15 @@ type LogFilter struct {
 	ChannelID int64
 	GroupName string
 	ModelName string
-	Success   *bool
-	StartTime *time.Time
-	EndTime   *time.Time
-	Page      int
-	PageSize  int
+	// ClientProtocol 按客户端入口协议过滤（openai / anthropic / …）。用于把
+	// DSH 与 Claude Code 的流量分开比较缓存命中率——此前日志无此字段，两者
+	// 共用同一 APIKey，数据里无法区分。
+	ClientProtocol string
+	Success        *bool
+	StartTime      *time.Time
+	EndTime        *time.Time
+	Page           int
+	PageSize       int
 }
 
 // LogStats 是日志汇总统计。费用按日志快照的货币分桶累计（无汇率换算）；
@@ -84,6 +88,9 @@ func applyLogFilter(db *gorm.DB, f LogFilter) *gorm.DB {
 	}
 	if f.ModelName != "" {
 		db = db.Where("model_name = ?", f.ModelName)
+	}
+	if f.ClientProtocol != "" {
+		db = db.Where("client_protocol = ?", f.ClientProtocol)
 	}
 	if f.Success != nil {
 		db = db.Where("success = ?", *f.Success)

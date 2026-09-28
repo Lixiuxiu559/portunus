@@ -45,7 +45,7 @@ func TestLogCallErrorAttribution(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			rec.reset()
-			s.logCall(1, g, tt, 0, false, true, nil, 1, 0, "req-attr-1", c.err)
+			s.logCall(1, g, tt, protocol.ProviderAnthropic, protocol.ComposeStats{}, 0, false, true, nil, 1, 0, "req-attr-1", c.err)
 			entry := rec.last()
 			if entry == nil {
 				t.Fatalf("未收集到日志")
@@ -65,9 +65,11 @@ func TestLogCallErrorAttribution(t *testing.T) {
 		})
 	}
 
-	// 成功调用不带归因字段；非流式 stream=false，request_id 照常落库
+	// 成功调用不带归因字段；非流式 stream=false，request_id 照常落库；
+	// 诊断遥测（客户端协议 + 桥接/垫片计数）必须原样落库——这是判断
+	// 「reasoning 桥是否真被触发」的唯一数据来源，断链即失去观测能力。
 	rec.reset()
-	s.logCall(1, g, tt, 200, true, false, nil, 1, 0, "req-attr-2", nil)
+	s.logCall(1, g, tt, protocol.ProviderAnthropic, protocol.ComposeStats{BridgeDecoded: 3, ShimRewrites: 2}, 200, true, false, nil, 1, 0, "req-attr-2", nil)
 	entry := rec.last()
 	if entry == nil {
 		t.Fatalf("未收集到日志")
@@ -80,6 +82,15 @@ func TestLogCallErrorAttribution(t *testing.T) {
 	}
 	if entry.RequestID != "req-attr-2" {
 		t.Errorf("request_id = %q, want req-attr-2", entry.RequestID)
+	}
+	if entry.ClientProtocol != "anthropic" {
+		t.Errorf("client_protocol = %q, want anthropic", entry.ClientProtocol)
+	}
+	if entry.BridgeDecoded != 3 {
+		t.Errorf("bridge_decoded = %d, want 3", entry.BridgeDecoded)
+	}
+	if entry.ShimRewrites != 2 {
+		t.Errorf("shim_rewrites = %d, want 2", entry.ShimRewrites)
 	}
 }
 

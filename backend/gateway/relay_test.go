@@ -156,6 +156,49 @@ func TestRelayNonStreamOpenAIToOpenAI(t *testing.T) {
 	}
 }
 
+// TestRelayLogsClientProtocolAndComposeStats 端到端断言诊断遥测真的落到日志行：
+// Claude Code 走 /v1/messages（anthropic）而渠道是 openai 类型，必然走跨协议重建；
+// 请求里带一个承载桥载荷的 thinking 块，外加一条缺思考的 tool_calls 助手。
+// 断言日志记录 client_protocol=anthropic、BridgeDecoded=1、ShimRewrites=1——
+// 这是判断「缓存问题是否真被修复」的唯一数据来源，链路任一环断掉都会失去观测能力。
+func TestRelayLogsClientProtocolAndComposeStats(t *testing.T) {
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","model":"upstream-model","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`))
+	})
+
+	r, key, logs := setupGateway(t, protocol.ProviderOpenAI, upstream)
+
+	sig := protocol.EncodeReasoningSignature("首轮真实思考")
+	body := `{"model":"my-model","max_tokens":64,"messages":[` +
+		`{"role":"user","content":[{"type":"text","text":"hi"}]},` +
+		`{"role":"assistant","content":[{"type":"thinking","thinking":"被客户端改写的明文","signature":"` + sig + `"},{"type":"text","text":"答案"}]},` +
+		`{"role":"user","content":[{"type":"text","text":"继续"}]},` +
+		`{"role":"assistant","content":[{"type":"tool_use","id":"c1","name":"ls","input":{}}]},` +
+		`{"role":"user","content":[{"type":"tool_result","tool_use_id":"c1","content":"ok"}]}` +
+		`]}`
+
+	w := doReq(t, r, "/v1/messages", body, key)
+	if w.Code != 200 {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	entry := logs.last()
+	if entry == nil {
+		t.Fatalf("未记录调用日志")
+	}
+	if entry.ClientProtocol != "anthropic" {
+		t.Errorf("client_protocol = %q, want anthropic", entry.ClientProtocol)
+	}
+	if entry.BridgeDecoded != 1 {
+		t.Errorf("bridge_decoded = %d, want 1（签名里的桥载荷应被还原）", entry.BridgeDecoded)
+	}
+	if entry.ShimRewrites != 1 {
+		t.Errorf("shim_rewrites = %d, want 1（仅带 tool_calls 那条应被垫片改写）", entry.ShimRewrites)
+	}
+}
+
 func TestRelayNonStreamOpenAIToAnthropic(t *testing.T) {
 	var gotBody []byte
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
