@@ -39,13 +39,9 @@ import (
 // 并解码（向后兼容）；识别不了的一律当普通签名处理，安全降级为「读 thinking 明文」。
 const ReasoningSignaturePrefix = "portunus-reasoning-v1:"
 
-// reasoningSignatureFallback 是无可封装内容时的非空签名占位。部分客户端校验签名
-// 非空才肯在下一轮回传 thinking 块，空签名会让整块思考内容丢失——这是 "sig" 常量
-// 原本承担的唯一职责，桥载荷为空时保留它，行为与改动前一致。
-const reasoningSignatureFallback = "sig"
-
 // EncodeReasoningSignature 把原始 reasoning_content 封装成 thinking 块的 signature。
-// reasoning 为空时返回空串（调用方据此走 reasoningSignatureFallback）。
+// reasoning 为空时返回空串（防御性兜底；正常流式路径下思考累积恒非空，见
+// anthropic_stream.go thinkingSignature）。
 func EncodeReasoningSignature(reasoning string) string {
 	if reasoning == "" {
 		return ""

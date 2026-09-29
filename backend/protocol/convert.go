@@ -67,6 +67,13 @@ type ComposeStats struct {
 	// 「前缀漂移面积」：每改写一条历史消息，其后的上游自动前缀缓存即失效
 	// （见 thinking_compat.go）。
 	ShimRewrites int
+	// HostedToolsStripped 是被剥离的托管工具声明计数：跨协议到不支持 hosted
+	// 工具的 openai 上游时剔除的声明数，加上 canonical 无法承载、入站即丢弃的
+	// 未知 hosted 类型数（如 code_execution_*）。web_search_* 能透传到 anthropic
+	// 上游，只在发往 openai 时被剥离。gemini 入站识别到的未知 hosted 键不计入
+	// （仅 anthropic/responses 入站计数）——源协议歧义在此说清，别指望数字对得上
+	// 全部入站协议。
+	HostedToolsStripped int
 }
 
 // ComposeUpstreamRequest 把客户端请求体装配为发往指定上游的请求体：
@@ -111,6 +118,7 @@ func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte
 		return nil, stats, err
 	}
 	stats.BridgeDecoded = req.bridgeDecoded
+	stats.HostedToolsStripped = req.hostedToolsStripped
 	if up.Model != "" {
 		req.Model = up.Model
 	}
@@ -119,6 +127,20 @@ func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte
 	// 该字段，-thinking 意图即静默漏进非 openai 上游（9a8e785 的 400 回归）。
 	if up.Thinking != nil && to == ProviderOpenAI {
 		req.Thinking = up.Thinking
+	}
+	// 托管工具声明发往 openai 上游前剥离：openai 兼容上游没有 hosted 工具语义，
+	// 带 type 的声明会被当成普通 function 或直接 400。同协议直通（rewriteSameProtocol）
+	// 不在此列——直通天然保真，客户端自己发的 hosted 声明原样送出。
+	if to == ProviderOpenAI {
+		var kept []Tool
+		for _, t := range req.Tools {
+			if isHostedToolType(t.Type) {
+				stats.HostedToolsStripped++
+				continue
+			}
+			kept = append(kept, t)
+		}
+		req.Tools = kept
 	}
 	out, err := renderRequestFromOpenAI(to, req)
 	return out, stats, err

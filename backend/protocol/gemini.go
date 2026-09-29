@@ -59,10 +59,22 @@ type GenerationConfig struct {
 	CandidateCount  int      `json:"candidateCount,omitempty"`
 }
 
-// GeminiTool 是 Gemini 工具定义。
+// GeminiTool 是 Gemini 工具定义。canonical 的 function 工具落在
+// functionDeclarations；托管搜索声明是各占一个 tools 元素的 hosted 键
+// （googleSearch / googleSearchRetrieval / enterpriseWebSearch），三者形状相同
+// （空对象 {}，或带少量配置的内层字段），区别只在版本/产品线。用指针承载：
+// nil 表示该键未出现，非 nil 即声明存在——hosted 声明没有 name/schema 可映射，
+// 出站渲染一个空对象即完整声明。
 type GeminiTool struct {
-	FunctionDeclarations []GeminiFunctionDeclaration `json:"functionDeclarations,omitempty"`
+	FunctionDeclarations  []GeminiFunctionDeclaration `json:"functionDeclarations,omitempty"`
+	GoogleSearch          *GeminiSearchTool           `json:"googleSearch,omitempty"`          // Gemini 原生搜索（现网主用）
+	GoogleSearchRetrieval *GeminiSearchTool           `json:"googleSearchRetrieval,omitempty"` // 旧版搜索键
+	EnterpriseWebSearch   *GeminiSearchTool           `json:"enterpriseWebSearch,omitempty"`   // 企业版搜索键
 }
+
+// GeminiSearchTool 是 hosted 搜索声明的占位形状：非 nil 即代表该声明存在，
+// 内层配置（如有）MVP 不承载；空结构体序列化为 {}。
+type GeminiSearchTool struct{}
 
 // GeminiFunctionDeclaration 是 Gemini 函数声明。
 type GeminiFunctionDeclaration struct {
@@ -94,6 +106,27 @@ type GeminiCandidate struct {
 	Content      *GeminiContent `json:"content,omitempty"`
 	FinishReason string         `json:"finishReason,omitempty"`
 	Index        int            `json:"index,omitempty"`
+	// GroundingMetadata 是托管搜索的接地数据（candidate 级，googleSearch 触发时
+	// 由上游附带）。MVP 只解析查询词与来源，searchEntryPoint / groundingSupports
+	// 不解析（未知字段直接忽略，DTO 不建）。
+	GroundingMetadata *GeminiGroundingMetadata `json:"groundingMetadata,omitempty"`
+}
+
+// GeminiGroundingMetadata 是 Gemini 的接地数据。
+type GeminiGroundingMetadata struct {
+	WebSearchQueries []string               `json:"webSearchQueries,omitempty"` // 上游实际执行的搜索词
+	GroundingChunks  []GeminiGroundingChunk `json:"groundingChunks,omitempty"`  // 引用来源
+}
+
+// GeminiGroundingChunk 是一条接地来源单元。Gemini 只定义了 web 一种形状。
+type GeminiGroundingChunk struct {
+	Web *GeminiGroundingWeb `json:"web,omitempty"`
+}
+
+// GeminiGroundingWeb 是 web 来源的 uri / title。
+type GeminiGroundingWeb struct {
+	URI   string `json:"uri,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
 // GeminiUsageMetadata 是 Gemini 用量元信息。
@@ -135,6 +168,17 @@ func geminiRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 					Description: fd.Description,
 					Parameters:  fd.Parameters,
 				},
+			})
+		}
+		// hosted 搜索声明（googleSearch / googleSearchRetrieval / enterpriseWebSearch）
+		// 归一到 canonical 统一语义名 web_search（归一理由见 openai.go
+		// isHostedToolType 注释）。同一元素内多个 hosted 键只算一次。其余未知 hosted
+		// 键跳过：gemini 入站不接 hosted 剥离遥测，保持简单（遥测链已由
+		// anthropic/responses 入站接好）。
+		if t.GoogleSearch != nil || t.GoogleSearchRetrieval != nil || t.EnterpriseWebSearch != nil {
+			out.Tools = append(out.Tools, Tool{
+				Type:     "web_search",
+				Function: FunctionDef{Name: "web_search"},
 			})
 		}
 	}
@@ -243,8 +287,16 @@ func geminiRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		out.GenerationConfig.MaxOutputTokens = req.MaxCompletionTokens
 	}
 
+	// tools：function 工具归入一个 functionDeclarations 元素；canonical 的托管
+	// 搜索声明（Type=web_search）渲染为独立的 googleSearch 空对象元素，与
+	// functionDeclarations 元素并列。hosted 工具没有 name/schema 可映射，一个
+	// 空对象即完整声明；若不分流，会被误渲染成空壳普通 function 声明。
 	var decls []GeminiFunctionDeclaration
 	for _, t := range req.Tools {
+		if isHostedToolType(t.Type) {
+			out.Tools = append(out.Tools, GeminiTool{GoogleSearch: &GeminiSearchTool{}})
+			continue
+		}
 		decls = append(decls, GeminiFunctionDeclaration{
 			Name:        t.Function.Name,
 			Description: t.Function.Description,
@@ -252,7 +304,7 @@ func geminiRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		})
 	}
 	if len(decls) > 0 {
-		out.Tools = []GeminiTool{{FunctionDeclarations: decls}}
+		out.Tools = append(out.Tools, GeminiTool{FunctionDeclarations: decls})
 	}
 	if choice := openAIToolChoiceToGemini(req.ToolChoice); choice != "" {
 		out.ToolConfig = &ToolConfig{FunctionCallingConfig: &FunctionCallingConfig{Mode: choice}}
@@ -368,6 +420,9 @@ func geminiResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		if cand.Content != nil {
 			out.Choices[0].Message = geminiContentToChat(*cand.Content)
 		}
+		// 托管搜索接地（candidate 级）：填进 canonical 载体，跨协议链路下游
+		// （如 anthropic 出向）据此合成 server_tool_use / web_search_tool_result。
+		out.Choices[0].Message.GroundingMetadata = geminiGroundingToCanonical(cand.GroundingMetadata)
 		out.Choices[0].FinishReason = geminiFinishToOpenAI(cand.FinishReason)
 	}
 	if resp.UsageMetadata != nil {
@@ -375,6 +430,27 @@ func geminiResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		out.Usage = &u
 	}
 	return out, nil
+}
+
+// geminiGroundingToCanonical 把 Gemini 的 groundingMetadata 映射为 canonical
+// GroundingMetadata。字段顺序与去重原样直通（Gemini 给什么转什么，不做排序去重
+// ——上游产出本身确定）。既无查询词也无来源时返回 nil，避免产出空载体让下游
+// 误判「有接地」。
+func geminiGroundingToCanonical(gm *GeminiGroundingMetadata) *GroundingMetadata {
+	if gm == nil {
+		return nil
+	}
+	var sources []GroundingSource
+	for _, c := range gm.GroundingChunks {
+		if c.Web == nil {
+			continue
+		}
+		sources = append(sources, GroundingSource{URI: c.Web.URI, Title: c.Web.Title})
+	}
+	if len(gm.WebSearchQueries) == 0 && len(sources) == 0 {
+		return nil
+	}
+	return &GroundingMetadata{SearchQueries: gm.WebSearchQueries, Sources: sources}
 }
 
 // geminiFinishToOpenAI 映射 finishReason → finish_reason。
@@ -474,6 +550,17 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		return out, nil
 	}
 	cand := resp.Candidates[0]
+	// candidate 级 groundingMetadata：托管搜索接地。独立成一条仅含接地的 chunk
+	// 且先于文本产出——anthropic 出向只在首个 text 块打开时补发合成的
+	// server_tool_use / web_search_tool_result 块，接地必须赶在 text 之前到达
+	// 才会被落地（「先搜索、后回答」）；本 chunk 若同时有文本增量，两条相邻事件
+	// 也不丢序。role chunk 先行，保持 canonical 流以 role 开场的惯例。
+	if gm := geminiGroundingToCanonical(cand.GroundingMetadata); gm != nil {
+		if b := g.st.emitRole("assistant"); b != nil {
+			out = append(out, b)
+		}
+		out = append(out, g.st.emitChunk(ChunkDelta{GroundingMetadata: gm}, ""))
+	}
 	if cand.Content != nil {
 		for _, p := range cand.Content.Parts {
 			if p.Text == "" {

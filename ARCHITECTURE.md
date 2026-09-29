@@ -17,7 +17,7 @@ LLM API 聚合服务：多渠道接入、按渠道模型定价、模型分组对
 | `model` | 模型：管理渠道中的模型，**每个模型带价格**（内置价格表填默认 + 手动覆盖） |
 | `group` | 分组：跨渠道聚合模型，**每个分组必配一个路由策略** |
 | `router` | 路由解析：按分组策略决定调用哪个/哪些上游，返回「模型 + 渠道」 |
-| `protocol` | 协议转换：OpenAI Chat / Responses ↔ Anthropic ↔ Gemini |
+| `protocol` | 协议转换：OpenAI Chat / Responses ↔ Anthropic ↔ Gemini。托管工具（hosted，如 web_search）以 canonical 统一语义名无损穿行：上游支持的协议渲染原生声明（googleSearch / web_search_20250305 等），openai 兼容上游剥离并计入遥测；Gemini 接地数据合成回 anthropic 的 server_tool_use 块 |
 | `api` | 管理 API：供前端调用（渠道 / 模型 / 分组的 CRUD） |
 | `gateway` | 对外 `/v1` LLM 接口：供 claude code / codex 等客户端调用，按分组策略路由 |
 | `cron` | 定时任务：定时同步模型、日志落库 |
@@ -54,3 +54,4 @@ LLM API 聚合服务：多渠道接入、按渠道模型定价、模型分组对
 4. **分组可混协议**，relay 时按需动态转换。
 5. **模型自动拉取**：启动同步 + 定时同步 + 手动触发；同步为全量覆盖，价格独立留存不丢。
 6. **框架沿用 Gin + GORM**（从零是摆脱 octopus 的业务负担，不必连成熟框架一起弃用）。
+7. **托管工具只适配、不代跑**：Claude Code 的 WebSearch 等服务端工具由上游执行（new-api / cc-switch 同一立场）。portunus 保证其在协议矩阵中无损穿行（声明双向映射、历史块同构转换、接地数据合成回流），上游无此能力时诚实剥离 + 遥测，绝不发明网关侧搜索执行（设计考证见 `docs/research/2026-09-29-hosted-websearch-bridging.md`）。

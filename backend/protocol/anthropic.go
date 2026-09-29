@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -60,7 +61,7 @@ func (m *AnthropicMessage) UnmarshalJSON(data []byte) error {
 
 // ContentBlock 是 Anthropic 消息 content 数组的一个单元。
 type ContentBlock struct {
-	Type      string       `json:"type"` // text / image / tool_use / tool_result / thinking / redacted_thinking
+	Type      string       `json:"type"` // text / image / tool_use / server_tool_use / tool_result / web_search_tool_result / thinking / redacted_thinking
 	Text      string       `json:"text,omitempty"`
 	ID        string       `json:"id,omitempty"`
 	Name      string       `json:"name,omitempty"`        // tool_use
@@ -111,6 +112,24 @@ func (b ContentBlock) MarshalJSON() ([]byte, error) {
 	case "redacted_thinking":
 		// data 是 redacted_thinking 的唯一内容字段：密文原样回传才能被上游识别。
 		m["data"] = b.Data
+	case "server_tool_use":
+		// 服务端工具调用：id / name / input 与 tool_use 同病根——空串/空对象时
+		// 也必须输出，否则客户端拿 undefined 做索引会崩。
+		m["id"] = b.ID
+		m["name"] = b.Name
+		if b.Input != nil {
+			m["input"] = b.Input
+		} else {
+			m["input"] = json.RawMessage(`{}`)
+		}
+	case "web_search_tool_result":
+		// content 是必填字段（搜索结果数组），为空时输出 []。
+		m["tool_use_id"] = b.ToolUseID
+		if b.Content != nil {
+			m["content"] = b.Content
+		} else {
+			m["content"] = []any{}
+		}
 	}
 	return json.Marshal(m)
 }
@@ -124,10 +143,14 @@ type ImageSource struct {
 }
 
 // AnthropicTool 是 Anthropic 工具定义。
+// Type 非空表示服务端托管工具（如 Claude Code 的 web_search_20250305）：
+// 这类声明没有 input_schema，只有 type/name 与可选字段，此前缺此字段导致
+// 入站被当作普通空壳 function 工具、出站又丢回 type——第一现场在此。
 type AnthropicTool struct {
+	Type        string `json:"type,omitempty"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
-	InputSchema any    `json:"input_schema"`
+	InputSchema any    `json:"input_schema,omitempty"`
 }
 
 // ThinkingConfig 定义在 openai.go（canonical 层与 Anthropic 同形状，此处复用）。
@@ -205,14 +228,15 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 	}
 
 	// 先收集 assistant.tool_use 的 id → 工具名映射，供 tool_result 补 name 字段
-	// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。
+	// （部分上游如 DeepSeek 要求 tool 消息必须带 name）。server_tool_use 同理：
+	// web_search_tool_result 的 tool_use_id 指向对应的 server_tool_use 块。
 	toolNameByID := map[string]string{}
 	for _, m := range req.Messages {
 		if m.Role != "assistant" {
 			continue
 		}
 		for _, block := range m.Content {
-			if block.Type == "tool_use" {
+			if block.Type == "tool_use" || block.Type == "server_tool_use" {
 				toolNameByID[block.ID] = block.Name
 			}
 		}
@@ -225,8 +249,26 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		out.bridgeDecoded += decoded // 桥接命中遥测，见 ChatCompletionRequest.bridgeDecoded
 	}
 
-	// tools → function tools
+	// tools → function tools；托管工具声明分流（见下方注释）
 	for _, t := range req.Tools {
+		if t.Type != "" {
+			if isVersionedClaudeWebSearchType(t.Type) {
+				// 版本化 web_search 声明：归一到 canonical 统一语义名 web_search
+				//（归一理由见 openai.go isHostedToolType 注释）。版本间的差异字段
+				// MVP 不承载，出站统一字面化到基线版本。不填 Parameters/
+				// Description——hosted 工具没有 schema，填空壳会让出站被误渲染成
+				// 普通 function（历史上的第一现场）。
+				out.Tools = append(out.Tools, Tool{
+					Type:     "web_search",
+					Function: FunctionDef{Name: t.Name},
+				})
+				continue
+			}
+			// 其余未知 hosted 类型（code_execution_* 等）：canonical 无法承载，
+			// 剥离并计入遥测（见 ComposeStats.HostedToolsStripped）。
+			out.hostedToolsStripped++
+			continue
+		}
 		out.Tools = append(out.Tools, Tool{
 			Type: "function",
 			Function: FunctionDef{
@@ -240,6 +282,28 @@ func anthropicRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		out.ToolChoice = anthropicToolChoiceToOpenAI(req.ToolChoice)
 	}
 	return out, nil
+}
+
+// isVersionedClaudeWebSearchType 判断 Anthropic 的 type 是否是版本化的
+// web_search 服务端工具声明：形如 web_search_20250305，即 web_search_ 前缀
+// 后接恰 8 位纯数字日期。参考 new-api 的 isVersionedClaudeWebSearchType——
+// 校验而不是只认字面量，是为了上游日后出新日期版本（web_search_20251111）
+// 时自动跟随，不必逐个枚举。
+func isVersionedClaudeWebSearchType(t string) bool {
+	const prefix = "web_search_"
+	if !strings.HasPrefix(t, prefix) {
+		return false
+	}
+	date := t[len(prefix):]
+	if len(date) != 8 {
+		return false
+	}
+	for _, c := range date {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // anthropicSystemToText 把 system（string 或 content blocks）压成一段文本。
@@ -307,36 +371,44 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) ([
 			// 空 reasoning_content 会被严格 thinking 上游视同缺失照样 400。
 			// 密文恰是本网关桥载荷时解码还原（无损、前缀稳定）；否则是上游加密
 			// 内容、无从还原，注入占位表明「此处曾有思考、内容不可用」。
+			//
+			// 这里注入是**无条件**的：客户端回了这个块但读不出内容，块本身存在于
+			// 历史，占位保留「此处曾有思考」的语义——粒度收窄不适用（垫片的收窄
+			// 针对的是「客户端压根没带思考块的消息」，见 thinking_compat.go
+			// InjectReasoningPlaceholders，场景不同）。
 			if rc, ok := DecodeReasoningSignature(block.Data); ok {
 				out.ReasoningContent += rc
 				bridgeDecoded++
 			} else {
 				out.ReasoningContent += ReasoningPlaceholder
 			}
-		case "tool_use":
-			args := "{}"
-			if block.Input != nil {
-				if b, err := json.Marshal(block.Input); err == nil {
-					args = string(b)
-				}
-			}
-			out.ToolCalls = append(out.ToolCalls, ToolCall{
-				ID:       block.ID,
-				Type:     "function",
-				Function: FunctionCall{Name: block.Name, Arguments: args},
-			})
-		case "tool_result":
+		case "tool_use", "server_tool_use":
+			// tool_use / server_tool_use 形状完全一致（服务端托管工具调用与普通工具
+			// 调用的区别只在语义来源），统一映射为 tool_calls，客户端下一轮才有一条
+			// 完整的 assistant 历史可回传。
+			out.ToolCalls = append(out.ToolCalls, toolCallFromBlock(block))
+		case "tool_result", "web_search_tool_result":
+			// tool_result / web_search_tool_result 均映射为 tool 消息。content 归一
+			// 按块类型分派：普通 tool_result 抽文本块并收集其中的图片（图片不进 tool
+			// 消息——OpenAI 规范 tool content 仅允许文本，DeepSeek 等严格上游对数组
+			// content 直接 400，挪到紧随其后的 user 消息）；web_search_tool_result 的
+			// content 是 [{type:web_search_result,url,title},...]，需专门归一且不收集
+			// 图片。
 			name := toolNames[block.ToolUseID]
+			content := anthropicToolResultText(block.Content)
+			var images []any
+			if block.Type == "tool_result" {
+				images = anthropicToolResultImageParts(block.Content)
+			} else {
+				content = anthropicWebSearchResultText(block.Content)
+			}
 			toolResults = append(toolResults, ChatMessage{
 				Role:       "tool",
-				Content:    anthropicToolResultText(block.Content),
+				Content:    content,
 				ToolCallID: block.ToolUseID,
 				Name:       &name,
 			})
-			// 图片不进 tool 消息：OpenAI 规范 tool content 仅允许文本，
-			// DeepSeek 等严格兼容上游对数组 content 直接 400。挪到紧随其后的
-			// user 消息（见下方 toolResults 收尾），视觉上游仍能看到图。
-			toolImages = append(toolImages, anthropicToolResultImageParts(block.Content)...)
+			toolImages = append(toolImages, images...)
 		}
 	}
 
@@ -364,6 +436,24 @@ func anthropicMessagesToChat(m AnthropicMessage, toolNames map[string]string) ([
 		out.Content = strings.Join(textParts, "")
 	}
 	return []ChatMessage{out}, bridgeDecoded
+}
+
+// toolCallFromBlock 把 tool_use / server_tool_use 块序列化为 canonical ToolCall：
+// 两者形状完全一致（id / name / input），仅语义来源不同——server_tool_use 是
+// Anthropic 服务端托管工具（如 web_search）的调用，客户端回传历史时同样需要
+// 一条完整的 tool_calls。input 序列化失败时兜底空对象。
+func toolCallFromBlock(block ContentBlock) ToolCall {
+	args := "{}"
+	if block.Input != nil {
+		if b, err := json.Marshal(block.Input); err == nil {
+			args = string(b)
+		}
+	}
+	return ToolCall{
+		ID:       block.ID,
+		Type:     "function",
+		Function: FunctionCall{Name: block.Name, Arguments: args},
+	}
 }
 
 // imageSourceToContentPart 把 Anthropic image 块的 source 转为 OpenAI image_url
@@ -423,6 +513,31 @@ func anthropicToolResultText(c any) string {
 		return sb.String()
 	}
 	return ""
+}
+
+// anthropicWebSearchResultText 把 web_search_tool_result 的 content（形如
+// [{"type":"web_search_result","url":..,"title":..},...]）序列化为紧凑文本，
+// 每条一行 "title: url"。tool 消息内容为空会让部分严格上游 400，而
+// anthropicToolResultText 只抽 text 块、对搜索结果块得空串，故单独归一；
+// 无 web_search_result 块时退回通用文本抽取（确定性输出，顺序即数组顺序）。
+func anthropicWebSearchResultText(c any) string {
+	items, ok := c.([]any)
+	if !ok {
+		return anthropicToolResultText(c)
+	}
+	var lines []string
+	for _, item := range items {
+		block, _ := item.(map[string]any)
+		if t, _ := block["type"].(string); t == "web_search_result" {
+			title, _ := block["title"].(string)
+			url, _ := block["url"].(string)
+			lines = append(lines, title+": "+url)
+		}
+	}
+	if len(lines) == 0 {
+		return anthropicToolResultText(c)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // anthropicToolResultImageParts 提取 tool_result content 里的图片，转为 OpenAI
@@ -546,6 +661,21 @@ func anthropicRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 	}
 
 	for _, t := range req.Tools {
+		if isHostedToolType(t.Type) {
+			// 托管工具声明：canonical 的统一语义名（web_search）字面化为 Anthropic
+			// 基线版本 web_search_20250305。绝不写 input_schema/description——
+			// hosted 声明没有 schema，填了会被上游当作普通 function 工具。
+			name := t.Function.Name
+			if name == "" {
+				// responses 出站不写 name 是协议差异（hosted 声明只认 type），但
+				// Anthropic 的 hosted 声明 name 必填：openai 入站只带
+				// {"type":"web_search"} 无 function.name 时，缺兜底会渲染出
+				// "name":"" 空键污染声明，这里回填 canonical 统一语义名。
+				name = "web_search"
+			}
+			out.Tools = append(out.Tools, AnthropicTool{Type: "web_search_20250305", Name: name})
+			continue
+		}
 		schema := t.Function.Parameters
 		if schema == nil {
 			schema = map[string]any{"type": "object"}
@@ -745,6 +875,12 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 				Signature: EncodeReasoningSignature(rc),
 			})
 		}
+		// 托管搜索接地：在 text 之前补 server_tool_use + web_search_tool_result
+		// 两个块，客户端才能看到搜索过程并把结果回传。idSeq 取当前块位置，
+		// 同一输入必产同一 id（确定性，前缀稳定）。
+		if blocks, ok := webSearchToolBlocks(choice.Message.GroundingMetadata, len(out.Content)); ok {
+			out.Content = append(out.Content, blocks...)
+		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			out.Content = append(out.Content, ContentBlock{Type: "text", Text: text})
 		}
@@ -762,6 +898,34 @@ func anthropicResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 		out.Usage = toAnthropicUsage(resp.Usage)
 	}
 	return json.Marshal(out)
+}
+
+// webSearchToolBlocks 依据 canonical 接地数据合成 server_tool_use +
+// web_search_tool_result 两个 Anthropic 块（非流式与流式共用，保证两处形状一致）。
+// idSeq 是本次响应内的块序号，决定 id："srvtoolu_gateway_<seq>"——必须是输入的
+// 确定性函数，同一输入产同一字节，否则客户端跨轮缓存前缀漂移（项目铁律，见
+// prefix_stability_test.go）。无接地数据时返回 ok=false。
+func webSearchToolBlocks(gm *GroundingMetadata, idSeq int) ([]ContentBlock, bool) {
+	if gm == nil || (len(gm.SearchQueries) == 0 && len(gm.Sources) == 0) {
+		return nil, false
+	}
+	id := "srvtoolu_gateway_" + strconv.Itoa(idSeq)
+	query := ""
+	if len(gm.SearchQueries) > 0 {
+		query = gm.SearchQueries[0]
+	}
+	results := make([]any, 0, len(gm.Sources))
+	for _, s := range gm.Sources {
+		results = append(results, map[string]any{
+			"type":  "web_search_result",
+			"url":   s.URI,
+			"title": s.Title,
+		})
+	}
+	return []ContentBlock{
+		{Type: "server_tool_use", ID: id, Name: "web_search", Input: map[string]any{"query": query}},
+		{Type: "web_search_tool_result", ToolUseID: id, Content: results},
+	}, true
 }
 
 // openAIFinishToAnthropic 映射 finish_reason → stop_reason。

@@ -30,10 +30,15 @@ type Log struct {
 	ErrMsg          string  `json:"err_msg,omitempty"`  // 失败原文（截断），成功为空
 	// ── 诊断遥测：把「缓存为什么没命中」从猜测变成可测量 ──────────────────
 	// 写入方是 gateway（值来自 protocol.ComposeStats 与客户端入口协议）。
-	ClientProtocol string    `gorm:"size:16;index" json:"client_protocol,omitempty"` // 客户端入口协议（openai / anthropic / openai_responses / gemini）；空 = 本次改动前的存量日志，未记录
-	BridgeDecoded  int       `json:"bridge_decoded"`                                 // reasoning 桥从 thinking 块签名还原原文的次数。anthropic 入向恒为 0 而请求里确有思考块 → 客户端没回传本网关的签名，桥接未生效（见 protocol/reasoning_bridge.go）
-	ShimRewrites   int       `json:"shim_rewrites"`                                  // thinking 兼容垫片改写的 assistant 消息条数，即被改写的前缀面积（见 protocol/thinking_compat.go）
-	CreatedAt      time.Time `gorm:"index" json:"created_at"`
+	ClientProtocol string `gorm:"size:16;index" json:"client_protocol,omitempty"` // 客户端入口协议（openai / anthropic / openai_responses / gemini）；空 = 本次改动前的存量日志，未记录
+	BridgeDecoded  int    `json:"bridge_decoded"`                                 // reasoning 桥从 thinking 块签名还原原文的次数。anthropic 入向恒为 0 而请求里确有思考块 → 客户端没回传本网关的签名，桥接未生效（见 protocol/reasoning_bridge.go）
+	ShimRewrites   int    `json:"shim_rewrites"`                                  // thinking 兼容垫片改写的 assistant 消息条数，即被改写的前缀面积（见 protocol/thinking_compat.go）
+	// HostedToolsStripped 是被剥离的托管工具声明计数：发往不支持 hosted 工具的
+	// openai 上游时剔除的声明数，加上 canonical 无法承载、入站即丢弃的未知
+	// hosted 类型数（见 protocol.ComposeStats）。>0 说明该请求的搜索类能力在
+	// 上游侧静默降级，客户端收到的 server_tool_use 将无对应执行。
+	HostedToolsStripped int       `json:"hosted_tools_stripped"`
+	CreatedAt           time.Time `gorm:"index" json:"created_at"`
 }
 
 // ── 失败归因词表（Log.ErrKind 取值），前端与排障按此过滤 ──────────────────

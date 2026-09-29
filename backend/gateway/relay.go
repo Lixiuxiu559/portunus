@@ -71,23 +71,16 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 			return
 		}
 
-		// -thinking 后缀：剥掉后解析分组。思考开关意图（复用 anthropic 客户端
-		// 自带的 budget_tokens，Claude Code 的 effort 就映射在这里）在此打包成
-		// UpstreamRequest，是否写入上游请求体由 protocol 按上游协议决定——
-		// gateway 不再触碰协议知识。
+		// -thinking 后缀：剥掉后解析分组（后缀判定、分组名解析是分组 / 模型名知识，
+		// 留在 gateway）；「thinking 落在哪个形状」是协议知识，交 protocol——
+		// ThinkingEnabledIntent 复用 anthropic 客户端自带的 budget_tokens
+		//（Claude Code 的 effort 就映射在这里）打包成意图，是否写入上游请求体由
+		// protocol 按上游协议决定。
 		groupName := meta.Model
 		var upThinking *protocol.ThinkingConfig
 		if strings.HasSuffix(groupName, thinkingSuffix) {
 			groupName = strings.TrimSuffix(groupName, thinkingSuffix)
-			upThinking = &protocol.ThinkingConfig{Type: "enabled"}
-			// budget 解析宽容：thinking 形状怪异（字符串 / 布尔等）时忽略，
-			// 与旧探测行为一致，不让元数据形状影响请求放行
-			if clientProto == protocol.ProviderAnthropic && len(meta.Thinking) > 0 {
-				var ct *protocol.ThinkingConfig
-				if json.Unmarshal(meta.Thinking, &ct) == nil && ct != nil && ct.BudgetTokens > 0 {
-					upThinking.BudgetTokens = ct.BudgetTokens
-				}
-			}
+			upThinking = protocol.ThinkingEnabledIntent(clientProto, meta.Thinking)
 		}
 
 		g, err := group.GetByName(groupName)

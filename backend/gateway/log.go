@@ -30,9 +30,10 @@ func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, c
 		DurationMs:   durationMs,
 		FirstTokenMs: firstTokenMs,
 		// 诊断遥测（见 shared.Log 同名字段注释）
-		ClientProtocol: string(clientProto),
-		BridgeDecoded:  stats.BridgeDecoded,
-		ShimRewrites:   stats.ShimRewrites,
+		ClientProtocol:      string(clientProto),
+		BridgeDecoded:       stats.BridgeDecoded,
+		ShimRewrites:        stats.ShimRewrites,
+		HostedToolsStripped: stats.HostedToolsStripped,
 	}
 	if callErr != nil {
 		entry.ErrKind = failSpec(callErr).ErrKind

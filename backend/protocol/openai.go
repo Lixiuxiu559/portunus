@@ -1,5 +1,7 @@
 package protocol
 
+import "encoding/json"
+
 // 本文件定义 OpenAI Chat Completions 的请求 / 响应 / 流式 chunk 结构，
 // 作为协议转换模块的内部规范格式（canonical）。其余协议均先转到该结构再转出。
 
@@ -28,12 +30,36 @@ type ChatCompletionRequest struct {
 	// reasoning 桥（reasoning_bridge.go）是否真被客户端回传触发——恒为 0 而请求里
 	// 确有思考块，说明客户端没回传本网关的签名，桥接形同未生效。
 	bridgeDecoded int
+
+	// hostedToolsStripped 是本次解析中因 canonical 无法承载而被丢弃的托管工具
+	// 声明数（如 Anthropic 的 code_execution_*）：web_search_* 能经 canonical
+	// 透传，其余 hosted 类型只能剥离。同样是解析遥测，非导出、不参与序列化，
+	// 由 ComposeUpstreamRequest 读出并入 ComposeStats.HostedToolsStripped。
+	hostedToolsStripped int
 }
 
 // ThinkingConfig 是思考模式配置（Anthropic 与 DeepSeek 等兼容方同形状）。
 type ThinkingConfig struct {
 	Type         string `json:"type"` // enabled / auto / disabled
 	BudgetTokens int    `json:"budget_tokens,omitempty"`
+}
+
+// ThinkingEnabledIntent 返回「开思考」意图：由上游模型名的 -thinking 后缀驱动，
+// gateway 判后缀、这里管协议形状。type 恒为 "enabled"（anthropic 词汇，canonical
+// 层与 Anthropic 同形状复用）；budget 从客户端原始 thinking 形状宽容提取——仅
+// anthropic 客户端自带该字段（Claude Code 的 effort 映射在 budget_tokens），
+// 形状怪异（字符串 / 布尔）或缺失时忽略，不让元数据形状影响请求放行。
+// raw 是原样保留的顶层 thinking 字段（见 relayMeta.Thinking）。
+func ThinkingEnabledIntent(clientProto Provider, raw json.RawMessage) *ThinkingConfig {
+	intent := &ThinkingConfig{Type: "enabled"}
+	if clientProto != ProviderAnthropic || len(raw) == 0 {
+		return intent
+	}
+	var ct *ThinkingConfig
+	if json.Unmarshal(raw, &ct) == nil && ct != nil && ct.BudgetTokens > 0 {
+		intent.BudgetTokens = ct.BudgetTokens
+	}
+	return intent
 }
 
 // ChatMessage 是一条对话消息。
@@ -44,6 +70,22 @@ type ChatMessage struct {
 	Name             *string    `json:"name,omitempty"`              // tool 消息的工具名；指针保证空串也输出（DeepSeek 等上游要求字段存在）
 	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID       string     `json:"tool_call_id,omitempty"`
+	// GroundingMetadata 是上游托管搜索的接地数据，见同类型注释。
+	GroundingMetadata *GroundingMetadata `json:"grounding_metadata,omitempty"`
+}
+
+// GroundingMetadata 承载上游托管搜索的接地数据（如 Gemini 的
+// groundingMetadata），仅作跨协议中转载体：在流式转换链的两段
+// （上游协议→canonical→客户端协议）之间传递，openai 上游不消费。
+type GroundingMetadata struct {
+	SearchQueries []string          `json:"search_queries,omitempty"` // 上游实际执行的搜索词
+	Sources       []GroundingSource `json:"sources,omitempty"`        // 引用来源
+}
+
+// GroundingSource 是一条搜索结果来源。
+type GroundingSource struct {
+	URI   string `json:"uri,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
 // ContentPart 是多模态 content 数组的一个单元。
@@ -61,9 +103,24 @@ type ImageURL struct {
 
 // Tool 是函数调用工具定义。
 type Tool struct {
-	Type     string      `json:"type"` // function
+	Type     string      `json:"type"` // function；非 function 的值是跨协议透传的托管工具声明（如 web_search_20250305）
 	Function FunctionDef `json:"function"`
 }
+
+// isHostedToolType 判断 canonical 工具声明是否为上游托管工具（Anthropic 的
+// 版本化 web_search_*、Gemini 的 googleSearch / googleSearchRetrieval /
+// enterpriseWebSearch、Responses 的 web_search / web_search_preview 等）：openai
+// 规范里 function 是唯一常规类型，其余非空类型值都是 hosted 声明。它决定两处
+// 行为——出站渲染是否写 input_schema，以及发往不支持 hosted 的 openai 上游时
+// 是否剥离（见 composeUpstream）。
+//
+// canonical 用统一语义名 web_search 归一承载各协议的 hosted 搜索——各协议的字面
+// 不同（anthropic: web_search_20250305 / gemini: googleSearch / responses:
+// web_search_preview），若各带各的字面，每个 renderer 都得认识全集；归一后各
+// renderer 只需认识这一个语义名，出站再字面化回目标协议的基线版本。此处是这段
+// 归一理由的唯一权威出处，各入站分流点（anthropic.go / gemini.go / responses.go）
+// 只引用不重复。
+func isHostedToolType(t string) bool { return t != "" && t != "function" }
 
 // FunctionDef 是函数定义。
 type FunctionDef struct {
@@ -131,6 +188,8 @@ type ChunkDelta struct {
 	Content          string          `json:"content,omitempty"`
 	ReasoningContent string          `json:"reasoning_content,omitempty"`
 	ToolCalls        []ChunkToolCall `json:"tool_calls,omitempty"`
+	// GroundingMetadata 同 ChatMessage 字段：托管搜索接地的跨协议中转载体。
+	GroundingMetadata *GroundingMetadata `json:"grounding_metadata,omitempty"`
 }
 
 // ChunkToolCall 是流式 chunk 里的工具调用增量。

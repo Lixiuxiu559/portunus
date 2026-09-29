@@ -23,8 +23,11 @@ type ResponsesRequest struct {
 
 // ResponsesTool 是 Responses 工具定义。
 type ResponsesTool struct {
-	Type        string `json:"type"` // function
-	Name        string `json:"name"`
+	// Type 是工具身份：function 为普通函数工具，web_search 等为 hosted 声明
+	// （hosted 形状只认 type，不带 name/parameters）。Name 必须 omitempty：
+	// hosted 声明渲染时 Name 为空，否则序列化会带出 "name":"" 空键污染声明。
+	Type        string `json:"type"`
+	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Parameters  any    `json:"parameters,omitempty"`
 	Strict      bool   `json:"strict,omitempty"`
@@ -121,7 +124,26 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		out.Messages = append(out.Messages, responsesItemsToChat(v)...)
 	}
 
+	// tools → function tools；hosted 声明分流。Responses 的 Type 字段在常规
+	// function 之外还承载 hosted 工具（web_search 及其各版本 / preview 字面）；
+	// web_search 系归一到 canonical 统一语义名 web_search（归一理由见 openai.go
+	// isHostedToolType 注释），版本间差异字段 MVP 不承载。不填 Parameters/
+	// Description——hosted 工具没有 schema，填空壳会被出站误渲染成普通 function。
+	// 其余 hosted 类型（code_interpreter / file_search / image_generation 等）
+	// canonical 无法承载，剥离并计入遥测（ChatCompletionRequest.hostedToolsStripped，
+	// 由 ComposeUpstreamRequest 汇入 ComposeStats.HostedToolsStripped）。
 	for _, t := range req.Tools {
+		if t.Type != "" && t.Type != "function" {
+			if isResponsesWebSearchType(t.Type) {
+				out.Tools = append(out.Tools, Tool{
+					Type:     "web_search",
+					Function: FunctionDef{Name: "web_search"},
+				})
+				continue
+			}
+			out.hostedToolsStripped++
+			continue
+		}
 		out.Tools = append(out.Tools, Tool{
 			Type: "function",
 			Function: FunctionDef{
@@ -135,6 +157,19 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		out.ToolChoice = req.ToolChoice
 	}
 	return out, nil
+}
+
+// isResponsesWebSearchType 判断 Responses 的 tool.type 是否是 hosted web_search
+// 声明。Responses 用字面量而非前缀版本号（故不能像 anthropic 的
+// isVersionedClaudeWebSearchType 那样只校验前缀 + 日期），枚举 new-api 的
+// isOpenAIResponsesWebSearchType 全集：基线 web_search、版本化
+// web_search_2025_08_26、以及 preview 系列。新增 preview 版本时在此补字面即可。
+func isResponsesWebSearchType(t string) bool {
+	switch t {
+	case "web_search", "web_search_2025_08_26", "web_search_preview", "web_search_preview_2025_03_11":
+		return true
+	}
+	return false
 }
 
 // responsesItemsToChat 把 Responses input 数组转成 OpenAI ChatMessage 序列。
@@ -241,16 +276,25 @@ func responsesItemsToChat(items []any) []ChatMessage {
 	return out
 }
 
-// responsesReasoningText 提取 reasoning item 的思考文本：优先 summary[] 摘要，
-// 为空时兜底 content[]（reasoning_text 段）。encrypted_content 密文无明文可取
-// （本机 Codex 实测 summary:[] + content:null + 密文），返回空串。
+// responsesReasoningText 提取 input reasoning item 的思考文本（请求方向入口）。
+// 规则见 joinResponsesReasoningText；encrypted_content 密文无明文可取（本机 Codex
+// 实测 summary:[] + content:null + 密文），返回空串。
 func responsesReasoningText(it InputItem) string {
+	return joinResponsesReasoningText(it.Summary, it.Content)
+}
+
+// joinResponsesReasoningText 合并 reasoning item 的思考文本：优先 summary[] 摘要
+// 拼接，为空时兜底 content[]（reasoning_text 段），整体 TrimSpace——空文本不入
+// 结果，避免 encrypted_content-only 形状凭空产出分隔符污染。请求方向
+// （responsesReasoningText）与响应方向（responsesResponseToOpenAI）共用本规则，
+// 此前两处各写一份已漂移（响应方向不 trim、兜底条件略异）。
+func joinResponsesReasoningText(summary, content []ResponsesContent) string {
 	var sb strings.Builder
-	for _, s := range it.Summary {
+	for _, s := range summary {
 		sb.WriteString(s.Text)
 	}
 	if sb.Len() == 0 {
-		for _, s := range it.Content {
+		for _, s := range content {
 			sb.WriteString(s.Text)
 		}
 	}
@@ -343,6 +387,13 @@ func responsesRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 	out.Input = input
 
 	for _, t := range req.Tools {
+		if isHostedToolType(t.Type) {
+			// 托管工具声明：canonical 的统一语义名（web_search）字面化为 Responses
+			// 基线 web_search。只写 type——hosted 声明以 type 为身份，绝不写
+			// name/description/parameters，否则会被上游当作普通 function 工具。
+			out.Tools = append(out.Tools, ResponsesTool{Type: "web_search"})
+			continue
+		}
 		out.Tools = append(out.Tools, ResponsesTool{
 			Type:        "function",
 			Name:        t.Function.Name,
@@ -400,20 +451,11 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 			}
 		case "reasoning":
 			// 思考摘要映射为 reasoning_content（DeepSeek 同款扩展字段），经下游转换
-			// 链透出（如转 Anthropic thinking 块）。官方 item 摘要在 summary[]；个别
-			// 上游放 content[]（reasoning_text 段），summary 为空时兜底取 content。
-			for _, s := range item.Summary {
-				if s.Text != "" {
-					out.Choices[0].Message.ReasoningContent += s.Text
-				}
-			}
-			if out.Choices[0].Message.ReasoningContent == "" {
-				for _, s := range item.Content {
-					if s.Text != "" {
-						out.Choices[0].Message.ReasoningContent += s.Text
-					}
-				}
-			}
+			// 链透出（如转 Anthropic thinking 块）。提取规则与请求方向同源
+			// （joinResponsesReasoningText）：summary[] 优先、content[] 兜底、
+			// 整体 TrimSpace。官方 item 摘要在 summary[]；个别上游放 content[]
+			// （reasoning_text 段）。
+			out.Choices[0].Message.ReasoningContent += joinResponsesReasoningText(item.Summary, item.Content)
 		}
 	}
 	out.Choices[0].FinishReason = finish

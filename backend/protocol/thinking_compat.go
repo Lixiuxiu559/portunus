@@ -28,12 +28,17 @@ const ReasoningPlaceholder = "（历史思考内容未保留）"
 // 该字段，严格上游也不要求（cc-switch 的 ensure_tool_call_reasoning_content 同款
 // 粒度，见 docs/research/reasoning-content-passback.md §2.1）。
 //
-// 粒度收窄是刻意的，不只是"更克制"：垫片每改写一条历史消息，就改变一次送往上游
-// 的字节。上游自动前缀缓存按 token 前缀精确匹配，被改写的消息之后整段失效。
-// 纯文本 assistant 在真实对话里远多于 tool_calls 消息，对它一并注入会让前缀漂移
-// 面积成倍放大——这正是 Claude Code 侧缓存命中率低的成因之一（同类分析见
-// reasoning_bridge.go）。垫片在 ComposeUpstreamRequest 末端执行（转换管线末尾），
-// 真实 reasoning_content 已回填完毕，不会被占位污染。
+// 粒度收窄是刻意的：收益在**保真度**（少改写客户端原始历史、贴近客户端所见），
+// 而非缓存命中。注入是历史的确定性函数——同一段历史每轮渲染出同一占位，第 N+1 轮
+// 的请求体仍以前一轮为前缀，前缀本就稳定（实证见 prefix_stability_test.go 的
+// TestPrefixStableShimInjectionIsDeterministic）。缓存命中的真问题在思考内容的
+// 有损往返，见 reasoning_bridge.go。纯文本 assistant 在真实对话里远多于 tool_calls
+// 消息，收窄后不必对其一并改写。垫片在 ComposeUpstreamRequest 末端执行（转换管线
+// 末尾），真实 reasoning_content 已回填完毕，不会被占位污染。
+//
+// 对照的另一层占位无条件注入：redacted_thinking 转换层对读不出内容的块直接补占位
+// （见 anthropic.go 该分支）——场景不同，治理对象是客户端已带回的单个块，不是
+// 「压根没带思考块的历史消息」，故粒度收窄不适用。
 //
 // map 往返保留 canonical 之外的未知字段（与 rewriteSameProtocol 同等保真）。
 //

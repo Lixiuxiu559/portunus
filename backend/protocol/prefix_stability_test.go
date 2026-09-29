@@ -184,3 +184,77 @@ func TestPrefixStableClientManglesThinkingPlaintext(t *testing.T) {
 		t.Errorf("同一输入两次装配结果不一致（非幂等 → 前缀必漂移）")
 	}
 }
+
+// TestPrefixStableHostedWebSearchHistory 托管搜索的历史块（server_tool_use /
+// web_search_tool_result）跨轮必须稳定：它们是历史消息的一部分，任何非幂等的
+// 映射都会让第二轮的请求体不再以第一轮为前缀。同时锁定映射形状（与手写期望
+// 一致），并验证重复转换幂等。
+func TestPrefixStableHostedWebSearchHistory(t *testing.T) {
+	const assistantTurn = `{"role":"assistant","content":[
+		{"type":"text","text":"我来搜索"},
+		{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"golang"}}
+	]}`
+	const resultTurn = `{"role":"user","content":[
+		{"type":"web_search_tool_result","tool_use_id":"srvtoolu_1","content":[
+			{"type":"web_search_result","url":"https://go.dev","title":"Go"}
+		]}
+	]}`
+
+	turn2 := []byte(`{"model":"m","max_tokens":8192,"system":` + probeSystem + `,"tools":` + probeTools + `,"messages":[
+		{"role":"user","content":[{"type":"text","text":"搜一下 golang"}]},
+		` + assistantTurn + `,
+		` + resultTurn + `
+	]}`)
+	turn3 := []byte(`{"model":"m","max_tokens":8192,"system":` + probeSystem + `,"tools":` + probeTools + `,"messages":[
+		{"role":"user","content":[{"type":"text","text":"搜一下 golang"}]},
+		` + assistantTurn + `,
+		` + resultTurn + `,
+		{"role":"assistant","content":[{"type":"text","text":"Go 是 Google 的语言"}]},
+		{"role":"user","content":[{"type":"text","text":"好"}]}
+	]}`)
+
+	up := func(b []byte) []byte {
+		out, _, err := ComposeUpstreamRequest(ProviderAnthropic, ProviderOpenAI, b, UpstreamRequest{Model: "gpt-x"})
+		if err != nil {
+			t.Fatalf("装配失败: %v", err)
+		}
+		return out
+	}
+	up2 := up(turn2)
+
+	// 手写期望形状：assistant 的 server_tool_use → tool_calls，随后 user 的
+	// web_search_tool_result → tool 消息（内容为每条 "title: url"）。
+	msgs, _, _ := upstreamParts(t, up2)
+	var assistantWithCall, toolMsg map[string]any
+	for _, raw := range msgs {
+		m, _ := raw.(map[string]any)
+		if m == nil {
+			continue
+		}
+		if m["role"] == "assistant" {
+			if _, ok := m["tool_calls"]; ok {
+				assistantWithCall = m
+			}
+		}
+		if m["role"] == "tool" {
+			toolMsg = m
+		}
+	}
+	if assistantWithCall == nil || toolMsg == nil {
+		t.Fatalf("托管搜索历史未按期望映射: %s", up2)
+	}
+	call := assistantWithCall["tool_calls"].([]any)[0].(map[string]any)
+	if call["id"] != "srvtoolu_1" || call["function"].(map[string]any)["name"] != "web_search" {
+		t.Errorf("server_tool_use → tool_call 形状不符: %v", call)
+	}
+	if toolMsg["tool_call_id"] != "srvtoolu_1" || toolMsg["name"] != "web_search" ||
+		toolMsg["content"] != "Go: https://go.dev" {
+		t.Errorf("web_search_tool_result → tool 消息形状不符: %v", toolMsg)
+	}
+
+	// 跨轮前缀稳定 + 重复转换幂等（缓存命中的充要条件）。
+	assertPrefixStable(t, up2, up(turn3))
+	if again := string(up(turn2)); again != string(up2) {
+		t.Errorf("同一请求两次装配不一致（非幂等 → 前缀必漂移）")
+	}
+}
