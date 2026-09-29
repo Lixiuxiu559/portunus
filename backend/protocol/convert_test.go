@@ -1116,3 +1116,115 @@ func TestConvertRequestAnthropicToOpenAIToolResultImage(t *testing.T) {
 		t.Errorf("纯文本 tool_result content 应为字符串，实际: %v", tool2["content"])
 	}
 }
+
+// TestConvertResponseAnthropicThinkingToReasoningContent 断言非流式 Anthropic 响应的
+// thinking 块映射为 reasoning_content：桥签名还原逐字节原文、非桥签名退 thinking 明文
+// （与请求入向一致）；redacted_thinking 的非桥密文跳过、不产 reasoning_content（与流式
+// 入向忽略 redacted_thinking 事件对齐）。见 docs/research/2026-09-29-capability-matrix-design.md §3.2。
+func TestConvertResponseAnthropicThinkingToReasoningContent(t *testing.T) {
+	// 非桥签名（上游原生 / 旧常量 "sig"）→ 退 thinking 明文
+	out, err := ConvertResponse(ProviderAnthropic, ProviderOpenAI, []byte(`{
+		"id":"msg_1","type":"message","role":"assistant","model":"m",
+		"content":[{"type":"thinking","thinking":"思考明文","signature":"sig"},{"type":"text","text":"答案"}],
+		"stop_reason":"end_turn"
+	}`))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	msg := unmarshalAny(t, out)["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+	if msg["reasoning_content"] != "思考明文" {
+		t.Errorf("非桥签名应退 thinking 明文，实际 reasoning_content=%v", msg["reasoning_content"])
+	}
+	if msg["content"] != "答案" {
+		t.Errorf("text 块应仍在正文 content，实际 %v", msg["content"])
+	}
+
+	// 桥签名 → 还原逐字节原文（signature 里承载的原始 reasoning_content）
+	payload := "桥载荷原文"
+	bridgeSig := EncodeReasoningSignature(payload)
+	out2, err := ConvertResponse(ProviderAnthropic, ProviderOpenAI, []byte(`{
+		"id":"msg_2","type":"message","role":"assistant","model":"m",
+		"content":[{"type":"thinking","thinking":"与签名不一致的明文","signature":"`+bridgeSig+`"}],
+		"stop_reason":"end_turn"
+	}`))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	msg2 := unmarshalAny(t, out2)["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+	if msg2["reasoning_content"] != payload {
+		t.Errorf("桥签名应还原 %q，实际 %v", payload, msg2["reasoning_content"])
+	}
+
+	// redacted_thinking 非桥密文：跳过（对齐流式忽略），不产 reasoning_content
+	out3, err := ConvertResponse(ProviderAnthropic, ProviderOpenAI, []byte(`{
+		"id":"msg_3","type":"message","role":"assistant","model":"m",
+		"content":[{"type":"redacted_thinking","data":"encrypted-blob"},{"type":"text","text":"答案"}],
+		"stop_reason":"end_turn"
+	}`))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	msg3 := unmarshalAny(t, out3)["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+	if rc, ok := msg3["reasoning_content"]; ok {
+		t.Errorf("非桥 redacted_thinking 应跳过，实际 reasoning_content=%v", rc)
+	}
+}
+
+// TestConvertResponseOpenAIToResponsesReasoningItem 断言非流式 OpenAI 响应的
+// reasoning_content 映射为 output 里 type=="reasoning" 的 item，且排在 message item
+// 之前（与流式 sink 的 reasoning_summary_text.delta 对称）。见设计文档 §3.2。
+func TestConvertResponseOpenAIToResponsesReasoningItem(t *testing.T) {
+	in := `{
+		"id":"c1","model":"m",
+		"choices":[{"index":0,"message":{"role":"assistant","content":"答","reasoning_content":"思考探针"},"finish_reason":"stop"}]
+	}`
+	out, err := ConvertResponse(ProviderOpenAI, ProviderOpenAIResponses, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	output := sliceAt(t, unmarshalAny(t, out), "output")
+	if len(output) != 2 {
+		t.Fatalf("output 应含 reasoning + message 两项，实际 %d: %s", len(output), out)
+	}
+	reasoning := output[0].(map[string]any)
+	if reasoning["type"] != "reasoning" {
+		t.Fatalf("首项应为 reasoning item，实际 type=%v", reasoning["type"])
+	}
+	summary := reasoning["summary"].([]any)
+	seg := summary[0].(map[string]any)
+	if seg["type"] != "summary_text" || seg["text"] != "思考探针" {
+		t.Errorf("reasoning summary 形状不匹配: %v", seg)
+	}
+	if msg := output[1].(map[string]any); msg["type"] != "message" {
+		t.Errorf("reasoning item 应排在 message item 之前，第二项 type=%v", msg["type"])
+	}
+}
+
+// TestConvertResponseOpenAIToGeminiThoughtPart 断言非流式 OpenAI 响应的
+// reasoning_content 映射为 thought=true 的 part，且排在正文 text part 之前
+// （与流式 sink 的 ReasoningDelta 对称）。见设计文档 §3.2。
+func TestConvertResponseOpenAIToGeminiThoughtPart(t *testing.T) {
+	in := `{
+		"choices":[{"index":0,"message":{"role":"assistant","content":"答","reasoning_content":"思考探针"},"finish_reason":"stop"}]
+	}`
+	out, err := ConvertResponse(ProviderOpenAI, ProviderGemini, []byte(in))
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	cand := sliceAt(t, unmarshalAny(t, out), "candidates")[0].(map[string]any)
+	parts := cand["content"].(map[string]any)["parts"].([]any)
+	if len(parts) != 2 {
+		t.Fatalf("parts 应含 thought + text 两个，实际 %d: %s", len(parts), out)
+	}
+	thought := parts[0].(map[string]any)
+	if thought["thought"] != true || thought["text"] != "思考探针" {
+		t.Errorf("首个 part 应为 thought=true 且 text=思考探针，实际 %v", thought)
+	}
+	text := parts[1].(map[string]any)
+	if text["text"] != "答" {
+		t.Errorf("第二个 part 应为正文，实际 %v", text)
+	}
+	if _, ok := text["thought"]; ok {
+		t.Errorf("正文 part 不应带 thought 字段，实际 %v", text)
+	}
+}

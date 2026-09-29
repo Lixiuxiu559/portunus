@@ -652,6 +652,25 @@ func anthropicResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		switch block.Type {
 		case "text":
 			textParts = append(textParts, block.Text)
+		case "thinking":
+			// 思考内容映射为 reasoning_content 扩展字段，与流式入向
+			// （anthropicToOpenAIStream 的 thinking_delta）行为一致——此前非流式漏写，
+			// 上游返回的思考块被整块丢弃（见 docs/research/2026-09-29-capability-matrix-design.md
+			// §1.2 响应入向行）。优先从 signature 的桥载荷还原逐字节原文，非桥签名
+			// （上游原生签名、旧常量 "sig"）退 thinking 明文——与请求入向行为一致。
+			if rc, ok := DecodeReasoningSignature(block.Signature); ok {
+				msg.ReasoningContent += rc
+			} else {
+				msg.ReasoningContent += block.Thinking
+			}
+		case "redacted_thinking":
+			// 与流式入向对齐：anthropicToOpenAIStream 对 redacted_thinking 事件整体
+			// 忽略（无对应 case），故非流式也只在密文恰为本网关桥载荷时还原，其余
+			// 跳过——不注入占位（占位是请求出向喂严格 thinking 上游的手段，见本文件
+			// 请求入向），保证同协议内流式 / 非流式一致。
+			if rc, ok := DecodeReasoningSignature(block.Data); ok {
+				msg.ReasoningContent += rc
+			}
 		case "tool_use":
 			args := "{}"
 			if block.Input != nil {

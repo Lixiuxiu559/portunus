@@ -400,6 +400,12 @@ func geminiResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
 		content := GeminiContent{Role: "model"}
+		// reasoning_content 非空时在 text part 之前插 thought part，与流式 sink 的
+		// ReasoningDelta 对称——此前非流式漏写，思考内容被静默丢弃
+		// （见 docs/research/2026-09-29-capability-matrix-design.md §3.2）。
+		if rc := choice.Message.ReasoningContent; rc != "" {
+			content.Parts = append(content.Parts, GeminiPart{Text: rc, Thought: true})
+		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			content.Parts = append(content.Parts, GeminiPart{Text: text})
 		}

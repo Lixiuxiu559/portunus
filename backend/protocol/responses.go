@@ -437,6 +437,15 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 	}
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
+		// reasoning_content 非空时在 message item 之前插 reasoning item，与流式 sink
+		// 的 reasoning_summary_text.delta 对称——此前非流式漏写，思考内容被静默丢弃
+		// （见 docs/research/2026-09-29-capability-matrix-design.md §3.2）。
+		if rc := choice.Message.ReasoningContent; rc != "" {
+			out.Output = append(out.Output, OutputItem{
+				Type:    "reasoning",
+				Summary: []ResponsesContent{{Type: "summary_text", Text: rc}},
+			})
+		}
 		if text := chatContentToText(choice.Message.Content); text != "" {
 			out.Output = append(out.Output, OutputItem{
 				Type:    "message",
