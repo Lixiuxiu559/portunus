@@ -1,0 +1,96 @@
+import base64
+import hashlib
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import Mock, patch
+
+import yaml
+
+from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files
+
+
+class SyncTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.asset = self.root / "Portunus-0.5.0-mac-arm64.zip"
+        self.asset.write_bytes(b"installer test payload")
+        self.digest = base64.b64encode(hashlib.sha512(self.asset.read_bytes()).digest()).decode()
+        for name in MANIFESTS:
+            self.write_manifest(name)
+        (self.root / (self.asset.name + ".blockmap")).write_text("blockmap")
+
+    def write_manifest(self, name, **overrides):
+        data = {
+            "version": "0.5.0", "path": self.asset.name,
+            "files": [{"url": self.asset.name, "sha512": self.digest, "size": self.asset.stat().st_size}],
+        }
+        data.update(overrides)
+        (self.root / name).write_text(yaml.safe_dump(data))
+
+    def test_installers_and_blockmaps_precede_all_manifests(self):
+        assets, manifests = prepare_files(self.root, "v0.5.0")
+        client = Mock()
+        guard = Mock(side_effect=lambda: self.assertEqual(client.upload_file.call_count, len(assets)))
+        sync_files(client, assets, manifests, guard)
+        guard.assert_called_once()
+        calls = client.upload_file.call_args_list
+        self.assertEqual([call.kwargs["Key"] for call in calls], ["releases/" + p.name for p in assets + manifests])
+        for call in calls:
+            self.assertEqual(call.kwargs["Bucket"], BUCKET)
+        for call in calls[len(assets):]:
+            self.assertEqual(call.kwargs["CacheControl"], "no-cache")
+
+    def test_upload_failure_preserves_existing_manifests(self):
+        assets, manifests = prepare_files(self.root, "v0.5.0")
+        client = Mock()
+        client.upload_file.side_effect = RuntimeError("upload failed")
+        guard = Mock()
+        with self.assertRaisesRegex(RuntimeError, "upload failed"):
+            sync_files(client, assets, manifests, guard)
+        guard.assert_not_called()
+        self.assertFalse(any(call.kwargs["Key"].endswith(".yml") for call in client.upload_file.call_args_list))
+
+    def test_newer_release_during_upload_prevents_manifest_publish(self):
+        assets, manifests = prepare_files(self.root, "v0.5.0")
+        client = Mock()
+        with self.assertRaisesRegex(ValueError, "newer release"):
+            sync_files(client, assets, manifests, Mock(side_effect=ValueError("newer release")))
+        self.assertEqual(client.upload_file.call_count, len(assets))
+
+    def test_incomplete_platform_manifests_fail_before_upload(self):
+        (self.root / MANIFESTS[-1]).unlink()
+        with self.assertRaises(FileNotFoundError):
+            prepare_files(self.root, "v0.5.0")
+
+    def test_wrong_version_is_rejected(self):
+        self.write_manifest(MANIFESTS[0], version="0.4.0")
+        with self.assertRaisesRegex(ValueError, "版本"):
+            prepare_files(self.root, "v0.5.0")
+
+    def test_corrupted_package_is_rejected(self):
+        self.asset.write_bytes(b"corrupted")
+        with self.assertRaisesRegex(ValueError, "SHA-512"):
+            prepare_files(self.root, "v0.5.0")
+
+    def test_missing_package_is_rejected(self):
+        self.asset.unlink()
+        with self.assertRaisesRegex(ValueError, "不存在"):
+            prepare_files(self.root, "v0.5.0")
+
+    def test_remote_and_traversing_paths_are_rejected(self):
+        for url in ["https://other.example/app.zip", "../app.zip", "%2e%2e%2fapp.zip", "app.zip?token=123"]:
+            with self.subTest(url=url):
+                self.write_manifest(MANIFESTS[0], files=[{"url": url, "sha512": self.digest}])
+                with self.assertRaisesRegex(ValueError, "非同目录"):
+                    prepare_files(self.root, "v0.5.0")
+
+    @patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo"})
+    @patch("sync_cos.subprocess.check_output")
+    def test_only_latest_release_can_be_synced(self, output):
+        output.return_value = "v0.5.0\n"
+        check_latest("v0.5.0")
+        with self.assertRaisesRegex(ValueError, "不是 GitHub 最新正式版"):
+            check_latest("v0.4.0")

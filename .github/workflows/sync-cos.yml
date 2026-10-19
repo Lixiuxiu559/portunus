@@ -1,0 +1,65 @@
+name: Sync release to COS
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '补同步的正式版本标签（须为 GitHub 最新正式版，例如 v0.4.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# 多个版本同步串行进行，不中断正在上传的安装包。
+concurrency:
+  group: cos-stable-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.event_name == 'workflow_dispatch' || (!github.event.release.draft && !github.event.release.prerelease)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 确认正式版本与上传凭证
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+        run: |
+          test -n "$COS_SECRET_ID" || { echo '::error::请配置 COS_SECRET_ID Secret'; exit 1; }
+          test -n "$COS_SECRET_KEY" || { echo '::error::请配置 COS_SECRET_KEY Secret'; exit 1; }
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease |
+            jq -e '.isDraft == false and .isPrerelease == false'
+          python .github/scripts/sync_cos.py --check-latest "$RELEASE_TAG"
+
+      - name: 下载正式 Release 文件
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir release-assets \
+            --pattern '*.exe' --pattern '*.dmg' --pattern '*.zip' --pattern '*.AppImage' \
+            --pattern '*.blockmap' --pattern 'latest*.yml'
+
+      - name: 安装同步工具依赖
+        run: python -m pip install -r .github/scripts/cos-requirements.txt
+
+      - name: 验证上传顺序与文件校验逻辑
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: 上传安装包并更新清单
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+        run: python .github/scripts/sync_cos.py release-assets "$RELEASE_TAG"

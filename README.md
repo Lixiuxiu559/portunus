@@ -215,4 +215,4 @@ Artifacts are written to `web/dist-electron/`. Pushing a `v*` tag triggers GitHu
 
 ---
 
-[Architecture and design](./ARCHITECTURE.md) · [Technical research](./docs/research) · [Release notes](https://github.com/Lixiuxiu559/portunus/releases) · [Issues and suggestions](https://github.com/Lixiuxiu559/portunus/issues)
+[Update distribution](./docs/updates.md) · [Architecture and design](./ARCHITECTURE.md) · [Technical research](./docs/research) · [Release notes](https://github.com/Lixiuxiu559/portunus/releases) · [Issues and suggestions](https://github.com/Lixiuxiu559/portunus/issues)
