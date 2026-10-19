@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 import tempfile
 import unittest
@@ -7,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files
+from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress
 
 
 class SyncTests(unittest.TestCase):
@@ -94,3 +96,16 @@ class SyncTests(unittest.TestCase):
         check_latest("v0.5.0")
         with self.assertRaisesRegex(ValueError, "不是 GitHub 最新正式版"):
             check_latest("v0.4.0")
+
+
+    def test_upload_progress_is_reported_at_ten_percent_intervals(self):
+        output = io.StringIO()
+        report = upload_progress("installer.zip")
+        with redirect_stdout(output):
+            for consumed in [1, 5, 10, 11, 20, 99, 100]:
+                report(consumed, 100)
+        self.assertEqual(output.getvalue().splitlines(), [
+            "上传进度：installer.zip 0%", "上传进度：installer.zip 10%",
+            "上传进度：installer.zip 20%", "上传进度：installer.zip 90%",
+            "上传进度：installer.zip 100%",
+        ])

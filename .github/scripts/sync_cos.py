@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -29,7 +30,10 @@ def prepare_files(directory, tag):
     import yaml
 
     directory = Path(directory)
-    assets = sorted(p for p in directory.iterdir() if p.name.endswith(ASSET_SUFFIXES) and p.is_file())
+    assets = sorted(
+        (p for p in directory.iterdir() if p.name.endswith(ASSET_SUFFIXES) and p.is_file()),
+        key=lambda p: (p.stat().st_size, p.name),
+    )
     manifests = [directory / name for name in MANIFESTS]
     version = tag.removeprefix("v")
     for path in manifests:
@@ -60,12 +64,26 @@ def prepare_files(directory, tag):
     return assets, manifests
 
 
+def upload_progress(name):
+    last_percent = -10
+
+    def report(consumed, total):
+        nonlocal last_percent
+        percent = min(100, int(consumed * 100 / max(total, 1))) // 10 * 10
+        if percent > last_percent:
+            last_percent = percent
+            print(f"上传进度：{name} {percent}%", flush=True)
+
+    return report
+
+
 def sync_files(client, assets, manifests, before_manifests):
     for path in assets:
         print(f"上传安装包：{path.name}", flush=True)
         client.upload_file(
             Bucket=BUCKET, Key=PREFIX + path.name, LocalFilePath=str(path),
-            PartSize=16, MAXThread=4, EnableMD5=True, StorageClass="STANDARD",
+            PartSize=2, MAXThread=4, EnableMD5=True, StorageClass="STANDARD",
+            progress_callback=upload_progress(path.name),
         )
     before_manifests()
     for path in manifests:
@@ -88,9 +106,10 @@ def main(args):
     assets, manifests = prepare_files(directory, tag)
     from qcloud_cos import CosConfig, CosS3Client
 
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     client = CosS3Client(CosConfig(
         Region=REGION, SecretId=os.environ["COS_SECRET_ID"],
-        SecretKey=os.environ["COS_SECRET_KEY"], Scheme="https",
+        SecretKey=os.environ["COS_SECRET_KEY"], Scheme="https", Timeout=120,
     ))
     sync_files(client, assets, manifests, lambda: check_latest(tag))
     print(f"{tag} 已同步到 COS：{BUCKET}/{PREFIX}")
