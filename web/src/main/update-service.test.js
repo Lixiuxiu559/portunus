@@ -167,3 +167,33 @@ test('用户取消 COS 下载时不切换备用源', async () => {
   await assert.rejects(service.downloadUpdate(), /cancelled/);
   assert.equal(calls.includes('source:github'), false);
 });
+
+
+test('打包环境 package.json 不含 build 时，模块可加载且 GitHub 备用源可用', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'portunus-packaged-update-'));
+  try {
+    const mainDir = path.join(root, 'src', 'main');
+    fs.mkdirSync(mainDir, { recursive: true });
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: '@portunus/web', version: '0.4.1' }));
+    for (const name of ['update-service.js', 'update-channels.js']) {
+      fs.copyFileSync(path.join(__dirname, name), path.join(mainDir, name));
+    }
+    const { createUpdateService: createPackagedService } = require(path.join(mainDir, 'update-service.js'));
+    const feeds = [];
+    const updater = new EventEmitter();
+    updater.setFeedURL = (feed) => feeds.push(feed);
+    updater.checkForUpdates = async () => {
+      if (feeds.length === 1) throw new Error('COS offline');
+      return available();
+    };
+    const service = createPackagedService(updater, { warn() {} });
+    assert.equal((await service.checkForUpdates()).updateInfo.version, '0.5.0');
+    assert.deepEqual(feeds[1], { provider: 'github', owner: 'Lixiuxiu559', repo: 'portunus' });
+    assert.deepEqual(feeds[1], require('../../package.json').build.publish);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

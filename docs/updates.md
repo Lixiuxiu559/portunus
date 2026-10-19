@@ -3,7 +3,7 @@
 Portunus 默认从腾讯云 COS 获取更新，检查更新或下载安装包失败时自动切换到 GitHub Releases。应用不提供更新源设置。
 
 - COS 根地址：`https://portunus-1321735248.cos.ap-shanghai.myqcloud.com/releases/`
-- GitHub 备用源：沿用 `web/package.json` 中的 `build.publish`。
+- GitHub 备用源：`Lixiuxiu559/portunus` 的正式 Releases，与打包发布配置保持一致。
 - 每次独立检查都先访问 COS；COS 返回“无更新”时，不额外检查 GitHub。
 - COS 下载失败后先重新检查 GitHub，只有相同版本可用时才继续下载。
 - 两个源都失败时才向界面报告错误。旧版应用需要先通过 GitHub 升级到包含 COS 默认源的新版本。

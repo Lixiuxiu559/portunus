@@ -5,7 +5,8 @@ const COS_SOURCE = {
   url: 'https://portunus-1321735248.cos.ap-shanghai.myqcloud.com/releases/',
   useMultipleRangeRequest: false,
 };
-const GITHUB_SOURCE = require('../../package.json').build.publish;
+// electron-builder 会移除 package.json 的 build 字段，运行时必须独立提供备用源。
+const GITHUB_SOURCE = { provider: 'github', owner: 'Lixiuxiu559', repo: 'portunus' };
 
 // 注入 updater，允许离线验证切源与事件行为，无需启动 Electron。
 function createUpdateService(autoUpdater, logger = console) {
