@@ -7,6 +7,7 @@ import json
 import hashlib
 import logging
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +20,12 @@ REGION = "ap-shanghai"
 PREFIX = "releases/"
 MANIFESTS = ("latest.yml", "latest-mac.yml", "latest-linux.yml")
 ASSET_SUFFIXES = (".exe", ".dmg", ".zip", ".AppImage", ".blockmap")
+KEEP_VERSIONS = 3
+VERSIONED_ASSET = re.compile(
+    r"Portunus-(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))-"
+    r"(?:mac-(?:arm64|x64)\.(?:dmg|zip)|windows-(?:arm64|x64)\.(?:exe|zip)"
+    r"|linux-(?:arm64|x64|x86_64)\.AppImage)(?:\.blockmap)?"
+)
 
 
 def check_latest(tag):
@@ -100,6 +107,63 @@ def sync_files(client, assets, manifests, before_manifests):
         )
 
 
+def formal_versions():
+    """按正式发布时间从新到旧获取全部版本，排除草稿和预发布。"""
+    pages = json.loads(subprocess.check_output(
+        ["gh", "api", f"repos/{REPOSITORY}/releases?per_page=100", "--paginate", "--slurp"],
+        text=True,
+    ))
+    releases = [release for page in pages for release in page
+                if release.get("draft") is False and release.get("prerelease") is False
+                and release.get("published_at")]
+    releases.sort(key=lambda release: release["published_at"], reverse=True)
+    return list(dict.fromkeys(release["tag_name"].removeprefix("v") for release in releases))
+
+
+def list_cos_keys(client):
+    keys = []
+    marker = ""
+    seen = {marker}
+    while True:
+        response = client.list_objects(Bucket=BUCKET, Prefix=PREFIX, Marker=marker, MaxKeys=1000)
+        keys.extend(item["Key"] for item in response.get("Contents", []))
+        truncated = str(response.get("IsTruncated", "false")).lower()
+        if truncated == "false":
+            return keys
+        if truncated != "true":
+            raise ValueError("COS 列举结果的分页状态无效，停止清理")
+        marker = response.get("NextMarker")
+        if not marker or marker in seen:
+            raise ValueError("COS 列举结果缺少有效的下一页标记，停止清理")
+        seen.add(marker)
+
+
+def prune_old_versions(client, tag):
+    current = tag.removeprefix("v")
+    versions = formal_versions()
+    if current not in versions:
+        raise ValueError("正式版本记录中缺少当前版本，停止清理")
+    keys_by_version = {}
+    for key in list_cos_keys(client):
+        if not key.startswith(PREFIX):
+            continue
+        match = VERSIONED_ASSET.fullmatch(key[len(PREFIX):])
+        if match and match["version"] in versions:
+            keys_by_version.setdefault(match["version"], []).append(key)
+    if current not in keys_by_version:
+        raise ValueError("COS 中未找到当前版本安装包，停止清理")
+    # 保留当前同步版本，以及 COS 中最近发布的两个正式版本。
+    existing = [current] + [version for version in versions if version != current and version in keys_by_version]
+    keep = set(existing[:KEEP_VERSIONS])
+    stale = sorted(key for version, keys in keys_by_version.items() if version not in keep for key in keys)
+    check_latest(tag)
+    print(f"保留正式版本：{', '.join(existing[:KEEP_VERSIONS])}", flush=True)
+    for key in stale:
+        print(f"清理旧版本文件：{key}", flush=True)
+        client.delete_object(Bucket=BUCKET, Key=key)
+    print(f"旧版本清理完成：删除 {len(stale)} 个文件", flush=True)
+
+
 def credentials():
     secret_id = os.environ.get("COS_SECRET_ID") or os.environ.get("TENCENTCLOUD_SECRET_ID")
     secret_key = os.environ.get("COS_SECRET_KEY") or os.environ.get("TENCENTCLOUD_SECRET_KEY")
@@ -167,7 +231,11 @@ def main(args):
         return
     client = create_cos_client()
     sync_files(client, assets, manifests, lambda: check_latest(tag))
-    print(f"{tag} 已同步到 COS：{BUCKET}/{PREFIX}")
+    print(f"{tag} 已同步到 COS：{BUCKET}/{PREFIX}", flush=True)
+    try:
+        prune_old_versions(client, tag)
+    except Exception as error:
+        raise RuntimeError("新版本已同步，但旧版本清理失败；请根据错误原因处理后重试") from error
 
 
 if __name__ == "__main__":

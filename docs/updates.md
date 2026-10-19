@@ -26,7 +26,7 @@ bash scripts/sync-cos.sh --tag v0.4.0
 
 也支持从环境变量 `COS_SECRET_ID` / `COS_SECRET_KEY`，或 `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY` 读取凭证。GitHub Secrets 中的密钥不能通过 API 取回到本地；无需将密钥发送到聊天或提交到仓库。
 
-上传账号需要具备此桶的对象上传、分块上传与相关查询权限，包括 `PutObject`、`InitiateMultipartUpload`、`UploadPart`、`CompleteMultipartUpload`、`ListMultipartUploads`、`ListParts` 等；分块任务列表查询需授权对应桶，上传权限限定到 `releases/*`。
+上传账号需要具备此桶的对象上传、分块上传与相关查询权限，包括 `PutObject`、`InitiateMultipartUpload`、`UploadPart`、`CompleteMultipartUpload`、`ListMultipartUploads`、`ListParts`、`GetBucket`、`DeleteObject` 等；分块任务列表查询需授权对应桶，上传和删除权限限定到 `releases/*`，对象列举权限授权到该桶。
 
 ### 下载与上传分开执行
 
@@ -49,7 +49,19 @@ bash scripts/sync-cos.sh --tag v0.4.0 --assets-dir /tmp/portunus-cos-releases/v0
 
 SDK 使用腾讯云官方公网域名 `tencentcos.cn` 上传，客户端通过 `myqcloud.com` 下载，两个域名访问同一存储桶。未启用全球加速。
 
-更新清单逐个发布，此阶段失败可能导致不同平台暂时处于不同版本，重新运行脚本补齐即可。旧安装包不会自动删除，需按存储用量自行保留或清理。
+更新清单逐个发布，此阶段失败可能导致不同平台暂时处于不同版本，重新运行脚本补齐即可。安装包或任一更新清单上传失败时，不执行旧版本清理。
+
+### 自动保留最近 3 个正式版本
+
+安装包和三个更新清单全部上传成功后，脚本列举 COS 的 `releases/` 文件，并结合 GitHub 正式 Release 记录自动清理旧版本：
+
+- 始终保留本次同步版本；其余按正式发布时间，保留 COS 中实际存在的最近两个正式版本。未同步到 COS 的 Release 不占保留名额。
+- 删除更早版本的安装包和对应 `.blockmap`，只处理符合 Portunus 平台安装包命名规则的文件。
+- 保留 `latest*.yml`、无版本号的固定下载文件、其他文件及无法确认属于正式版的文件。
+- 清理前再次确认本次版本仍是 GitHub 最新正式版；列举或版本查询失败时不开始删除。
+- 清理失败会报告错误，已发布的新版本仍然有效。重新运行脚本可继续完成清理。
+
+此规则清理的是当前可见对象，不清理未完成的分块任务；若存储桶启用了版本控制，删除旧文件也不等于清除了其历史对象版本。
 
 ## 验证
 
