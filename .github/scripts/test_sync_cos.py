@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress
+from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress, create_cos_client
 
 
 class SyncTests(unittest.TestCase):
@@ -109,3 +109,12 @@ class SyncTests(unittest.TestCase):
             "上传进度：installer.zip 20%", "上传进度：installer.zip 90%",
             "上传进度：installer.zip 100%",
         ])
+
+
+    @patch.dict("os.environ", {"COS_SECRET_ID": "test-id", "COS_SECRET_KEY": "test-key"})
+    def test_upload_uses_official_public_domain(self):
+        client = create_cos_client()
+        self.assertEqual(
+            client._conf.uri(bucket=BUCKET, path="releases/test"),
+            "https://portunus-1321735248.cos.ap-shanghai.tencentcos.cn/releases/test",
+        )

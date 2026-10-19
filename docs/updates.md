@@ -25,6 +25,8 @@ Portunus 默认从腾讯云 COS 获取更新，检查更新或下载安装包失
 
 使用可写入 `portunus-1321735248` 桶 `releases/*` 的腾讯云子账号密钥。脚本使用官方 COS Python SDK 的分块上传，需要对象上传、分块上传及相关查询权限（例如 `PutObject`、`InitiateMultipartUpload`、`UploadPart`、`CompleteMultipartUpload`、`ListMultipartUploads`、`ListParts`、`AbortMultipartUpload`）；其中分块任务列表查询属于桶级操作，需授权对应存储桶，上传权限限定到 `releases/*`。具体授权配置参见[腾讯云 COS 的 CAM 文档](https://cloud.tencent.com/document/product/436/11714)。密钥仅放在 GitHub Secrets 中，不放入客户端、仓库文件或聊天。
 
+上传 SDK 使用 COS 官方公网域名 `tencentcos.cn`；客户端下载地址继续使用 `myqcloud.com`，两个域名访问同一个存储桶。
+
 目标桶、地域和前缀已固定在 `.github/scripts/sync_cos.py` 中，与客户端默认源一致，无需额外设置域名变量。
 
 ### 同步顺序

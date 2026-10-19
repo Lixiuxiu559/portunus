@@ -95,22 +95,27 @@ def sync_files(client, assets, manifests, before_manifests):
         )
 
 
+def create_cos_client():
+    from qcloud_cos import CosConfig, CosS3Client
+
+    return CosS3Client(CosConfig(
+        Region=REGION, SecretId=os.environ["COS_SECRET_ID"],
+        SecretKey=os.environ["COS_SECRET_KEY"], Scheme="https", Timeout=120,
+        EnableOldDomain=False, EnableInternalDomain=False,
+    ))
+
+
 def main(args):
     if len(args) == 2 and args[0] == "--check-latest":
         check_latest(args[1])
         return
     if len(args) != 2:
         raise ValueError("用法：sync_cos.py <安装包目录> <版本标签>")
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     directory, tag = args
     check_latest(tag)
     assets, manifests = prepare_files(directory, tag)
-    from qcloud_cos import CosConfig, CosS3Client
-
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
-    client = CosS3Client(CosConfig(
-        Region=REGION, SecretId=os.environ["COS_SECRET_ID"],
-        SecretKey=os.environ["COS_SECRET_KEY"], Scheme="https", Timeout=120,
-    ))
+    client = create_cos_client()
     sync_files(client, assets, manifests, lambda: check_latest(tag))
     print(f"{tag} 已同步到 COS：{BUCKET}/{PREFIX}")
 
