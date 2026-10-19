@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress, create_cos_client
+from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress, create_cos_client, credentials, release_info, download_release
 
 
 class SyncTests(unittest.TestCase):
@@ -118,3 +118,36 @@ class SyncTests(unittest.TestCase):
             client._conf.uri(bucket=BUCKET, path="releases/test"),
             "https://portunus-1321735248.cos.ap-shanghai.tencentcos.cn/releases/test",
         )
+
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("sync_cos.sys.stdin.isatty", return_value=False)
+    def test_missing_local_credentials_gives_actionable_error(self, _):
+        with self.assertRaisesRegex(ValueError, "本地终端"):
+            credentials()
+
+    @patch.dict("os.environ", {"TENCENTCLOUD_SECRET_ID": "local-id", "TENCENTCLOUD_SECRET_KEY": "local-key"}, clear=True)
+    def test_tencent_cloud_environment_credentials_are_supported(self):
+        self.assertEqual(credentials(), ("local-id", "local-key"))
+
+    @patch("sync_cos.subprocess.check_output")
+    def test_prerelease_is_rejected_before_upload(self, output):
+        output.return_value = '{"tagName":"v0.6.0-beta.1","isDraft":false,"isPrerelease":true}'
+        with self.assertRaisesRegex(ValueError, "正式 Release"):
+            release_info("v0.6.0-beta.1")
+
+    @patch("sync_cos.subprocess.check_output")
+    def test_local_latest_version_is_resolved_and_verified(self, output):
+        output.side_effect = [
+            '{"tagName":"v0.5.0","isDraft":false,"isPrerelease":false}',
+            'v0.5.0\n',
+        ]
+        self.assertEqual(release_info(None), "v0.5.0")
+
+    @patch("sync_cos.subprocess.run")
+    def test_local_download_refreshes_manifests_and_reuses_packages(self, run):
+        download_release("v0.5.0", self.root)
+        self.assertEqual(run.call_count, 2)
+        self.assertIn("--clobber", run.call_args_list[0].args[0])
+        self.assertIn("--skip-existing", run.call_args_list[1].args[0])
+        self.assertTrue(all(call.kwargs["check"] for call in run.call_args_list))
