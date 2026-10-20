@@ -1,0 +1,13 @@
+[
+  {
+    "mode": "current",
+    "exit_code": 0,
+    "local_requests": 1,
+    "agent_text": [
+      "first",
+      "OK"
+    ],
+    "active_item_error": false,
+    "paid_calls": 0
+  }
+]

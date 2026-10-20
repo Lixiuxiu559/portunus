@@ -1,0 +1,272 @@
+data: {"type":"response.created","response":{"id":"f0eb44e1-0ee4-475c-8b32-a3141e603e1a","object":"response","status":"in_progress","model":"deepseek-flash","output":[]},"sequence_number":0}
+
+data: {"item":{"content":[],"id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"sequence_number":1,"type":"response.output_item.added"}
+
+data: {"content_index":0,"item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"part":{"annotations":[],"text":"","type":"output_text"},"sequence_number":2,"type":"response.content_part.added"}
+
+data: {"content_index":0,"delta":"1","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":3,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":4,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"2","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":5,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":6,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"3","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":7,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":8,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"4","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":9,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":10,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"5","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":11,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":12,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"6","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":13,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":14,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"7","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":15,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":16,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"8","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":17,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":18,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"9","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":19,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":20,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"10","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":21,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":22,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"11","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":23,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":24,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"12","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":25,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":26,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"13","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":27,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":28,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"14","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":29,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":30,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"15","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":31,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":32,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"16","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":33,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":34,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"17","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":35,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":36,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"18","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":37,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":38,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"19","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":39,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":40,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"20","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":41,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":42,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"21","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":43,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":44,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"22","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":45,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":46,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"23","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":47,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":48,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"24","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":49,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":50,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"25","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":51,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":52,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"26","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":53,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":54,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"27","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":55,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":56,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"28","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":57,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":58,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"29","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":59,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":60,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"30","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":61,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":62,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"31","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":63,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":64,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"32","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":65,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":66,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"33","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":67,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":68,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"34","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":69,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":70,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"35","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":71,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":72,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"36","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":73,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":74,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"37","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":75,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":76,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"38","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":77,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":78,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"39","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":79,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":80,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"40","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":81,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":82,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"41","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":83,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":84,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"42","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":85,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":86,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"43","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":87,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":88,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"44","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":89,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":90,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"45","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":91,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":92,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"46","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":93,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":94,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"47","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":95,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":96,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"48","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":97,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":98,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"49","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":99,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":100,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"50","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":101,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":102,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"51","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":103,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":104,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"52","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":105,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":106,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"53","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":107,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":108,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"54","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":109,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":110,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"55","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":111,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":112,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"56","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":113,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":114,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"57","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":115,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":116,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"58","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":117,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":118,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"59","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":119,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":120,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"60","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":121,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":122,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"61","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":123,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":124,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"62","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":125,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":126,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"63","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":127,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":128,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"64","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":129,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"delta":"\n","item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":130,"type":"response.output_text.delta"}
+
+data: {"content_index":0,"item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"sequence_number":131,"text":"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n","type":"response.output_text.done"}
+
+data: {"content_index":0,"item_id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","output_index":0,"part":{"annotations":[],"text":"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n","type":"output_text"},"sequence_number":132,"type":"response.content_part.done"}
+
+data: {"item":{"content":[{"annotations":[],"text":"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n","type":"output_text"}],"id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","role":"assistant","status":"incomplete","type":"message"},"output_index":0,"sequence_number":133,"type":"response.output_item.done"}
+
+data: {"type":"response.incomplete","response":{"id":"f0eb44e1-0ee4-475c-8b32-a3141e603e1a","object":"response","status":"incomplete","model":"deepseek-flash","output":[{"type":"message","id":"msg_f0eb44e1-0ee4-475c-8b32-a3141e603e1a_0","role":"assistant","content":[{"type":"output_text","text":"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n","annotations":[]}],"status":"incomplete"}],"usage":{"input_tokens":27,"output_tokens":128,"total_tokens":155,"input_tokens_details":{"cached_tokens":0}},"incomplete_details":{"reason":"max_output_tokens"}},"sequence_number":134}
+
+data: [DONE]
+

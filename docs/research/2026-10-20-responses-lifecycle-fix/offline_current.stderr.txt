@@ -1,0 +1,11 @@
+Reading additional input from stdin...
+2026-10-20T14:13:09.051882Z  WARN codex_models_manager::model_info: Unknown model probe3 is used. This will use fallback model metadata.
+2026-10-20T14:13:09.074390Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.076346Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.077760Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.079129Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.080335Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.081741Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.083191Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.084374Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back
+2026-10-20T14:13:09.175937Z  WARN codex_models_manager::model_info: Unknown model probe3 is used. This will use fallback model metadata.

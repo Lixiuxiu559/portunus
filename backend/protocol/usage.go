@@ -123,11 +123,13 @@ func toResponsesUsage(u *Usage) *ResponsesUsage {
 	if u == nil {
 		return nil
 	}
-	return &ResponsesUsage{
+	out := &ResponsesUsage{
 		InputTokens:  u.PromptTokens + u.CacheReadTokens + u.CacheWriteTokens,
 		OutputTokens: u.CompletionTokens,
 		TotalTokens:  u.TotalTokens,
 	}
+	out.InputTokensDetails.CachedTokens = u.CacheReadTokens
+	return out
 }
 
 // ── 流式直通的 usage 提取（注册为 providerImpls 的能力项 newUsageExtractor）──
@@ -196,12 +198,12 @@ func newGeminiUsageExtractor() func([]byte) *Usage {
 	}
 }
 
-// newResponsesUsageExtractor Responses 流事件的 usage 提取：仅 response.completed
-// 携带最终 usage。
+// newResponsesUsageExtractor Responses 完成、截断或失败事件均可携带最终 usage。
 func newResponsesUsageExtractor() func([]byte) *Usage {
 	return func(payload []byte) *Usage {
 		var ev ResponsesStreamEvent
-		if json.Unmarshal(payload, &ev) != nil || ev.Type != "response.completed" ||
+		if json.Unmarshal(payload, &ev) != nil ||
+			(ev.Type != "response.completed" && ev.Type != "response.incomplete" && ev.Type != "response.failed") ||
 			ev.Response == nil || ev.Response.Usage == nil {
 			return nil
 		}

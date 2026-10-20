@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -49,17 +50,60 @@ type InputItem struct {
 type ResponsesContent struct {
 	Type string `json:"type"` // input_text / output_text / input_image
 	Text string `json:"text,omitempty"`
+	// 仅 output_text 使用；指针保留必需的空数组，不污染输入或 summary。
+	Annotations *[]any `json:"annotations,omitempty"`
 }
 
 // ResponsesResponse 是 Responses 响应体。
 type ResponsesResponse struct {
-	ID     string          `json:"id"`
-	Object string          `json:"object"`
-	Status string          `json:"status"`
-	Model  string          `json:"model"`
-	Output []OutputItem    `json:"output"`
-	Usage  *ResponsesUsage `json:"usage,omitempty"`
-	Error  any             `json:"error,omitempty"`
+	ID                string                      `json:"id"`
+	Object            string                      `json:"object"`
+	Status            string                      `json:"status"`
+	Model             string                      `json:"model"`
+	Output            []OutputItem                `json:"output"`
+	Usage             *ResponsesUsage             `json:"usage,omitempty"`
+	Error             any                         `json:"error,omitempty"`
+	IncompleteDetails *ResponsesIncompleteDetails `json:"incomplete_details,omitempty"`
+}
+
+// ResponsesIncompleteDetails 区分输出预算耗尽和内容过滤等未完成原因。
+type ResponsesIncompleteDetails struct {
+	Reason string `json:"reason"`
+}
+
+// responsesCompletion 将 canonical 结束原因映射为响应级状态。
+func responsesCompletion(finish string) (string, *ResponsesIncompleteDetails) {
+	switch finish {
+	case "length":
+		return "incomplete", &ResponsesIncompleteDetails{Reason: "max_output_tokens"}
+	case "content_filter":
+		return "incomplete", &ResponsesIncompleteDetails{Reason: "content_filter"}
+	default:
+		return "completed", nil
+	}
+}
+
+// responsesFinishReason 响应级截断优先于已完成的输出项；工具优先于文本，
+// 避免 output 排列顺序改变最终结束原因。
+func responsesFinishReason(resp *ResponsesResponse, sawTool bool) (string, error) {
+	if resp.Status == "incomplete" {
+		if resp.IncompleteDetails != nil {
+			switch resp.IncompleteDetails.Reason {
+			case "max_output_tokens":
+				return "length", nil
+			case "content_filter":
+				return "content_filter", nil
+			}
+		}
+		return "", fmt.Errorf("无法映射 responses 未完成原因: %+v", resp.IncompleteDetails)
+	}
+	if resp.Status != "" && resp.Status != "completed" {
+		return "", fmt.Errorf("responses 响应尚未正常完成: %s", resp.Status)
+	}
+	if sawTool || hasFunctionCallItem(resp.Output) {
+		return "tool_calls", nil
+	}
+	return "stop", nil
 }
 
 // OutputItem 是 responses output 的一个单元。
@@ -75,6 +119,18 @@ type OutputItem struct {
 	Status    string             `json:"status,omitempty"`
 }
 
+// 工具参数可能在首帧或预算截断时为空，但 function_call 的 arguments 仍必填。
+func (item OutputItem) MarshalJSON() ([]byte, error) {
+	type outputItem OutputItem
+	if item.Type == "function_call" {
+		return json.Marshal(struct {
+			outputItem
+			Arguments string `json:"arguments"`
+		}{outputItem(item), item.Arguments})
+	}
+	return json.Marshal(outputItem(item))
+}
+
 // ResponsesUsage 是 Responses 用量。
 type ResponsesUsage struct {
 	InputTokens        int `json:"input_tokens"`
@@ -87,12 +143,18 @@ type ResponsesUsage struct {
 
 // ResponsesStreamEvent 是 Responses 流式事件。
 type ResponsesStreamEvent struct {
-	Type        string             `json:"type"`
-	Response    *ResponsesResponse `json:"response,omitempty"`
-	Item        *OutputItem        `json:"item,omitempty"`
-	Delta       string             `json:"delta,omitempty"`
-	OutputIndex int                `json:"output_index,omitempty"`
-	ItemID      string             `json:"item_id,omitempty"`
+	Type           string             `json:"type"`
+	Response       *ResponsesResponse `json:"response,omitempty"`
+	Item           *OutputItem        `json:"item,omitempty"`
+	Delta          string             `json:"delta,omitempty"`
+	OutputIndex    int                `json:"output_index,omitempty"`
+	ItemID         string             `json:"item_id,omitempty"`
+	ContentIndex   *int               `json:"content_index,omitempty"`
+	SummaryIndex   *int               `json:"summary_index,omitempty"`
+	Part           map[string]any     `json:"part,omitempty"`
+	Text           string             `json:"text,omitempty"`
+	Arguments      *string            `json:"arguments,omitempty"`
+	SequenceNumber int                `json:"sequence_number"`
 }
 
 // ===== 请求：responses → openai =====
@@ -432,23 +494,16 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 		Choices: []ChatChoice{{Index: 0, Message: ChatMessage{Role: "assistant"}}},
 	}
 
-	var finish string
 	for _, item := range resp.Output {
 		switch item.Type {
 		case "message":
 			out.Choices[0].Message.Content = responsesContentToText(item.Content)
-			if item.Status == "completed" {
-				finish = "stop"
-			}
 		case "function_call":
 			out.Choices[0].Message.ToolCalls = append(out.Choices[0].Message.ToolCalls, ToolCall{
 				ID:       item.CallID,
 				Type:     "function",
 				Function: FunctionCall{Name: item.Name, Arguments: item.Arguments},
 			})
-			if finish == "" {
-				finish = "tool_calls"
-			}
 		case "reasoning":
 			// 思考摘要映射为 reasoning_content（DeepSeek 同款扩展字段），经下游转换
 			// 链透出（如转 Anthropic thinking 块）。提取规则与请求方向同源
@@ -457,6 +512,10 @@ func responsesResponseToOpenAI(body []byte) (*ChatCompletionResponse, error) {
 			// （reasoning_text 段）。
 			out.Choices[0].Message.ReasoningContent += joinResponsesReasoningText(item.Summary, item.Content)
 		}
+	}
+	finish, err := responsesFinishReason(&resp, false)
+	if err != nil {
+		return nil, err
 	}
 	out.Choices[0].FinishReason = finish
 
@@ -479,6 +538,7 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 	}
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
+		out.Status, out.IncompleteDetails = responsesCompletion(choice.FinishReason)
 		// reasoning_content 非空时在 message item 之前插 reasoning item，与流式 sink
 		// 的 reasoning_summary_text.delta 对称——此前非流式漏写，思考内容被静默丢弃
 		// （见 docs/research/2026-09-29-capability-matrix-design.md §3.2）。
@@ -492,8 +552,8 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 			out.Output = append(out.Output, OutputItem{
 				Type:    "message",
 				Role:    "assistant",
-				Content: []ResponsesContent{{Type: "output_text", Text: text}},
-				Status:  "completed",
+				Content: []ResponsesContent{{Type: "output_text", Text: text, Annotations: &[]any{}}},
+				Status:  out.Status,
 			})
 		}
 		for _, tc := range choice.Message.ToolCalls {
@@ -502,7 +562,7 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 				CallID:    tc.ID,
 				Name:      tc.Function.Name,
 				Arguments: tc.Function.Arguments,
-				Status:    "completed",
+				Status:    out.Status,
 			})
 		}
 	}
@@ -568,21 +628,22 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			Index:    ev.OutputIndex,
 			Function: ChunkFunctionCall{Arguments: ev.Delta},
 		}}}, ""))
-	case "response.completed":
+	case "response.completed", "response.incomplete":
 		if ev.Response != nil {
 			r.st.setMeta(ev.Response.ID, ev.Response.Model)
 			if ev.Response.Usage != nil {
 				u := usageFromResponses(*ev.Response.Usage)
 				r.st.usage = &u
 			}
-			// finish_reason 取决于流式过程中是否出现过 function_call（更可靠，
-			// 因为部分上游的 completed.response.output 可能为空或只带精简项）；
-			// 若 output 元素里有 function_call 也一并识别。
-			if r.sawTool || hasFunctionCallItem(ev.Response.Output) {
-				r.st.finish = "tool_calls"
-			} else {
-				r.st.finish = "stop"
+			// 事件类型是终态的依据，兼容省略 response.status 的上游。
+			if ev.Type == "response.incomplete" {
+				ev.Response.Status = "incomplete"
 			}
+			finish, err := responsesFinishReason(ev.Response, r.sawTool)
+			if err != nil {
+				return nil, err
+			}
+			r.st.finish = finish
 		}
 	case "response.failed":
 		// 错误暂不映射为 chunk
@@ -611,86 +672,176 @@ func (r *responsesToOpenAIStream) Usage() *Usage { return r.st.usage }
 
 // ===== 流式：openai → responses =====
 
-// responsesBlockSink 把块生命周期回调映射为 Responses 流事件（由
-// fromOpenAISkeleton 驱动）。工具调用映射为 output_item.added（item 携带
-// call_id / name，output_index 沿用 openai 的 tool_calls index）+ 参数增量事件；
-// 思考增量映射为 reasoning_summary_text.delta（与 responses→openai 方向的
-// 解析对称）。旧实现只透文本，tool_calls / reasoning 被静默丢弃。
+// responsesBlockSink 为正文、思考和工具建立独立输出项。工具的 OpenAI index
+// 与 Responses output_index 分开，避免思考/正文占用输出项后发生索引冲突。
 func newResponsesFromOpenAI() StreamConverter {
 	return newFromOpenAISkeleton(&responsesBlockSink{})
 }
 
 type responsesBlockSink struct {
-	id, model string
-	started   bool
+	id, model   string
+	started     bool
+	sequence    int
+	items       []OutputItem
+	toolIndexes map[int]int
+	singleType  string
+	singleIndex int
+	singleText  strings.Builder
 }
 
-// ev 序列化一个流事件。
+// ev 只在输出项相关事件写入 output_index（包括必须保留的 0）。
 func (r *responsesBlockSink) ev(e ResponsesStreamEvent) []byte {
+	e.SequenceNumber = r.sequence
+	r.sequence++
 	b, _ := json.Marshal(e)
+	if e.Item != nil || e.ItemID != "" {
+		var fields map[string]any
+		_ = json.Unmarshal(b, &fields)
+		fields["output_index"] = e.OutputIndex
+		if e.Item != nil && e.Type == "response.output_item.added" {
+			item := fields["item"].(map[string]any)
+			switch e.Item.Type {
+			case "message":
+				item["content"] = []any{}
+			case "reasoning":
+				item["summary"] = []any{}
+			case "function_call":
+				item["arguments"] = ""
+			}
+		}
+		b, _ = json.Marshal(fields)
+	}
 	return b
 }
 
 func (r *responsesBlockSink) BeginMessage(id, model string, _ *Usage) [][]byte {
 	r.started = true
+	if id == "" {
+		id = "resp_" + rand.Text()
+	}
 	r.id, r.model = id, model
+	r.items = []OutputItem{}
 	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.created", Response: &ResponsesResponse{
-		ID: r.id, Object: "response", Status: "in_progress", Model: r.model,
+		ID: r.id, Object: "response", Status: "in_progress", Model: r.model, Output: []OutputItem{},
 	}})}
 }
 
+func (r *responsesBlockSink) startSingle(kind string) [][]byte {
+	if r.singleType != "" {
+		return nil
+	}
+	index := len(r.items)
+	prefix := "msg_"
+	if kind == "reasoning" {
+		prefix = "rs_"
+	}
+	item := OutputItem{ID: fmt.Sprintf("%s%s_%d", prefix, r.id, index), Type: kind, Status: "in_progress"}
+	if kind == "message" {
+		item.Role = "assistant"
+	}
+	r.items = append(r.items, item)
+	r.singleType, r.singleIndex = kind, index
+	r.singleText.Reset()
+	events := [][]byte{r.ev(ResponsesStreamEvent{Type: "response.output_item.added", OutputIndex: index, Item: &item})}
+	zero := 0
+	ev := ResponsesStreamEvent{ItemID: item.ID, OutputIndex: index}
+	if kind == "message" {
+		ev.Type = "response.content_part.added"
+		ev.ContentIndex = &zero
+		ev.Part = map[string]any{"type": "output_text", "text": "", "annotations": []any{}}
+	} else {
+		ev.Type = "response.reasoning_summary_part.added"
+		ev.SummaryIndex = &zero
+		ev.Part = map[string]any{"type": "summary_text", "text": ""}
+	}
+	return append(events, r.ev(ev))
+}
+
 func (r *responsesBlockSink) TextDelta(s string) [][]byte {
-	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.output_text.delta", Delta: s})}
+	out := r.startSingle("message")
+	r.singleText.WriteString(s)
+	zero := 0
+	return append(out, r.ev(ResponsesStreamEvent{Type: "response.output_text.delta", Delta: s,
+		ItemID: r.items[r.singleIndex].ID, OutputIndex: r.singleIndex, ContentIndex: &zero}))
 }
 
 func (r *responsesBlockSink) ReasoningDelta(s string) [][]byte {
-	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.reasoning_summary_text.delta", Delta: s})}
+	out := r.startSingle("reasoning")
+	r.singleText.WriteString(s)
+	zero := 0
+	return append(out, r.ev(ResponsesStreamEvent{Type: "response.reasoning_summary_text.delta", Delta: s,
+		ItemID: r.items[r.singleIndex].ID, OutputIndex: r.singleIndex, SummaryIndex: &zero}))
 }
 
 func (r *responsesBlockSink) ToolStart(index int, id, name string) [][]byte {
-	return [][]byte{r.ev(ResponsesStreamEvent{
-		Type:        "response.output_item.added",
-		OutputIndex: index,
-		Item:        &OutputItem{Type: "function_call", CallID: id, Name: name},
-	})}
+	if r.toolIndexes == nil {
+		r.toolIndexes = map[int]int{}
+	}
+	outputIndex := len(r.items)
+	r.toolIndexes[index] = outputIndex
+	item := OutputItem{ID: fmt.Sprintf("fc_%s_%d", r.id, outputIndex), Type: "function_call", CallID: id, Name: name, Status: "in_progress"}
+	r.items = append(r.items, item)
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.output_item.added", OutputIndex: outputIndex, Item: &item})}
 }
 
 func (r *responsesBlockSink) ToolDelta(index int, args string) [][]byte {
-	return [][]byte{r.ev(ResponsesStreamEvent{
-		Type:        "response.function_call_arguments.delta",
-		OutputIndex: index,
-		Delta:       args,
-	})}
+	outputIndex := r.toolIndexes[index]
+	item := &r.items[outputIndex]
+	item.Arguments += args
+	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.function_call_arguments.delta", OutputIndex: outputIndex, ItemID: item.ID, Delta: args})}
 }
 
-// ToolComplete 发 output_item.done——Responses 客户端（codex 的 SSE 处理器）
-// 只在该事件上分发工具执行，added + delta 而无 done 的工具调用永远不会被执行；
-// item 携带骨架累积的完整参数与 completed 状态。
+// 骨架可在切换到正文时提前关闭工具。先保存完整参数，等待 Finish 明确
+// 结束原因后再定稿，避免独立尾帧的截断原因晚到、工具却已被标为完成。
 func (r *responsesBlockSink) ToolComplete(index int, id, name, args string) [][]byte {
-	return [][]byte{r.ev(ResponsesStreamEvent{
-		Type:        "response.output_item.done",
-		OutputIndex: index,
-		Item:        &OutputItem{Type: "function_call", CallID: id, Name: name, Arguments: args, Status: "completed"},
-	})}
+	item := &r.items[r.toolIndexes[index]]
+	item.CallID, item.Name, item.Arguments = id, name, args
+	return nil
 }
 
-func (r *responsesBlockSink) TextEnd() [][]byte { return nil }
+func (r *responsesBlockSink) TextEnd() [][]byte {
+	if r.singleType == "" {
+		return nil
+	}
+	item := &r.items[r.singleIndex]
+	text := r.singleText.String()
+	zero := 0
+	done := ResponsesStreamEvent{ItemID: item.ID, OutputIndex: r.singleIndex, Text: text}
+	part := ResponsesStreamEvent{ItemID: item.ID, OutputIndex: r.singleIndex}
+	if r.singleType == "message" {
+		item.Content = []ResponsesContent{{Type: "output_text", Text: text, Annotations: &[]any{}}}
+		done.Type = "response.output_text.done"
+		done.ContentIndex = &zero
+		part.Type = "response.content_part.done"
+		part.ContentIndex = &zero
+		part.Part = map[string]any{"type": "output_text", "text": text, "annotations": []any{}}
+	} else {
+		item.Summary = []ResponsesContent{{Type: "summary_text", Text: text}}
+		done.Type = "response.reasoning_summary_text.done"
+		done.SummaryIndex = &zero
+		part.Type = "response.reasoning_summary_part.done"
+		part.SummaryIndex = &zero
+		part.Part = map[string]any{"type": "summary_text", "text": text}
+	}
+	r.singleType = ""
+	return [][]byte{r.ev(done), r.ev(part)}
+}
 
-// Finish 发 response.completed（Responses 事件无 finish_reason 字段，完成即
-// status=completed；usage 反向还原——input_tokens 是含缓存的总输入，需加回
-// 缓存读 / 写）。与旧实现一致：未收到任何 chunk 时不产出。
-func (r *responsesBlockSink) Finish(_ string, u *Usage) [][]byte {
+// Finish 先定稿所有输出项，再发送携带完整 output、终态和用量的响应。
+func (r *responsesBlockSink) Finish(reason string, u *Usage) [][]byte {
 	if !r.started {
 		return nil
 	}
-	resp := &ResponsesResponse{
-		ID:     r.id,
-		Object: "response",
-		Status: "completed",
-		Model:  r.model,
+	status, details := responsesCompletion(reason)
+	var out [][]byte
+	for index := range r.items {
+		item := &r.items[index]
+		item.Status = status
+		if item.Type == "function_call" {
+			out = append(out, r.ev(ResponsesStreamEvent{Type: "response.function_call_arguments.done", OutputIndex: index, ItemID: item.ID, Arguments: &item.Arguments}))
+		}
+		out = append(out, r.ev(ResponsesStreamEvent{Type: "response.output_item.done", OutputIndex: index, Item: item}))
 	}
-	if u != nil {
-		resp.Usage = toResponsesUsage(u)
-	}
-	return [][]byte{r.ev(ResponsesStreamEvent{Type: "response.completed", Response: resp})}
+	resp := &ResponsesResponse{ID: r.id, Object: "response", Model: r.model, Status: status, IncompleteDetails: details, Output: r.items, Usage: toResponsesUsage(u)}
+	return append(out, r.ev(ResponsesStreamEvent{Type: "response." + status, Response: resp}))
 }

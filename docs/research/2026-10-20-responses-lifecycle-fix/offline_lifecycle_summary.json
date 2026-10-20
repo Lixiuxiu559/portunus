@@ -1,0 +1,22 @@
+[
+  {
+    "mode": "current",
+    "exit_code": 0,
+    "local_requests": 1,
+    "agent_text": [
+      "OK"
+    ],
+    "active_item_error": false,
+    "paid_calls": 0
+  },
+  {
+    "mode": "control",
+    "exit_code": 0,
+    "local_requests": 1,
+    "agent_text": [
+      "OK"
+    ],
+    "active_item_error": false,
+    "paid_calls": 0
+  }
+]

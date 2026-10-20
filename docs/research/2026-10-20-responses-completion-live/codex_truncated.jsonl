@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"01a1597f-55c7-7840-8f90-30e86d186c2b"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `probe3` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}
+{"type":"turn.started"}
+{"type":"error","message":"stream disconnected before completion: Incomplete response returned, reason: max_output_tokens"}
+{"type":"turn.failed","error":{"message":"stream disconnected before completion: Incomplete response returned, reason: max_output_tokens"}}

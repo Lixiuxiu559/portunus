@@ -1,0 +1,416 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/Lixiuxiu559/portunus/backend/channel"
+	"github.com/Lixiuxiu559/portunus/backend/gateway"
+	"github.com/Lixiuxiu559/portunus/backend/group"
+	"github.com/Lixiuxiu559/portunus/backend/model"
+	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
+	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+type route struct {
+	ID                  int64
+	Name                string
+	Type                protocol.Provider
+	BaseURL, Key, Model string
+}
+type observation struct {
+	mu                   sync.Mutex
+	ID                   string           `json:"id"`
+	ChannelID            int64            `json:"channel_id"`
+	Model                string           `json:"upstream_model"`
+	Stream               bool             `json:"stream"`
+	Budget               int              `json:"budget"`
+	Attempts             int              `json:"physical_upstream_calls"`
+	Blocked              int              `json:"blocked_extra_attempts"`
+	UpstreamStatus       int              `json:"upstream_status"`
+	SentBudget           any              `json:"sent_max_tokens"`
+	SentCompletionBudget any              `json:"sent_max_completion_tokens"`
+	Finish               string           `json:"upstream_finish_reason"`
+	Usage                any              `json:"upstream_usage"`
+	UpstreamDone         bool             `json:"upstream_done"`
+	ClientStatus         int              `json:"client_status"`
+	Terminal             []map[string]any `json:"client_terminal_events"`
+	ClientDone           bool             `json:"client_done"`
+	CLIExit              int              `json:"cli_exit"`
+	CLIEvents            []map[string]any `json:"cli_events,omitempty"`
+	ClientCalls          int              `json:"client_requests"`
+	Log                  *shared.Log      `json:"gateway_log,omitempty"`
+	Passed               bool             `json:"protocol_verified"`
+	TransportError       bool             `json:"transport_error"`
+}
+type guardTransport struct {
+	base   http.RoundTripper
+	active *observation
+}
+
+func (g *guardTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	o := g.active
+	b, e := io.ReadAll(req.Body)
+	if e != nil {
+		return nil, e
+	}
+	req.Body.Close()
+	var sent map[string]any
+	if json.Unmarshal(b, &sent) != nil {
+		return nil, fmt.Errorf("invalid request")
+	}
+	o.mu.Lock()
+	if o.Attempts >= 1 {
+		o.Blocked++
+		o.mu.Unlock()
+		return nil, fmt.Errorf("probe guard: extra paid call blocked")
+	}
+	if sent["model"] != o.Model || sent["max_tokens"] != float64(o.Budget) || sent["max_completion_tokens"] != nil {
+		o.mu.Unlock()
+		return nil, fmt.Errorf("probe guard: wrong model or budget")
+	}
+	o.Attempts++
+	o.SentBudget = sent["max_tokens"]
+	o.SentCompletionBudget = sent["max_completion_tokens"]
+	o.mu.Unlock()
+	req.Body = io.NopCloser(bytes.NewReader(b))
+	resp, e := g.base.RoundTrip(req)
+	if e != nil {
+		o.mu.Lock()
+		o.TransportError = true
+		o.mu.Unlock()
+		return nil, fmt.Errorf("upstream transport failed")
+	}
+	o.mu.Lock()
+	o.UpstreamStatus = resp.StatusCode
+	o.mu.Unlock()
+	resp.Body = &observedBody{ReadCloser: resp.Body, o: o, stream: o.Stream}
+	return resp, nil
+}
+
+type observedBody struct {
+	io.ReadCloser
+	o       *observation
+	stream  bool
+	pending []byte
+	all     []byte
+}
+
+func (b *observedBody) Read(p []byte) (int, error) {
+	n, e := b.ReadCloser.Read(p)
+	if n > 0 {
+		if b.stream {
+			b.pending = append(b.pending, p[:n]...)
+			for {
+				idx := bytes.IndexByte(b.pending, '\n')
+				if idx < 0 {
+					break
+				}
+				line := strings.TrimSpace(string(b.pending[:idx]))
+				b.pending = b.pending[idx+1:]
+				b.observe(line)
+			}
+		} else {
+			b.all = append(b.all, p[:n]...)
+			b.observeJSON(b.all)
+		}
+	}
+	return n, e
+}
+func (b *observedBody) observe(line string) {
+	if !strings.HasPrefix(line, "data:") {
+		return
+	}
+	data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	if data == "[DONE]" {
+		b.o.mu.Lock()
+		b.o.UpstreamDone = true
+		b.o.mu.Unlock()
+		return
+	}
+	b.observeJSON([]byte(data))
+}
+func (b *observedBody) observeJSON(raw []byte) {
+	var ev map[string]any
+	if json.Unmarshal(raw, &ev) != nil {
+		return
+	}
+	b.o.mu.Lock()
+	defer b.o.mu.Unlock()
+	if u := ev["usage"]; u != nil {
+		b.o.Usage = u
+	}
+	if cs, ok := ev["choices"].([]any); ok {
+		for _, c := range cs {
+			if cm, ok := c.(map[string]any); ok {
+				if fr, ok := cm["finish_reason"].(string); ok && fr != "" {
+					b.o.Finish = fr
+				}
+			}
+		}
+	}
+}
+func die(s string) { fmt.Fprintln(os.Stderr, s); os.Exit(2) }
+func must(e error) {
+	if e != nil {
+		die("probe setup failed: " + e.Error())
+	}
+}
+func main() {
+	if os.Getenv("PORTUNUS_REAL_COMPLETION_PROBE") != "1" {
+		die("explicit opt-in required")
+	}
+	report, err := filepath.Abs("docs/research/2026-10-20-responses-completion-live")
+	must(err)
+	out, err := os.OpenFile(filepath.Join(report, "results.jsonl"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		die("results already exist; refusing duplicate paid calls")
+	}
+	defer out.Close()
+	home, err := os.UserHomeDir()
+	must(err)
+	db, err := gorm.Open(sqlite.Open("file:"+filepath.Join(home, "Library/Application Support/@portunus/web/data/portunus.db")+"?mode=ro"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	must(err)
+	var routes []route
+	must(db.Table("channels c").Select("c.id,c.name,c.type,c.base_url,c.key,m.name as model").Joins("join models m on m.channel_id=c.id").Where("(c.id=1 and m.name=?) or (c.id=3 and m.name=?)", "deepseek/deepseek-v4.1-flash", "deepseek-flash").Order("c.id").Scan(&routes).Error)
+	sqlDB, err := db.DB()
+	must(err)
+	must(sqlDB.Close())
+	if len(routes) != 2 {
+		die("expected configured routes missing; no calls sent")
+	}
+	for _, r := range routes {
+		if r.Type != protocol.ProviderOpenAI || r.Key == "" {
+			die("route changed; no calls sent")
+		}
+	}
+	shared.DB, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	must(err)
+	must(shared.DB.AutoMigrate(&channel.Channel{}, &model.Model{}, &group.Group{}, &group.GroupItem{}))
+	for _, rt := range routes {
+		ch := channel.Channel{ID: rt.ID, Name: rt.Name, Type: rt.Type, BaseURL: rt.BaseURL, Key: rt.Key}
+		must(shared.DB.Create(&ch).Error)
+		m := model.Model{ChannelID: ch.ID, Name: rt.Model}
+		must(shared.DB.Create(&m).Error)
+		grp := group.Group{Name: fmt.Sprintf("probe%d", rt.ID), Strategy: group.StrategyFailover}
+		must(shared.DB.Create(&grp).Error)
+		must(shared.DB.Create(&group.GroupItem{GroupID: grp.ID, ModelID: m.ID}).Error)
+	}
+	pc := shared.DefaultProxyConfig()
+	pc.RetryCount = 0
+	pc.FirstByteTimeoutSeconds = 45
+	pc.NonStreamTimeoutSeconds = 90
+	client := gateway.NewHTTPClient(pc)
+	transport := &guardTransport{base: client.Transport}
+	client.Transport = transport
+	tokenBytes := make([]byte, 16)
+	_, err = rand.Read(tokenBytes)
+	must(err)
+	token := hex.EncodeToString(tokenBytes)
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
+	gateway.Register(router, gateway.Deps{Cfg: pc, Client: client, Breakers: gateway.NewBreakerStore(pc), Auth: func(k string) (int64, bool) { return 1, k == token }, LogWrite: func(l *shared.Log) { o := transport.active; o.mu.Lock(); cp := *l; o.Log = &cp; o.mu.Unlock() }})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		o := transport.active
+		o.mu.Lock()
+		o.ClientCalls++
+		o.mu.Unlock()
+		raw, e := io.ReadAll(r.Body)
+		if e != nil {
+			http.Error(w, "read failed", 400)
+			return
+		}
+		var body map[string]any
+		if json.Unmarshal(raw, &body) != nil {
+			http.Error(w, "invalid json", 400)
+			return
+		}
+		// 客户端发出的其余字段原样通过，仅由测试边界注入已批准输出预算。
+		body["max_output_tokens"] = o.Budget
+		raw, _ = json.Marshal(body)
+		r.Body = io.NopCloser(bytes.NewReader(raw))
+		r.ContentLength = int64(len(raw))
+		recorder := &teeWriter{ResponseWriter: w}
+		router.ServeHTTP(recorder, r)
+		o.mu.Lock()
+		o.ClientStatus = recorder.status
+		parseClient(recorder.body.Bytes(), o)
+		o.mu.Unlock()
+	}))
+	defer srv.Close()
+	redact := func(s string) string {
+		s = strings.ReplaceAll(s, token, "[PROBE_TOKEN]")
+		for _, r := range routes {
+			s = strings.ReplaceAll(s, r.Key, "[REDACTED]")
+		}
+		return s
+	}
+	var rows []*observation
+	longPrompt := "请从1数到1000，每个数字独占一行，不要解释，不要省略，不要使用工具。"
+	run := func(o *observation, prompt string, cli bool) {
+		transport.active = o
+		start := time.Now()
+		fmt.Printf("starting %s channel=%d budget=%d\n", o.ID, o.ChannelID, o.Budget)
+		if cli {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+			defer cancel()
+			work, er := os.MkdirTemp("/tmp", "portunus-codex-live-")
+			must(er)
+			defer os.RemoveAll(work)
+			args := []string{"exec", "--ignore-user-config", "--ignore-rules", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "--color", "never", "--json", "-C", work, "-m", fmt.Sprintf("probe%d", o.ChannelID)}
+			cfg := []string{`model_provider="portunus_probe"`, `model_providers.portunus_probe.name="Portunus live verification"`, `model_providers.portunus_probe.base_url="` + srv.URL + `/v1"`, `model_providers.portunus_probe.env_key="PORTUNUS_PROBE_TOKEN"`, `model_providers.portunus_probe.wire_api="responses"`, `model_providers.portunus_probe.requires_openai_auth=false`, `model_providers.portunus_probe.supports_websockets=false`, `model_providers.portunus_probe.request_max_retries=0`, `model_providers.portunus_probe.stream_max_retries=0`, `model_reasoning_effort="none"`, `web_search="disabled"`}
+			for _, c := range cfg {
+				args = append(args, "-c", c)
+			}
+			args = append(args, prompt)
+			cmd := exec.CommandContext(ctx, "codex", args...)
+			cmd.Env = append(os.Environ(), "PORTUNUS_PROBE_TOKEN="+token)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			er = cmd.Run()
+			o.CLIExit = 0
+			if er != nil {
+				o.CLIExit = -1
+				if exit, ok := er.(*exec.ExitError); ok {
+					o.CLIExit = exit.ExitCode()
+				}
+			}
+			clean := redact(stdout.String())
+			must(os.WriteFile(filepath.Join(report, o.ID+".jsonl"), []byte(clean), 0600))
+			must(os.WriteFile(filepath.Join(report, o.ID+".stderr.txt"), []byte(redact(stderr.String())), 0600))
+			for _, line := range strings.Split(clean, "\n") {
+				var ev map[string]any
+				if json.Unmarshal([]byte(line), &ev) == nil {
+					o.CLIEvents = append(o.CLIEvents, ev)
+				}
+			}
+		} else {
+			body, _ := json.Marshal(map[string]any{"model": fmt.Sprintf("probe%d", o.ChannelID), "input": prompt, "max_output_tokens": o.Budget, "stream": o.Stream, "reasoning": map[string]any{"effort": "none"}})
+			req, er := http.NewRequest(http.MethodPost, srv.URL+"/v1/responses", bytes.NewReader(body))
+			must(er)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Content-Type", "application/json")
+			resp, er := (&http.Client{Timeout: 100 * time.Second}).Do(req)
+			if er == nil {
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			} else {
+				o.TransportError = true
+			}
+		}
+		o.mu.Lock()
+		expectedStatus, expectedReason := "incomplete", "max_output_tokens"
+		if o.ID == "codex_normal" {
+			expectedStatus, expectedReason = "completed", ""
+		}
+		validTerminal := len(o.Terminal) == 1
+		if validTerminal {
+			t := o.Terminal[0]
+			validTerminal = t["status"] == expectedStatus
+			if expectedReason != "" {
+				d, ok := t["incomplete_details"].(map[string]any)
+				validTerminal = validTerminal && ok && d["reason"] == expectedReason
+			}
+		}
+		o.Passed = o.Attempts == 1 && o.UpstreamStatus == 200 && o.ClientStatus == 200 && validTerminal
+		if expectedStatus == "incomplete" {
+			o.Passed = o.Passed && o.Finish == "length"
+		} else {
+			o.Passed = o.Passed && o.Finish == "stop"
+		}
+		encoded, _ := json.Marshal(o)
+		mustWrite(out, append(encoded, '\n'))
+		must(out.Sync())
+		fmt.Printf("finished %s status=%d upstream_finish=%s cli_exit=%d verified=%t duration_ms=%d\n", o.ID, o.ClientStatus, o.Finish, o.CLIExit, o.Passed, time.Since(start).Milliseconds())
+		o.mu.Unlock()
+		rows = append(rows, o)
+	}
+	for _, r := range routes {
+		for _, stream := range []bool{true, false} {
+			id := fmt.Sprintf("channel_%d_stream_%t", r.ID, stream)
+			run(&observation{ID: id, ChannelID: r.ID, Model: r.Model, Stream: stream, Budget: 128}, longPrompt, false)
+		}
+	}
+	r := routes[1]
+	run(&observation{ID: "codex_normal", ChannelID: r.ID, Model: r.Model, Stream: true, Budget: 256}, "不要读取文件或使用任何工具。最终回复只输出两个英文字母 OK，不要解释。", true)
+	run(&observation{ID: "codex_truncated", ChannelID: r.ID, Model: r.Model, Stream: true, Budget: 128}, longPrompt, true)
+	summary := map[string]any{"created_utc": time.Now().UTC().Format(time.RFC3339), "codex_version": "0.157.0", "rows": rows, "planned_max_paid_calls": 6}
+	data, _ := json.MarshalIndent(summary, "", "  ")
+	must(os.WriteFile(filepath.Join(report, "summary.json"), data, 0600))
+}
+func mustWrite(w io.Writer, b []byte) { _, e := w.Write(b); must(e) }
+
+type teeWriter struct {
+	http.ResponseWriter
+	body   bytes.Buffer
+	status int
+}
+
+func (w *teeWriter) WriteHeader(code int) { w.status = code; w.ResponseWriter.WriteHeader(code) }
+func (w *teeWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = 200
+	}
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+func (w *teeWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+func parseClient(body []byte, o *observation) {
+	add := func(ev map[string]any) {
+		typ, _ := ev["type"].(string)
+		if typ == "response.completed" || typ == "response.incomplete" || typ == "response.failed" {
+			r, _ := ev["response"].(map[string]any)
+			m := map[string]any{"type": typ}
+			for _, k := range []string{"status", "incomplete_details", "usage", "error"} {
+				if r[k] != nil {
+					m[k] = r[k]
+				}
+			}
+			o.Terminal = append(o.Terminal, m)
+		}
+	}
+	if !o.Stream {
+		var r map[string]any
+		if json.Unmarshal(body, &r) == nil {
+			add(map[string]any{"type": "response." + fmt.Sprint(r["status"]), "response": r})
+		}
+		return
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "[DONE]" {
+			o.ClientDone = true
+			continue
+		}
+		var ev map[string]any
+		if json.Unmarshal([]byte(payload), &ev) == nil {
+			add(ev)
+		}
+	}
+}

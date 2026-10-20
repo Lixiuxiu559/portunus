@@ -1,0 +1,96 @@
+{
+  "physical_upstream_calls": 6,
+  "input_tokens_including_cache": 22600,
+  "output_tokens": 641,
+  "upstream_cache_read_tokens": 10880,
+  "cases": [
+    {
+      "id": "channel_1_stream_true",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": true,
+        "upstream_stream_done": true
+      },
+      "upstream_output_tokens": 128,
+      "codex_exit": null
+    },
+    {
+      "id": "channel_1_stream_false",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": true,
+        "upstream_stream_done": null
+      },
+      "upstream_output_tokens": 128,
+      "codex_exit": null
+    },
+    {
+      "id": "channel_3_stream_true",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": true,
+        "upstream_stream_done": true
+      },
+      "upstream_output_tokens": 128,
+      "codex_exit": null
+    },
+    {
+      "id": "channel_3_stream_false",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": true,
+        "upstream_stream_done": null
+      },
+      "upstream_output_tokens": 128,
+      "codex_exit": null
+    },
+    {
+      "id": "codex_normal",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": true,
+        "upstream_stream_done": true,
+        "codex_visible_text": false,
+        "codex_recognizes_budget_truncation": null
+      },
+      "upstream_output_tokens": 1,
+      "codex_exit": 0
+    },
+    {
+      "id": "codex_truncated",
+      "checks": {
+        "one_physical_call": true,
+        "terminal_semantics": true,
+        "output_usage_preserved": true,
+        "input_total_preserved": true,
+        "client_cache_detail_preserved": false,
+        "upstream_stream_done": true,
+        "codex_visible_text": false,
+        "codex_recognizes_budget_truncation": true
+      },
+      "upstream_output_tokens": 128,
+      "codex_exit": 1
+    }
+  ],
+  "overall_complete_codex_compatibility": false,
+  "completion_semantics_verified": true,
+  "source_sha256": {
+    "backend/protocol/responses.go": "2c015db00d2fa8ffb179d054acbd90e1e2c5ed35fce50c048fc8896af9487ad4",
+    "backend/protocol/usage.go": "2b3716ee951da9e4b1251151d0ca32ee891f656fc29f0b3d97db5ca39a6c0b66"
+  }
+}
