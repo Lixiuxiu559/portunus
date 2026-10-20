@@ -126,3 +126,54 @@ func TestUpstreamAttemptRoutes(t *testing.T) {
 		})
 	}
 }
+
+func TestLogRequestRoutes(t *testing.T) {
+	setupCascadeTest(t)
+	if err := shared.InitLogDB(&shared.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	rows := []shared.Log{
+		{RequestID: "exact_%+'", APIKeyID: 7, ChannelID: 1, ModelName: "a", GroupName: "g", ClientProtocol: "openai", Status: 503},
+		{RequestID: "exact_%+'", ChannelID: 2, ModelName: "b", Success: true, Status: 200},
+		{RequestID: "exact_other", ChannelID: 1},
+		{}, {},
+	}
+	if err := shared.LogDB.Create(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	r := gin.New()
+	registerLogRoutes(r.Group("/api"))
+	for _, tc := range []struct {
+		name     string
+		query    url.Values
+		total    int64
+		length   int
+		latestID int64
+		logCount int64
+	}{
+		{"complete-summary", url.Values{"request_id": {"exact_%+'"}, "api_key_id": {"7"}, "channel_id": {"1"}, "model_name": {"a"}, "group_name": {"g"}, "client_protocol": {"openai"}, "success": {"false"}, "page_size": {"1"}}, 1, 1, rows[1].ID, 2},
+		{"exact-percent", url.Values{"request_id": {"%"}}, 0, 0, 0, 0},
+		{"prefix", url.Values{"request_id": {"exact_"}}, 0, 0, 0, 0},
+		{"legacy-first", url.Values{"page": {"1"}, "page_size": {"1"}}, 4, 1, rows[4].ID, 1},
+		{"legacy-second", url.Values{"page": {"2"}, "page_size": {"1"}}, 4, 1, rows[3].ID, 1},
+		{"out-of-range", url.Values{"page": {"5"}, "page_size": {"1"}}, 4, 0, 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/logs/requests?"+tc.query.Encode(), nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			var response struct {
+				Total int64               `json:"total"`
+				Data  []shared.LogRequest `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if response.Total != tc.total || response.Data == nil || len(response.Data) != tc.length || (tc.length > 0 && (response.Data[0].LatestLog.ID != tc.latestID || response.Data[0].LogCount != tc.logCount)) {
+				t.Fatalf("响应错误: %s", w.Body.String())
+			}
+		})
+	}
+}

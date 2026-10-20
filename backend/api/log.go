@@ -17,7 +17,17 @@ func registerLogRoutes(r *gin.RouterGroup) {
 	g.GET("", listLogs)
 	g.GET("/stat", getLogStats)
 	g.GET("/attempts", listUpstreamAttempts)
+	g.GET("/requests", listLogRequests)
 	g.DELETE("", deleteOldLogs)
+}
+
+func listLogRequests(c *gin.Context) {
+	rows, total, err := shared.ListLogRequests(parseLogFilter(c))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"total": total, "data": rows})
 }
 
 func listUpstreamAttempts(c *gin.Context) {

@@ -29,3 +29,12 @@
 .log-detail-error { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .log-detail-error pre { font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; max-height: 240px; overflow-y: auto; user-select: text; }
 @media (max-width: 639px) { .logs-filter-channel, .logs-filter-request { flex: 1 1 180px; } .log-detail-fields { grid-template-columns: 100px minmax(0, 1fr); } }
+.logs-view-switch { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; flex-shrink: 0; }
+.request-attempt-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.request-attempt-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; margin-bottom: 10px; }
+.request-attempt-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px; }
+.request-attempt-list { display: flex; flex-direction: column; gap: 12px; }
+.request-attempt-row { padding: 12px; border: 1px solid var(--border); border-radius: 12px; overflow-wrap: anywhere; }
+.request-attempt-row p { margin-top: 5px; }
+.request-attempt-row pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; font-size: 12px; margin-block: 10px; user-select: text; }
+.request-attempt-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

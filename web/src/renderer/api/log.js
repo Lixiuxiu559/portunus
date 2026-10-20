@@ -19,3 +19,13 @@ export function listLogs(params) {
 export function getLogStats(params) {
   return request.get('/logs/stat', { params });
 }
+
+/** 按请求精确查询已采集的上游尝试；空数组不证明实际尝试数为 0。 */
+export function listUpstreamAttempts(params) {
+  return request.get('/logs/attempts', { params });
+}
+
+/** 服务端请求关联归并；无请求 ID 的历史行独立保留，total 为关联项数。 */
+export function listLogRequests(params) {
+  return request.get('/logs/requests', { params });
+}

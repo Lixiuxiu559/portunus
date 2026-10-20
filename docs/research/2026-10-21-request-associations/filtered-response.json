@@ -1,0 +1,44 @@
+{
+  "filtered": {
+    "data": [
+      {
+        "key": "request:mixed_%+&=中",
+        "request_id": "mixed_%+&=中",
+        "log_count": 3,
+        "latest_log": {
+          "id": 58,
+          "api_key_id": 0,
+          "group_name": "coding",
+          "channel_id": 2,
+          "model_name": "shared-model",
+          "status": 200,
+          "success": true,
+          "stream": false,
+          "request_id": "mixed_%+&=中",
+          "input_token": 7,
+          "output_token": 1,
+          "cache_read_token": 0,
+          "cache_write_token": 0,
+          "duration_ms": 0,
+          "first_token_ms": 0,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 0,
+          "hosted_tools_stripped": 0,
+          "created_at": "2026-10-21T03:22:37.191478+08:00"
+        },
+        "first_at": "2026-10-21T03:22:37.191431+08:00",
+        "last_at": "2026-10-21T03:22:37.191478+08:00"
+      }
+    ],
+    "total": 1
+  },
+  "stats": {
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_requests": 2,
+    "recent_requests": 0
+  }
+}
