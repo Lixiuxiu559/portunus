@@ -146,23 +146,23 @@ func TestTruncateErrTinyMax(t *testing.T) {
 	}
 }
 
-func TestComputeCost(t *testing.T) {
-	m := model.Model{InputPrice: 2.5, OutputPrice: 10, CacheReadPrice: 1.25, CacheWritePrice: 2.5}
-
-	// 1M 输入 + 1M 输出 → (1e6*2.5 + 1e6*10)/1e6 = 12.5
-	u := &protocol.Usage{PromptTokens: 1000000, CompletionTokens: 1000000}
-	if cost := computeCost(u, m); cost != 12.5 {
-		t.Errorf("computeCost = %f, want 12.5", cost)
+func TestLogCallRetainsUsageWithoutBilling(t *testing.T) {
+	rec := &logRecorder{}
+	s := NewRelayServer(Deps{LogWrite: rec.write})
+	target := router.Target{Model: model.Model{Name: "legacy-priced", Currency: model.CurrencyCNY, InputPrice: 2.5, OutputPrice: 10, CacheReadPrice: 1.25, CacheWritePrice: 2.5}, Channel: channel.Channel{ID: 42}}
+	usage := &protocol.Usage{PromptTokens: 100, CompletionTokens: 20, CacheReadTokens: 30, CacheWriteTokens: 40}
+	s.logCall(7, &group.Group{Name: "coding"}, target, protocol.ProviderOpenAIResponses, protocol.ComposeStats{BridgeDecoded: 2, ShimRewrites: 3, HostedToolsStripped: 1}, 500, false, true, usage, 120, 25, "request-usage", errors.New("example failure"))
+	entry := rec.last()
+	if entry == nil {
+		t.Fatal("未记录调用")
 	}
-
-	// 加上缓存读/写 → 12.5 + (1e6*1.25 + 1e6*2.5)/1e6 = 16.25
-	u = &protocol.Usage{PromptTokens: 1000000, CompletionTokens: 1000000, CacheReadTokens: 1000000, CacheWriteTokens: 1000000}
-	if cost := computeCost(u, m); cost != 16.25 {
-		t.Errorf("computeCost with cache = %f, want 16.25", cost)
+	if entry.Cost != 0 || entry.Currency != "" {
+		t.Fatalf("新日志不能继承价格/计算费用: %+v", entry)
 	}
-
-	// 空用量 → 0
-	if cost := computeCost(&protocol.Usage{}, m); cost != 0 {
-		t.Errorf("空用量应为 0, got %f", cost)
+	if entry.InputToken != 100 || entry.OutputToken != 20 || entry.CacheReadToken != 30 || entry.CacheWriteToken != 40 {
+		t.Fatalf("用量丢失: %+v", entry)
+	}
+	if entry.RequestID != "request-usage" || entry.ErrKind == "" || entry.ErrMsg != "example failure" || entry.ClientProtocol != "openai_responses" || entry.BridgeDecoded != 2 || entry.ShimRewrites != 3 || entry.HostedToolsStripped != 1 || entry.DurationMs != 120 || entry.FirstTokenMs != 25 {
+		t.Fatalf("诊断字段丢失: %+v", entry)
 	}
 }

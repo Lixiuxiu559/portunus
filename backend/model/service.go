@@ -18,53 +18,33 @@ var ErrChannelNotFound = &shared.StatusError{Status: 400, Message: "渠道不存
 
 // CreateRequest 创建模型请求。
 type CreateRequest struct {
-	ChannelID       int64    `json:"channel_id" binding:"required"`
-	Name            string   `json:"name" binding:"required"`
-	Currency        Currency `json:"currency"`          // 计价货币；缺省 USD
-	InputPrice      *float64 `json:"input_price"`       // 不传则用内置默认价
-	OutputPrice     *float64 `json:"output_price"`      // 不传则用内置默认价
-	CacheReadPrice  *float64 `json:"cache_read_price"`  // 不传则用内置默认价
-	CacheWritePrice *float64 `json:"cache_write_price"` // 不传则用内置默认价
+	ChannelID int64  `json:"channel_id" binding:"required"`
+	Name      string `json:"name" binding:"required"`
 }
 
 // UpdateRequest 更新模型请求，仅包含需要变更的字段。
 type UpdateRequest struct {
-	ChannelID       *int64    `json:"channel_id"`
-	Name            *string   `json:"name"`
-	Currency        *Currency `json:"currency"`
-	InputPrice      *float64  `json:"input_price"`
-	OutputPrice     *float64  `json:"output_price"`
-	CacheReadPrice  *float64  `json:"cache_read_price"`
-	CacheWritePrice *float64  `json:"cache_write_price"`
+	ChannelID *int64  `json:"channel_id"`
+	Name      *string `json:"name"`
 }
 
 // Response 是模型的对外响应。
 type Response struct {
-	ID              int64     `json:"id"`
-	ChannelID       int64     `json:"channel_id"`
-	Name            string    `json:"name"`
-	Currency        Currency  `json:"currency"`
-	InputPrice      float64   `json:"input_price"`
-	OutputPrice     float64   `json:"output_price"`
-	CacheReadPrice  float64   `json:"cache_read_price"`
-	CacheWritePrice float64   `json:"cache_write_price"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID        int64     `json:"id"`
+	ChannelID int64     `json:"channel_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ToResponse 将实体转为响应。
 func (m *Model) ToResponse() Response {
 	return Response{
-		ID:              m.ID,
-		ChannelID:       m.ChannelID,
-		Name:            m.Name,
-		Currency:        m.Currency,
-		InputPrice:      m.InputPrice,
-		OutputPrice:     m.OutputPrice,
-		CacheReadPrice:  m.CacheReadPrice,
-		CacheWritePrice: m.CacheWritePrice,
-		CreatedAt:       m.CreatedAt,
-		UpdatedAt:       m.UpdatedAt,
+		ID:        m.ID,
+		ChannelID: m.ChannelID,
+		Name:      m.Name,
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
 	}
 }
 
@@ -102,7 +82,7 @@ func Get(id int64) (*Model, error) {
 	return &m, nil
 }
 
-// Create 创建模型；未显式指定的价格字段用内置默认价补齐。
+// Create 创建模型，不填充已退役的价格字段。
 func Create(req CreateRequest) (*Model, error) {
 	if req.Name == "" {
 		return nil, ErrInvalid
@@ -114,24 +94,7 @@ func Create(req CreateRequest) (*Model, error) {
 	if !ok {
 		return nil, ErrChannelNotFound
 	}
-	currency := CurrencyUSD
-	if req.Currency != "" {
-		if !req.Currency.Valid() {
-			return nil, ErrInvalid
-		}
-		currency = req.Currency
-	}
-
-	def := defaultPrice[req.Name]
-	m := Model{
-		ChannelID:       req.ChannelID,
-		Name:            req.Name,
-		Currency:        currency,
-		InputPrice:      resolvePrice(req.InputPrice, def.Input),
-		OutputPrice:     resolvePrice(req.OutputPrice, def.Output),
-		CacheReadPrice:  resolvePrice(req.CacheReadPrice, def.CacheRead),
-		CacheWritePrice: resolvePrice(req.CacheWritePrice, def.CacheWrite),
-	}
+	m := Model{ChannelID: req.ChannelID, Name: req.Name}
 	if err := shared.DB.Create(&m).Error; err != nil {
 		return nil, err
 	}
@@ -160,24 +123,6 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 		}
 		m.ChannelID = *req.ChannelID
 	}
-	if req.Currency != nil {
-		if !req.Currency.Valid() {
-			return nil, ErrInvalid
-		}
-		m.Currency = *req.Currency
-	}
-	if req.InputPrice != nil {
-		m.InputPrice = *req.InputPrice
-	}
-	if req.OutputPrice != nil {
-		m.OutputPrice = *req.OutputPrice
-	}
-	if req.CacheReadPrice != nil {
-		m.CacheReadPrice = *req.CacheReadPrice
-	}
-	if req.CacheWritePrice != nil {
-		m.CacheWritePrice = *req.CacheWritePrice
-	}
 	if err := shared.DB.Save(&m).Error; err != nil {
 		return nil, err
 	}
@@ -192,14 +137,6 @@ func Delete(id int64) error {
 // DeleteByChannelTx 在事务中删除指定渠道下的全部模型。
 func DeleteByChannelTx(tx *gorm.DB, channelID int64) error {
 	return tx.Where("channel_id = ?", channelID).Delete(&Model{}).Error
-}
-
-// resolvePrice 返回请求中显式指定的价格，否则返回内置默认价（无则 0）。
-func resolvePrice(req *float64, def float64) float64 {
-	if req != nil {
-		return *req
-	}
-	return def
 }
 
 // Exists 校验模型是否存在。

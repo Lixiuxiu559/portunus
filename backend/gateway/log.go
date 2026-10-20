@@ -4,7 +4,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/Lixiuxiu559/portunus/backend/group"
-	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/router"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
@@ -22,7 +21,6 @@ func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, c
 		GroupName:    g.Name,
 		ChannelID:    t.Channel.ID,
 		ModelName:    t.Model.Name,
-		Currency:     string(t.Model.Currency), // 费用货币快照：模型此后改价/改币/删除均不影响历史账
 		Status:       status,
 		Success:      success,
 		Stream:       stream,
@@ -44,7 +42,6 @@ func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, c
 		entry.OutputToken = int64(usage.CompletionTokens)
 		entry.CacheReadToken = int64(usage.CacheReadTokens)
 		entry.CacheWriteToken = int64(usage.CacheWriteTokens)
-		entry.Cost = computeCost(usage, t.Model)
 	}
 	s.deps.LogWrite(&entry)
 }
@@ -82,12 +79,4 @@ func truncateErr(s string, max int) string {
 		return cut + ellipsis
 	}
 	return cut
-}
-
-// computeCost 按四维价格计算一次调用费用（价格单位：每 1M token）。
-func computeCost(usage *protocol.Usage, m model.Model) float64 {
-	return (float64(usage.PromptTokens)*m.InputPrice +
-		float64(usage.CompletionTokens)*m.OutputPrice +
-		float64(usage.CacheReadTokens)*m.CacheReadPrice +
-		float64(usage.CacheWriteTokens)*m.CacheWritePrice) / 1e6
 }

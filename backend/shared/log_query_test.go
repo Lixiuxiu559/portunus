@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"math"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -71,11 +71,18 @@ func TestLogStatsBy(t *testing.T) {
 	if s.InputTokens != 30 || s.OutputTokens != 15 {
 		t.Errorf("token 统计不对: in=%d out=%d", s.InputTokens, s.OutputTokens)
 	}
-	if math.Abs(s.TotalCostUSD-0.3) > 1e-9 {
-		t.Errorf("TotalCostUSD = %f, want 0.3", s.TotalCostUSD)
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if s.TotalCostCNY != 0 {
-		t.Errorf("TotalCostCNY = %f, want 0", s.TotalCostCNY)
+	var fields map[string]any
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"total_cost_usd", "total_cost_cny", "cost", "currency"} {
+		if _, ok := fields[key]; ok {
+			t.Fatalf("统计响应不应包含退役字段 %s", key)
+		}
 	}
 	if s.RecentRequests != 2 {
 		t.Errorf("RecentRequests = %d, want 2", s.RecentRequests)
@@ -215,5 +222,74 @@ func TestDeleteOldLogs(t *testing.T) {
 	}
 	if count != 2 {
 		t.Errorf("剩余日志 = %d, want 2", count)
+	}
+}
+
+func TestLogRetirementPreservesHistoricalDataAndCacheStats(t *testing.T) {
+	setupLogTest(t)
+	legacy := Log{GroupName: "selected", ModelName: "old", Currency: "CNY", Cost: 9.875, InputToken: 10, OutputToken: 20, CacheReadToken: 30, CacheWriteToken: 40, Status: 200, Success: true, RequestID: "legacy-request"}
+	if err := LogDB.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []Log{
+		{GroupName: "selected", ModelName: "new", InputToken: 1, OutputToken: 2, CacheReadToken: 3, CacheWriteToken: 4, Success: false, Status: 500},
+		{GroupName: "other", InputToken: 100, OutputToken: 200, CacheReadToken: 300, CacheWriteToken: 400, Success: true},
+	} {
+		if err := LogDB.Create(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 运行正常启动的迁移后，旧列和数值必须仍完整存在。
+	if err := LogDB.AutoMigrate(&Log{}); err != nil {
+		t.Fatal(err)
+	}
+	rows, total, err := ListLogs(LogFilter{GroupName: "selected"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Fatalf("分组过滤失效: %d", total)
+	}
+	stats, err := LogStatsBy(LogFilter{GroupName: "selected"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.InputTokens != 11 || stats.OutputTokens != 22 || stats.CacheReadTokens != 33 || stats.CacheWriteTokens != 44 || stats.TotalRequests != 2 {
+		t.Fatalf("过滤用量聚合错误: %+v", stats)
+	}
+	success := true
+	filtered, err := LogStatsBy(LogFilter{GroupName: "selected", Success: &success})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filtered.InputTokens != 10 || filtered.OutputTokens != 20 || filtered.CacheReadTokens != 30 || filtered.CacheWriteTokens != 40 || filtered.TotalRequests != 1 {
+		t.Fatalf("成功过滤错误: %+v", filtered)
+	}
+	var preserved Log
+	if err := LogDB.First(&preserved, legacy.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if preserved.Currency != legacy.Currency || preserved.Cost != legacy.Cost || preserved.RequestID != legacy.RequestID {
+		t.Fatalf("历史数据被改写: %+v", preserved)
+	}
+	data, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload []map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range payload {
+		for _, field := range []string{"currency", "cost"} {
+			if _, ok := row[field]; ok {
+				t.Fatalf("日志响应不应暴露历史费用字段: %s", field)
+			}
+		}
+	}
+	for _, column := range []string{"cost", "currency"} {
+		if !LogDB.Migrator().HasColumn(&Log{}, column) {
+			t.Fatalf("历史列被移除: %s", column)
+		}
 	}
 }

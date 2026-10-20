@@ -26,15 +26,14 @@ type LogFilter struct {
 	PageSize       int
 }
 
-// LogStats 是日志汇总统计。费用按日志快照的货币分桶累计（无汇率换算）；
-// 存量日志与空 currency 记入 USD 桶。
+// LogStats 是调用记录与 token 用量汇总，不读取历史费用列。
 type LogStats struct {
-	TotalCostUSD   float64 `json:"total_cost_usd"`
-	TotalCostCNY   float64 `json:"total_cost_cny"`
-	InputTokens    int64   `json:"input_tokens"`
-	OutputTokens   int64   `json:"output_tokens"`
-	TotalRequests  int64   `json:"total_requests"`
-	RecentRequests int64   `json:"recent_requests"` // 近 60 秒请求数
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	TotalRequests    int64 `json:"total_requests"`
+	RecentRequests   int64 `json:"recent_requests"` // 近 60 秒请求数
 }
 
 // ListLogs 按筛选条件分页查询日志，返回日志与总数。
@@ -59,10 +58,10 @@ func ListLogs(f LogFilter) ([]Log, int64, error) {
 func LogStatsBy(f LogFilter) (LogStats, error) {
 	var s LogStats
 	err := applyLogFilter(LogDB.Model(&Log{}), f).
-		Select(`COALESCE(SUM(CASE WHEN currency = 'CNY' THEN cost ELSE 0 END),0) AS total_cost_cny,
-			COALESCE(SUM(CASE WHEN currency = 'CNY' THEN 0 ELSE cost END),0) AS total_cost_usd,
-			COALESCE(SUM(input_token),0) AS input_tokens,
+		Select(`COALESCE(SUM(input_token),0) AS input_tokens,
 			COALESCE(SUM(output_token),0) AS output_tokens,
+			COALESCE(SUM(cache_read_token),0) AS cache_read_tokens,
+			COALESCE(SUM(cache_write_token),0) AS cache_write_tokens,
 			COUNT(*) AS total_requests`).
 		Scan(&s).Error
 	if err != nil {

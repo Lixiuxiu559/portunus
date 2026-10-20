@@ -7,15 +7,15 @@ import (
 // 本文件是调用日志的实体与失败归因词表（写入方 gateway 经 Deps.LogWrite 注入，
 // 读方是管理端 api/log.go 的查询路由）。查询 / 统计 / 清理在 log_query.go。
 
-// Log 记录一次对外 LLM 调用的完整信息，供日志查询与费用统计。
+// Log 记录一次对外 LLM 调用的完整信息，供调用诊断与用量统计。
 type Log struct {
 	ID              int64   `gorm:"primaryKey" json:"id"`
 	APIKeyID        int64   `gorm:"index" json:"api_key_id"`
 	GroupName       string  `gorm:"index" json:"group_name"`
 	ChannelID       int64   `gorm:"index" json:"channel_id"`
 	ModelName       string  `gorm:"index" json:"model_name"`
-	Currency        string  `gorm:"size:8" json:"currency"` // 费用货币快照（写入时取自模型；空视为 USD）
-	Status          int     `json:"status"`                 // 上游返回的 HTTP 状态码
+	Currency        string  `gorm:"size:8" json:"-"` // 历史费用币种，只保留存量数据
+	Status          int     `json:"status"`          // 上游返回的 HTTP 状态码
 	Success         bool    `gorm:"index" json:"success"`
 	Stream          bool    `gorm:"index" json:"stream"`                       // 是否流式请求（按客户端请求的 stream 参数记录，与首包是否到达无关）
 	RequestID       string  `gorm:"size:32;index" json:"request_id,omitempty"` // 请求关联 ID：同一次客户端请求的所有上游尝试共享，并以 X-Request-Id 透传上游，跨网关对账时以此对齐
@@ -23,7 +23,7 @@ type Log struct {
 	OutputToken     int64   `json:"output_token"`
 	CacheReadToken  int64   `json:"cache_read_token"`
 	CacheWriteToken int64   `json:"cache_write_token"`
-	Cost            float64 `json:"cost"`
+	Cost            float64 `json:"-"`
 	DurationMs      int64   `json:"duration_ms"`
 	FirstTokenMs    int64   `json:"first_token_ms"`     // 流式首包耗时（客户端 TTFT），非流式为 0
 	ErrKind         string  `json:"err_kind,omitempty"` // 失败类别（取值见下方 ErrKind 词表；判定归 gateway.failSpec 的失败处置），成功为空；无查询路径暂不建索引

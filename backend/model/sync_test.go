@@ -77,17 +77,17 @@ func TestSyncFromChannel(t *testing.T) {
 	for _, m := range ms {
 		byName[m.Name] = m
 	}
-	if g := byName["gpt-4o"]; g.InputPrice != 2.5 || g.OutputPrice != 10 {
-		t.Errorf("gpt-4o 默认价错误: %+v", g)
-	}
-	if c := byName["some-custom-model"]; c.InputPrice != 0 || c.OutputPrice != 0 {
-		t.Errorf("未匹配模型价格应为 0: %+v", c)
-	}
-	// 同步拉回的模型默认 USD 计价
-	for _, m := range ms {
-		if m.Currency != CurrencyUSD {
-			t.Errorf("同步模型 %s 货币 = %q, want USD", m.Name, m.Currency)
+	for _, m := range byName {
+		if m.InputPrice != 0 || m.OutputPrice != 0 || m.CacheReadPrice != 0 || m.CacheWritePrice != 0 {
+			t.Fatalf("同步新模型不能套用历史默认价格: %+v", m)
 		}
+	}
+	// 给现有模型设置历史数据，重复同步不得覆盖或清空。
+	legacy := byName["gpt-4o"]
+	legacy.Currency, legacy.InputPrice, legacy.OutputPrice = CurrencyCNY, 7.25, 19.5
+	legacy.CacheReadPrice, legacy.CacheWritePrice = .3, 2.4
+	if err := shared.DB.Save(&legacy).Error; err != nil {
+		t.Fatal(err)
 	}
 
 	// 重复同步不应重复插入
@@ -98,6 +98,14 @@ func TestSyncFromChannel(t *testing.T) {
 	if added2 != 0 {
 		t.Fatalf("二次同步新增数 = %d, want 0", added2)
 	}
+	var preserved Model
+	if err := shared.DB.First(&preserved, legacy.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if preserved.Currency != legacy.Currency || preserved.InputPrice != legacy.InputPrice || preserved.OutputPrice != legacy.OutputPrice || preserved.CacheReadPrice != legacy.CacheReadPrice || preserved.CacheWritePrice != legacy.CacheWritePrice {
+		t.Fatalf("重复同步改写历史价格: %+v", preserved)
+	}
+
 }
 
 func TestSyncFromChannelUnauthorized(t *testing.T) {
