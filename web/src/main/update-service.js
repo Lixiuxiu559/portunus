@@ -10,43 +10,78 @@ const GITHUB_SOURCE = { provider: 'github', owner: 'Lixiuxiu559', repo: 'portunu
 
 // 注入 updater，允许离线验证切源与事件行为，无需启动 Electron。
 function createUpdateService(autoUpdater, logger = console) {
+  // 由服务调度下载，确保自动下载也经过同版本备用源校验。
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
   let currentWindow = null;
-  let forwarded = false;
   let source = null;
   let offeredVersion = null;
   let checkPromise = null;
   let downloadPromise = null;
+  let downloadedFiles = null;
+  let lastCheckResult = null;
   let refreshingDownload = false;
+  let state = {
+    revision: 0,
+    checking: false,
+    available: false,
+    downloading: false,
+    downloaded: false,
+    installing: false,
+    latestVersion: null,
+    progress: { percent: 0, bytesPerSecond: 0 },
+    error: null,
+  };
 
+  const getState = () => structuredClone(state);
   const send = (channel, ...args) => {
     if (currentWindow && !currentWindow.isDestroyed()) {
       currentWindow.webContents.send(channel, ...args);
     }
   };
+  function updateState(changes) {
+    state = { ...state, ...structuredClone(changes), revision: state.revision + 1 };
+    send(UPDATE_CHANNELS.state, getState());
+  }
+  function reportError(err) {
+    updateState({ checking: false, downloading: false, installing: false, error: err.message });
+    send(UPDATE_CHANNELS.error, err.message);
+  }
+
+  // 在服务创建时监听，无窗口期间的下载结果仍然可以由新窗口恢复。
+  autoUpdater.on('checking-for-update', () => {
+    if (!refreshingDownload) send(UPDATE_CHANNELS.checking);
+  });
+  autoUpdater.on('update-available', (info) => {
+    if (!refreshingDownload) send(UPDATE_CHANNELS.available, info);
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    if (!refreshingDownload) send(UPDATE_CHANNELS.notAvailable, info);
+  });
+  autoUpdater.on('download-progress', (info) => {
+    updateState({ progress: info });
+    send(UPDATE_CHANNELS.downloadProgress, info);
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    updateState({
+      checking: false,
+      available: true,
+      downloading: false,
+      downloaded: true,
+      latestVersion: state.latestVersion || info.version,
+      progress: { ...state.progress, percent: 100 },
+      error: null,
+    });
+    send(UPDATE_CHANNELS.downloaded, info);
+  });
+  autoUpdater.on('error', (err) => {
+    // electron-updater 会先发 error 再 reject；受控操作只上报最终失败。
+    if (!checkPromise && !downloadPromise) reportError(err);
+  });
 
   function forwardEvents(win) {
     currentWindow = win;
-    if (forwarded) return;
-    forwarded = true;
-    for (const [event, channel] of [
-      ['checking-for-update', UPDATE_CHANNELS.checking],
-      ['update-available', UPDATE_CHANNELS.available],
-      ['update-not-available', UPDATE_CHANNELS.notAvailable],
-    ]) {
-      autoUpdater.on(event, (info) => {
-        // 下载切源时重新检查元数据，不改变用户已经确认的更新版本。
-        if (!refreshingDownload) send(channel, info);
-      });
-    }
-    autoUpdater.on('download-progress', (info) => send(UPDATE_CHANNELS.downloadProgress, info));
-    autoUpdater.on('update-downloaded', (info) => send(UPDATE_CHANNELS.downloaded, info));
-    autoUpdater.on('error', (err) => {
-      // electron-updater 会先发 error 再 reject；受控操作只上报最终失败。
-      if (!checkPromise && !downloadPromise) send(UPDATE_CHANNELS.error, err.message);
-    });
   }
 
   function selectSource(next) {
@@ -67,17 +102,31 @@ function createUpdateService(autoUpdater, logger = console) {
   }
 
   function checkForUpdates() {
-    // 下载期间不切换 provider；重复检查共享同一个操作。
-    if (downloadPromise) return downloadPromise.then(() => null);
+    // 包已就绪或正在下载时保留同一版本，避免后续检查使安装包与界面不一致。
+    if (downloadPromise || state.downloaded || state.installing) return Promise.resolve(structuredClone(lastCheckResult));
     if (checkPromise) return checkPromise;
+    updateState({ checking: true, available: false, latestVersion: null, error: null });
     checkPromise = Promise.resolve()
       .then(checkSources)
       .then((result) => {
-        if (result?.isUpdateAvailable) offeredVersion = result.updateInfo.version;
+        // 只缓存版本元数据；真实 UpdateCheckResult 还含不可克隆的取消令牌。
+        lastCheckResult = result == null ? result : {
+          isUpdateAvailable: result.isUpdateAvailable,
+          updateInfo: structuredClone(result.updateInfo),
+          ...(result.versionInfo ? { versionInfo: structuredClone(result.versionInfo) } : {}),
+        };
+        offeredVersion = result?.isUpdateAvailable ? result.updateInfo.version : null;
+        updateState({
+          checking: false,
+          available: Boolean(offeredVersion),
+          latestVersion: result?.updateInfo?.version ?? null,
+        });
+        // 不等待下载，检查仍返回元数据；直接启动避免与 checkPromise 互相等待。
+        if (offeredVersion) startDownload().catch(() => {});
         return result;
       })
       .catch((err) => {
-        send(UPDATE_CHANNELS.error, err.message);
+        reportError(err);
         throw err;
       })
       .finally(() => { checkPromise = null; });
@@ -106,35 +155,60 @@ function createUpdateService(autoUpdater, logger = console) {
       offeredVersion = version;
     } finally {
       refreshingDownload = false;
+      if (!offeredVersion) updateState({ available: false });
     }
-    send(UPDATE_CHANNELS.downloadProgress, { percent: 0, bytesPerSecond: 0 });
+    const progress = { percent: 0, bytesPerSecond: 0 };
+    updateState({ progress });
+    send(UPDATE_CHANNELS.downloadProgress, progress);
     return autoUpdater.downloadUpdate();
   }
 
-  function downloadUpdate() {
+  function startDownload() {
     if (downloadPromise) return downloadPromise;
-    if (checkPromise) return checkPromise.then(() => downloadUpdate());
+    if (state.downloaded) return Promise.resolve(structuredClone(downloadedFiles));
+    updateState({ downloading: true, progress: { percent: 0, bytesPerSecond: 0 }, error: null });
     downloadPromise = Promise.resolve()
       .then(downloadWithFallback)
+      .then((files) => {
+        downloadedFiles = structuredClone(files);
+        return files;
+      })
       .catch((err) => {
-        send(UPDATE_CHANNELS.error, err.message);
+        reportError(err);
         throw err;
       })
       .finally(() => { downloadPromise = null; });
     return downloadPromise;
   }
 
+  function downloadUpdate() {
+    if (downloadPromise) return downloadPromise;
+    if (state.downloaded) return Promise.resolve(structuredClone(downloadedFiles));
+    if (checkPromise) return checkPromise.then(() => downloadUpdate());
+    return startDownload();
+  }
+
   function quitAndInstall() {
-    autoUpdater.quitAndInstall();
+    if (state.installing) return false;
+    if (!state.downloaded) throw new Error('更新尚未下载完成');
+    updateState({ installing: true, error: null });
+    try {
+      autoUpdater.quitAndInstall(true, true);
+      return true;
+    } catch (err) {
+      reportError(err);
+      throw err;
+    }
   }
 
   function register(ipcMain) {
+    ipcMain.handle('update:get-state', () => getState());
     ipcMain.handle('update:check', () => checkForUpdates());
     ipcMain.handle('update:download', () => downloadUpdate());
     ipcMain.handle('update:install', () => quitAndInstall());
   }
 
-  return { forwardEvents, register, checkForUpdates, downloadUpdate, quitAndInstall };
+  return { forwardEvents, register, getState, checkForUpdates, downloadUpdate, quitAndInstall };
 }
 
 module.exports = { createUpdateService, COS_SOURCE };

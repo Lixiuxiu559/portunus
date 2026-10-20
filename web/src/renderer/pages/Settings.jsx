@@ -1,15 +1,14 @@
-import { useEffect, useState, useRef } from 'react';
-import { Typography, Button, Card, Spinner, Input, TextField, Modal, toast } from '@heroui/react';
-import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw, Copy, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Typography, Button, Card, Spinner, Input, TextField, toast } from '@heroui/react';
+import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
-import IconButton from '../components/IconButton';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
-import { getAPIKey, regenerateAPIKey } from '../api/apikey';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
 
 export default function Settings() {
-  const { checking, available, downloaded, latestVersion, progress, error, check, download, install } =
+  const { checking, available, downloading, downloaded, installing, latestVersion, progress, error, check, download, install } =
     useUpdater();
 
   const [syncInterval, setSyncIntervalState] = useState('');
@@ -17,103 +16,11 @@ export default function Settings() {
   const [savingInterval, setSavingInterval] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const [apiKey, setApiKey] = useState(null);
-  // 令牌区三态：loading 拉取中 / ready 有令牌 / empty 首次运行无令牌 / error 拉取失败
-  const [keyState, setKeyState] = useState('loading');
-  const [copied, setCopied] = useState(false);
-  const [regenerateOpen, setRegenerateOpen] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-
-  // 应用版本（从主进程 package.json 读，消除前端双写）
+  // 应用版本仍从主进程读取；服务令牌与访问范围统一在服务接入页维护。
   const [appVersion, setAppVersion] = useState('');
-  // 后端监听范围：local（只本机）/ lan（局域网）
-  const [networkMode, setNetworkModeState] = useState('local');
-  const [savingMode, setSavingMode] = useState(false);
-
-  const loadAPIKey = async () => {
-    setKeyState('loading');
-    try {
-      const k = await getAPIKey();
-      setApiKey(k ?? null);
-      setKeyState(k ? 'ready' : 'empty');
-    } catch {
-      setKeyState('error'); // toast 由 request 拦截器统一提示
-    }
-  };
-
-  // 首次运行无令牌时直接生成（无旧令牌可失效，无需确认弹窗）
-  const handleGenerate = async () => {
-    setRegenerating(true);
-    try {
-      const k = await regenerateAPIKey();
-      setApiKey(k);
-      setKeyState(k ? 'ready' : 'empty');
-      toast.success('令牌已生成');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAPIKey();
-  }, []);
-
-  // 读应用版本与网络监听范围（Electron 环境下才有）
   useEffect(() => {
     window.api?.getAppVersion?.().then((v) => setAppVersion(v ?? '')).catch(() => {});
-    window.api?.getNetworkMode?.().then((m) => setNetworkModeState(m ?? 'local')).catch(() => {});
   }, []);
-
-  // 进入设置页时主动检查一次更新：启动时的静默检查发生在后台，
-  // 其结果事件（available/not-available）只有本页挂载期间才能被订阅到，
-  // 用户从别的页切进来必然已错过，不补查就永远看不到最新版本信息。
-  const didAutoCheck = useRef(false);
-  useEffect(() => {
-    // 开发模式没有打包环境的 app-update.yml，检查必然报错；
-    // 不自动补查（手动点"检查更新"仍会触发，能看到明确错误，便于调试 UI）
-    if (import.meta.env.DEV) return;
-    if (didAutoCheck.current || !window.api?.checkForUpdate) return;
-    didAutoCheck.current = true;
-    check();
-  }, [check]);
-
-  const handleCopyKey = async (key) => {
-    try {
-      await navigator.clipboard.writeText(key);
-    } catch {
-      // 降级方案
-      const input = document.createElement('input');
-      input.value = key;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const handleRegenerate = async () => {
-    setRegenerating(true);
-    try {
-      const k = await regenerateAPIKey();
-      setApiKey(k);
-      setRegenerateOpen(false);
-      toast.success('令牌已重新生成');
-    } catch {
-      // toast 由 request 拦截器统一提示
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
-  const maskKey = (key) => {
-    if (!key) return '';
-    if (key.length <= 8) return key;
-    return key.slice(0, 4) + '****' + key.slice(-4);
-  };
 
   const loadSyncSettings = async () => {
     try {
@@ -170,28 +77,26 @@ export default function Settings() {
     }
   };
 
-  const saveNetworkMode = async (mode) => {
-    if (mode === networkMode) return;
-    setSavingMode(true);
-    try {
-      const res = await window.api?.setNetworkMode?.(mode);
-      setNetworkModeState(res?.networkMode ?? mode);
-      toast.success(res?.restarted ? '已保存，后端已自动重启' : '已保存');
-    } catch (err) {
-      toast.danger(`保存失败：${err?.message ?? ''}`);
-    } finally {
-      setSavingMode(false);
-    }
-  };
+  const showDownloadProgress = downloading || downloaded;
+  const downloadPercent = downloaded ? 100 : Math.round(progress.percent);
+  let updateStatus = '发现新版本，正在准备后台下载…';
+  if (error) updateStatus = `更新出错：${error}`;
+  else if (installing) updateStatus = '正在重启并应用更新…';
+  else if (downloaded) updateStatus = '下载完成，重启即可更新';
+  else if (downloading) {
+    updateStatus = progress.percent > 0
+      ? `${downloadPercent}% · ${formatSpeed(progress.bytesPerSecond)}`
+      : '准备下载…';
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-6">
-      {/* 渠道同步 */}
+      {/* 上游模型同步 */}
       <Card className="gap-4 p-5">
         <Card.Header className="p-0">
           <Typography type="body-sm" className="text-muted">
-            渠道同步
+            上游模型同步
           </Typography>
         </Card.Header>
         <Card.Content className="p-0">
@@ -242,137 +147,11 @@ export default function Settings() {
         </Card.Content>
       </Card>
 
-      {/* 令牌管理 */}
-      <Card className="gap-4 p-5">
-        <Card.Header className="p-0">
-          <Typography type="body-sm" className="text-muted">
-            令牌管理
-          </Typography>
-        </Card.Header>
-        <Card.Content className="p-0">
-          <div className="flex flex-col gap-3">
-            {keyState === 'ready' && apiKey ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <Typography type="body-xs" className="text-muted font-mono">
-                      {maskKey(apiKey.key)}
-                    </Typography>
-                    <Typography type="body-xs" className="text-muted">
-                      创建于 {new Date(apiKey.created_at).toLocaleDateString()}
-                    </Typography>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <IconButton label="复制令牌" onClick={() => handleCopyKey(apiKey.key)}>
-                      {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-                    </IconButton>
-                    {/* 复制成功的读屏播报（视觉反馈是图标变化，这里补 aria-live） */}
-                    <span className="sr-only" aria-live="polite">
-                      {copied ? '令牌已复制到剪贴板' : ''}
-                    </span>
-                    <Button variant="secondary" size="sm" onPress={() => setRegenerateOpen(true)}>
-                      <RefreshCw className="size-4" />
-                      重新生成
-                    </Button>
-                  </div>
-                </div>
-                <Typography type="body-xs" className="text-muted">
-                  重新生成后旧令牌立即失效，已配置的客户端需重新写入。
-                </Typography>
-              </>
-            ) : keyState === 'empty' ? (
-              <div className="flex items-center justify-between gap-3">
-                <Typography type="body-sm" className="text-muted">
-                  暂无 API 令牌，客户端接入前需先生成一个。
-                </Typography>
-                <Button variant="primary" size="sm" isPending={regenerating} onPress={handleGenerate}>
-                  生成令牌
-                </Button>
-              </div>
-            ) : keyState === 'error' ? (
-              <div className="flex items-center justify-between gap-3">
-                <Typography type="body-sm" className="text-muted">
-                  令牌加载失败。
-                </Typography>
-                <Button variant="secondary" size="sm" onPress={loadAPIKey}>
-                  重试
-                </Button>
-              </div>
-            ) : (
-              <Typography type="body-sm" className="text-muted">加载中…</Typography>
-            )}
-          </div>
-        </Card.Content>
-      </Card>
-
-      {/* 重新生成确认弹窗 */}
-      <Modal.Backdrop isOpen={regenerateOpen} onOpenChange={setRegenerateOpen}>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>重新生成令牌</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <Typography color="muted">
-                重新生成后旧令牌立即失效，已配置的 Claude Code / Codex 客户端需重新写入，是否继续？
-              </Typography>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                取消
-              </Button>
-              <Button variant="danger" isPending={regenerating} onPress={handleRegenerate}>
-                {regenerating ? '生成中…' : '重新生成'}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-
-      {/* 网络访问（后端 sidecar 监听范围） */}
-      <Card className="gap-4 p-5">
-        <Card.Header className="p-0">
-          <Typography type="body-sm" className="text-muted">
-            网络访问
-          </Typography>
-        </Card.Header>
-        <Card.Content className="p-0">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <Typography className="font-medium">后端监听范围</Typography>
-                <Typography type="body-sm" className="text-muted">
-                  仅本机：只这台机器能连；局域网：同网络下其他设备也能用你的聚合服务
-                </Typography>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <Button
-                  size="sm"
-                  variant={networkMode === 'local' ? 'primary' : 'secondary'}
-                  aria-pressed={networkMode === 'local'}
-                  isDisabled={savingMode}
-                  onPress={() => saveNetworkMode('local')}
-                >
-                  仅本机
-                </Button>
-                <Button
-                  size="sm"
-                  variant={networkMode === 'lan' ? 'primary' : 'secondary'}
-                  aria-pressed={networkMode === 'lan'}
-                  isDisabled={savingMode}
-                  onPress={() => saveNetworkMode('lan')}
-                >
-                  局域网
-                </Button>
-              </div>
-            </div>
-            {savingMode && (
-              <Typography type="body-sm" className="text-muted">
-                保存中，后端正在自动重启…
-              </Typography>
-            )}
-          </div>
+      <Card className="gap-3 p-5">
+        <Card.Header className="p-0"><Typography className="font-medium">服务接入</Typography></Card.Header>
+        <Card.Content className="p-0 space-y-2">
+          <Typography type="body-sm" className="text-muted">网关地址、访问令牌、监听范围及 API / 客户端接入示例统一在服务接入页维护。</Typography>
+          <Link to="/clients" className="text-sm text-accent hover:underline">前往服务接入 →</Link>
         </Card.Content>
       </Card>
 
@@ -390,7 +169,7 @@ export default function Settings() {
                 <a
                   href={GITHUB_URL}
                   onClick={openGitHub}
-                  aria-label="查看开源仓库"
+                  aria-label="查看项目仓库"
                   title={GITHUB_URL}
                   className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-80 hover:underline decoration-accent underline-offset-4"
                 >
@@ -409,55 +188,56 @@ export default function Settings() {
                   </Typography>
                 )}
               </div>
-              {error && (
-                <Typography type="body-sm" className="text-danger mt-1">
-                  更新出错: {error}
-                </Typography>
-              )}
             </div>
             <div className="flex items-center gap-2">
               {checking && (
                 <Spinner size="sm" />
               )}
               {!downloaded && !checking && (
-                <Button variant="tertiary" size="sm" onPress={check}>
+                <Button variant="tertiary" size="sm" onPress={check} isDisabled={downloading}>
                   <RotateCw className="size-4" />
                   检查更新
                 </Button>
               )}
-              {available && !downloaded && !checking && (
+              {available && !downloaded && !checking && !downloading && error && (
                 <Button variant="primary" size="sm" onPress={download}>
                   <Download className="size-4" />
-                  下载更新
+                  重新下载
                 </Button>
               )}
               {downloaded && (
-                <Button variant="primary" size="sm" onPress={install}>
+                <Button variant="primary" size="sm" onPress={install} isDisabled={installing}>
                   <CheckCircle className="size-4" />
-                  安装并重启
+                  {installing ? '正在重启…' : '重启以更新'}
                 </Button>
               )}
             </div>
           </div>
         </Card.Content>
 
-        {progress.percent > 0 && progress.percent < 100 && (
-          <div
-            className="mt-1"
-            role="progressbar"
-            aria-label="更新下载进度"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(progress.percent)}
-          >
-            <div className="w-full h-2 rounded-full bg-accent/10 overflow-hidden">
+        {/* 发现新版本时即预留状态高度，开始下载、失败或完成都在原位更新。 */}
+        {(available || downloaded || error) && (
+          <div className="mt-1 h-12 shrink-0 min-w-0">
+            <div
+              className="w-full h-2 rounded-full bg-accent/10 overflow-hidden"
+              role={showDownloadProgress ? 'progressbar' : undefined}
+              aria-label={showDownloadProgress ? '更新下载进度' : undefined}
+              aria-valuemin={showDownloadProgress ? 0 : undefined}
+              aria-valuemax={showDownloadProgress ? 100 : undefined}
+              aria-valuenow={showDownloadProgress ? downloadPercent : undefined}
+            >
               <div
                 className="h-full rounded-full bg-accent transition-all duration-300"
-                style={{ width: `${progress.percent}%` }}
+                style={{ width: `${downloaded ? 100 : error ? 0 : progress.percent}%` }}
               />
             </div>
-            <Typography type="body-sm" className="text-muted mt-1">
-              {Math.round(progress.percent)}% · {formatSpeed(progress.bytesPerSecond)}
+            <Typography
+              type="body-sm"
+              className={`${error ? 'text-danger' : 'text-muted'} mt-1 truncate`}
+              role="status"
+              title={error ? `更新出错：${error}` : undefined}
+            >
+              {updateStatus}
             </Typography>
           </div>
         )}

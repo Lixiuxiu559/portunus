@@ -72,8 +72,7 @@
     "test:e2e": "node scripts/startup-race-check.mjs"
   },
   "dependencies": {
-    "electron-updater": "^6.6.2",
-    "smol-toml": "^1.8.0"
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -93,6 +92,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.2",
+    "smol-toml": "^1.8.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^7.0.2",
     "vite": "^8.0.16",

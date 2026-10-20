@@ -9,18 +9,21 @@ const SERVER_URL = addressOf({ isPackaged: process.env.NODE_ENV !== 'development
 contextBridge.exposeInMainWorld('api', {
   // ─── 应用信息 ───
   getAppVersion: () => ipcRenderer.invoke('app:version'),
-  // 平台标识（渲染进程据此区分 mac 半自动 / win 全自动更新）
+  // 平台标识
   platform: process.platform,
 
   // ─── 更新 ───
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  getUpdateState: () => ipcRenderer.invoke('update:get-state'),
 
   // 监听更新事件（channel 白名单来自 update-channels 单一来源）
   onUpdateEvent: (channel, callback) => {
     if (UPDATE_CHANNEL_NAMES.includes(channel)) {
-      ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+      const listener = (_event, ...args) => callback(...args);
+      ipcRenderer.on(channel, listener);
+      return () => ipcRenderer.removeListener(channel, listener);
     }
   },
 
@@ -33,23 +36,4 @@ contextBridge.exposeInMainWorld('api', {
 
   // 打开外部链接（默认浏览器）
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
-});
-
-// ─── 客户端配置文件读写（Claude Code / Codex）───
-contextBridge.exposeInMainWorld('clientConfig', {
-  getPaths: () => ipcRenderer.invoke('client-config:paths'),
-  readClaude: () => ipcRenderer.invoke('client-config:read-claude'),
-  readCodex: () => ipcRenderer.invoke('client-config:read-codex'),
-  readCodexAuth: () => ipcRenderer.invoke('client-config:read-codex-auth'),
-  saveCodexAuth: (text) => ipcRenderer.invoke('client-config:save-codex-auth', text),
-  readBackupCodexAuth: () => ipcRenderer.invoke('client-config:read-backup-codex-auth'),
-  rollbackCodexAuth: () => ipcRenderer.invoke('client-config:rollback-codex-auth'),
-  writeCodexCatalog: (models) => ipcRenderer.invoke('client-config:write-codex-catalog', models),
-  readCodexCatalog: () => ipcRenderer.invoke('client-config:read-codex-catalog'),
-  readBackupClaude: () => ipcRenderer.invoke('client-config:read-backup-claude'),
-  readBackupCodex: () => ipcRenderer.invoke('client-config:read-backup-codex'),
-  saveClaude: (text) => ipcRenderer.invoke('client-config:save-claude', text),
-  saveCodex: (text) => ipcRenderer.invoke('client-config:save-codex', text),
-  rollbackClaude: () => ipcRenderer.invoke('client-config:rollback-claude'),
-  rollbackCodex: () => ipcRenderer.invoke('client-config:rollback-codex'),
 });

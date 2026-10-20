@@ -30,7 +30,7 @@ export default function DeleteGroupModal({ group, isOpen, onOpenChange, onDelete
           </Modal.Header>
           <Modal.Body>
             <Typography color="muted">
-              确定删除分组「{group?.name}」吗？分组内的所有模型关联将一并移除，删除后不可恢复。
+              确定删除分组「{group?.name}」吗？使用此 model 名称的客户端将无法继续调用。分组内的模型关联将一并移除，上游渠道和模型仍保留。删除后不可恢复。
             </Typography>
           </Modal.Body>
           <Modal.Footer>

@@ -14,7 +14,7 @@ export default function App() {
       <Background />
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/channels" replace />} />
+          <Route index element={<Navigate to="/groups" replace />} />
           <Route path="channels" element={<Channels />} />
           <Route path="models" element={<Models />} />
           <Route path="groups" element={<Groups />} />

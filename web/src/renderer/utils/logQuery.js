@@ -6,6 +6,7 @@
 /** 把筛选状态折叠成 /api/logs 的 query 参数；空筛选不出现在结果里。 */
 export function buildLogParams(filters, page, pageSize) {
   const params = { page, page_size: pageSize };
+  if (filters.group_name) params.group_name = filters.group_name;
   if (filters.model_name) params.model_name = filters.model_name;
   // 客户端入口协议：把 DSH(openai) 与 Claude Code(anthropic) 的流量分开比较缓存命中率
   if (filters.client_protocol && filters.client_protocol !== 'all') params.client_protocol = filters.client_protocol;

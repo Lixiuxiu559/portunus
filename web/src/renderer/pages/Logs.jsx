@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Card, TextField, Input, Select, ListBox, Label,
   DateRangePicker, DateField, RangeCalendar,
@@ -39,6 +40,10 @@ const errKindLabels = {
 };
 
 export default function Logs() {
+  const [searchParams] = useSearchParams();
+  const linkedGroup = searchParams.get('group') || '';
+  const lastLinkedGroup = useRef(linkedGroup);
+  const requestSequence = useRef(0);
   const [logs, setLogs] = useState({ total: 0, data: [] });
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,33 +54,46 @@ export default function Logs() {
   const [loadError, setLoadError] = useState(false);
 
   const [filters, setFilters] = useState({
+    group_name: linkedGroup,
     model_name: '',
     client_protocol: 'all',
     success: 'all',
     range: null,
   });
 
+  const [query, setQuery] = useState(filters);
+
+  useEffect(() => {
+    if (lastLinkedGroup.current === linkedGroup) return;
+    lastLinkedGroup.current = linkedGroup;
+    setFilters((f) => ({ ...f, group_name: linkedGroup }));
+    setQuery((q) => ({ ...q, group_name: linkedGroup }));
+    setPage(1);
+  }, [linkedGroup]);
+
   // targetPage 显式传页码，避免 setPage 与请求闭包页码不一致的双请求竞态
   const fetchLogs = async (isRefresh = false, targetPage = page) => {
     // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
     const setRefreshState = isRefresh || logs.data?.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
+    const sequence = ++requestSequence.current;
     try {
       // 时间参数必须是带时区偏移的 RFC3339（见 utils/logQuery.js 的契约说明）
-      const params = buildLogParams(filters, targetPage, pageSize);
+      const params = buildLogParams(query, targetPage, pageSize);
       const [l, s] = await Promise.all([listLogs(params), getLogStats(params)]);
+      if (sequence !== requestSequence.current) return;
       setLogs(l || { total: 0, data: [] });
       setStats(s);
       setLoadError(false);
     } catch {
       // 无数据时进错误态而非伪造空态；stats 保留旧值（表格错误态已表明数据不可信）
-      if ((logs.data?.length || 0) === 0) setLoadError(true);
+      if (sequence === requestSequence.current && (logs.data?.length || 0) === 0) setLoadError(true);
     } finally {
-      setRefreshState(false);
+      if (sequence === requestSequence.current) { setLoading(false); setRefreshing(false); }
     }
   };
 
-  useEffect(() => { fetchLogs(); }, [page]);
+  useEffect(() => { fetchLogs(); }, [page, query]);
 
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
 
@@ -93,7 +111,7 @@ export default function Logs() {
       ),
     },
     {
-      title: '模型',
+      title: '上游模型',
       dataIndex: 'model_name',
       key: 'model_name',
       width: '200px',
@@ -144,7 +162,7 @@ export default function Logs() {
         const cacheRead = record?.cache_read_token || 0;
         const cacheWrite = record?.cache_write_token || 0;
         // 主数字展示总输入（未命中 + 缓存读 + 缓存写，还原上游 prompt_tokens），
-        // 缓存命中明细放小字；DB 字段保持计费口径（input_token 为未命中部分）不变。
+        // 缓存命中明细放小字；input_token 为非缓存输入。
         const total = val == null ? null : val + cacheRead + cacheWrite;
         return (
           <span className="block text-center font-mono">
@@ -197,18 +215,6 @@ export default function Logs() {
       },
     },
     {
-      title: '费用',
-      dataIndex: 'cost',
-      key: 'cost',
-      width: '100px',
-      // 前缀按该条日志快照的货币；空 currency（存量）视为 USD
-      render: (val, record) => (
-        <span className="text-center font-mono block">
-          {record?.currency === 'CNY' ? '¥' : '$'}{Number(val || 0).toFixed(6)}
-        </span>
-      ),
-    },
-    {
       title: '状态',
       dataIndex: 'success',
       key: 'success',
@@ -235,20 +241,27 @@ export default function Logs() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* 统计卡片：费用按货币分桶累计（无汇率换算，两个口径各自成立） */}
+      <div className="mb-4 shrink-0">
+        <h1 className="text-xl font-semibold">调用记录</h1>
+        <p className="mt-1 text-sm text-muted">查看分组实际调用的模型、用量和结果。记录数按日志行统计，一次客户端请求可能产生多条记录。</p>
+        <p className="mt-1 text-xs text-muted">用量来自上游报告；输入明细保留缓存读取和写入 token。近期记录指近 60 秒。</p>
+      </div>
+      {/* 统计按当前查询范围汇总，不把日志行数当作独立客户端请求数。 */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
-          <StatCard label="美元费用" value={`$${Number(stats.total_cost_usd || 0).toFixed(4)}`} />
-          <StatCard label="人民币费用" value={`¥${Number(stats.total_cost_cny || 0).toFixed(4)}`} />
-          <StatCard label="总请求" value={String(stats.total_requests || 0)} />
-          <StatCard label="输入 Token" value={formatNum(stats.input_tokens)} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <StatCard label="记录数" value={String(stats.total_requests || 0)} />
+          <StatCard label="非缓存输入 Token" value={formatNum(stats.input_tokens)} detail={`缓存读 ${formatNum(stats.cache_read_tokens)} · 缓存写 ${formatNum(stats.cache_write_tokens)}`} />
           <StatCard label="输出 Token" value={formatNum(stats.output_tokens)} />
-          <StatCard label="近期请求" value={String(stats.recent_requests || 0)} />
+          <StatCard label="近期记录" value={String(stats.recent_requests || 0)} />
         </div>
       )}
 
       {/* 筛选栏 */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
+        <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="w-40">
+          <Label>模型分组</Label>
+          <Input placeholder="按分组名称查询" />
+        </TextField>
         <TextField
           name="model_name"
           value={filters.model_name}
@@ -372,8 +385,8 @@ export default function Logs() {
           size="md"
           variant="primary"
           onPress={() => {
-            if (page === 1) fetchLogs(true);
-            else setPage(1);
+            setPage(1);
+            setQuery({ ...filters });
           }}
         >
           <Search className="size-4" /> 查询
@@ -383,7 +396,7 @@ export default function Logs() {
         <Button
           size="md"
           variant="secondary"
-          aria-label="刷新日志"
+          aria-label="刷新调用记录"
           onPress={() => fetchLogs(true)}
           isPending={refreshing}
           className="ml-auto"
@@ -399,11 +412,11 @@ export default function Logs() {
         loading={loading}
         refreshing={refreshing}
         emptyText={
-          filters.model_name || filters.client_protocol !== 'all' || filters.success !== 'all' || filters.range
-            ? '没有符合条件的日志，可调整或清除筛选'
-            : '暂无日志'
+          query.group_name || query.model_name || query.client_protocol !== 'all' || query.success !== 'all' || query.range
+            ? '没有符合条件的调用记录，可调整或清除筛选'
+            : '暂无调用记录'
         }
-        errorText={loadError ? '日志加载失败，请检查后端服务后重试' : undefined}
+        errorText={loadError ? '调用记录加载失败，请检查后端服务后重试' : undefined}
         onRetry={() => fetchLogs()}
       />
 
@@ -421,7 +434,7 @@ export default function Logs() {
   );
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, detail }) {
   return (
     <Card className="gap-1 px-4 py-2 rounded-2xl">
       <Card.Header className="p-0">
@@ -429,6 +442,7 @@ function StatCard({ label, value }) {
       </Card.Header>
       <Card.Content className="p-0">
         <Typography type="body" className="font-semibold">{value}</Typography>
+        {detail && <Typography type="body-xs" className="mt-1 text-muted">{detail}</Typography>}
       </Card.Content>
     </Card>
   );

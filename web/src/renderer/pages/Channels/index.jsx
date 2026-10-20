@@ -56,7 +56,11 @@ export default function Channels() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-end mb-4 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 shrink-0">
+        <div>
+          <h1 className="text-xl font-semibold">上游渠道</h1>
+          <p className="mt-1 text-sm text-muted">统一接入官方 API 和各类中转站。获取模型列表后，将模型加入分组对外提供服务。</p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"

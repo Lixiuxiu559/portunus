@@ -22,11 +22,11 @@ const BASE_URL = isProd ? `${serverUrl}/api` : '/api';
 const request = axios.create({
   baseURL: BASE_URL,
   timeout: 30_000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'X-Portunus-Local': '1' },
 });
 
 // ─── 请求拦截器 ───
-// 管理 API 暂未接入鉴权；后续有登录态时在此注入 Authorization
+// 管理访问由后端本机边界保护；服务 API 令牌不用于管理授权。
 request.interceptors.request.use(
   (config) => config,
   (error) => Promise.reject(error),

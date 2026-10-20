@@ -60,3 +60,10 @@ test('buildLogParams：client_protocol 映射，all/空值省略', () => {
   const absent = buildLogParams({ model_name: '', success: 'all', range: null }, 1, 20);
   assert.equal('client_protocol' in absent, false, '未设置时不应出现在参数里');
 });
+
+
+test('分组入口筛选保留准确 model 标识，空分组省略', () => {
+  const filters = { group_name: '编码 A&B/快?=#', model_name: '', success: 'all' };
+  assert.equal(buildLogParams(filters, 1, 20).group_name, filters.group_name);
+  assert.equal('group_name' in buildLogParams({ ...filters, group_name: '' }, 1, 20), false);
+});

@@ -27,7 +27,7 @@ export default function DeleteModelModal({ model, isOpen, onOpenChange, onDelete
           </Modal.Header>
           <Modal.Body>
             <Typography color="muted">
-              确定删除模型「{model?.name}」吗？删除后不可恢复。
+              确定删除模型「{model?.name}」吗？引用此模型的分组成员也会移除，可能影响当前手动选择或备用顺序。分组名称会保留，删除后不可恢复。
             </Typography>
           </Modal.Body>
           <Modal.Footer>

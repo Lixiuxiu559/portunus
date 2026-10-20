@@ -3,12 +3,18 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 import serverAddress from './src/main/server-address.js';
+import { localManagementProxyGuard } from './dev-management-access.mjs';
 
 // 开发后端的地址单一来源：vite 代理把 /api、/v1 转发到它（见 server-address.js）。
 const devBackendUrl = serverAddress.addressOf({ isPackaged: false }).url;
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), {
+    name: 'local-management-access',
+    configureServer(server) {
+      server.middlewares.use(localManagementProxyGuard);
+    },
+  }],
   // 默认 '/' 供 Vite 开发服务器使用；Electron 打包（file:// 协议）必须以 VITE_BASE=./ 覆盖，
   // 否则根绝对路径的静态资源在 file:// 下会 404。
   base: process.env.VITE_BASE ?? '/',
@@ -24,6 +30,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
     proxy: {

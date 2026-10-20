@@ -14,7 +14,7 @@ export function listLogs(params) {
 
 /**
  * 日志汇总统计
- * @returns { total_cost, input_tokens, output_tokens, total_requests, recent_requests }
+ * @returns { input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_requests, recent_requests }
  */
 export function getLogStats(params) {
   return request.get('/logs/stat', { params });

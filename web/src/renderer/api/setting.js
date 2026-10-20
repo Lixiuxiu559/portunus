@@ -1,7 +1,7 @@
 import request from './request';
 
 /**
- * 全局设置：同步间隔、日志保留等（模型计价货币是模型自身属性，不在全局设置）
+ * 全局维护设置：模型同步间隔、日志保留等
  */
 
 /** 获取全局设置 { sync_interval, last_sync_at, log_retention_days } */

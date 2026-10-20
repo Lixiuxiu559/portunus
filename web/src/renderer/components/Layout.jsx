@@ -1,27 +1,25 @@
-import { useState } from 'react';
-import { Tabs, Modal, Button, Typography } from '@heroui/react';
+import { Button, Tabs } from '@heroui/react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import useLiquidNav from '../hooks/useLiquidNav';
-import { getNavBlock } from '../utils/navGuard';
 import logo from '../assets/logo.png';
+import { useUpdater } from '../hooks/useUpdater';
 
 export const tabs = [
-  { id: 'channels', label: '渠道', path: '/channels' },
-  { id: 'models', label: '模型', path: '/models' },
-  { id: 'groups', label: '分组', path: '/groups' },
-  { id: 'logs', label: '日志', path: '/logs' },
-  { id: 'clients', label: '客户端', path: '/clients' },
+  { id: 'groups', label: '模型分组', path: '/groups' },
+  { id: 'channels', label: '上游渠道', path: '/channels' },
+  { id: 'models', label: '上游模型', path: '/models' },
+  { id: 'clients', label: '服务接入', path: '/clients' },
+  { id: 'logs', label: '调用记录', path: '/logs' },
   { id: 'settings', label: '设置', path: '/settings' },
 ];
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  // 导航守卫：页面注册了未保存数据时，切页先存下目标，确认后再走
-  const [pendingNav, setPendingNav] = useState(null);
+  const { downloaded, installing, latestVersion, error, install } = useUpdater();
 
-  const currentTab = tabs.find((t) => location.pathname.startsWith(t.path))?.id || 'channels';
+  const currentTab = tabs.find((t) => location.pathname.startsWith(t.path))?.id || 'groups';
 
   // 液态玻璃导航：距离感知拉伸 + 点击涟漪（位置流动由 RAC SharedElement + CSS 完成）
   const liquid = useLiquidNav(currentTab);
@@ -29,16 +27,7 @@ export default function Layout() {
   const handleTabChange = (key) => {
     const tab = tabs.find((t) => t.id === key);
     if (!tab || tab.path === location.pathname) return;
-    if (getNavBlock()) {
-      setPendingNav(tab);
-      return;
-    }
     navigate(tab.path);
-  };
-
-  const confirmLeave = () => {
-    if (pendingNav) navigate(pendingNav.path);
-    setPendingNav(null);
   };
 
   return (
@@ -74,6 +63,16 @@ export default function Layout() {
           <ThemeToggle />
         </div>
       </header>
+      {downloaded && (
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-accent/20 bg-accent/10 px-6 py-2" role="status">
+          <span className={`text-sm ${error ? 'text-danger' : 'text-foreground'}`}>
+            {error ? `更新失败：${error}` : `新版本 v${latestVersion} 已下载，重启即可更新`}
+          </span>
+          <Button variant="primary" size="sm" onPress={install} isDisabled={installing}>
+            {installing ? '正在重启…' : '重启以更新'}
+          </Button>
+        </div>
+      )}
       <main className="flex-1 min-h-0 p-6">
         {/* key 换页时重建容器，触发 page-in 上浮淡入过渡 */}
         <div key={location.pathname} className="page-in mx-auto max-w-7xl h-full flex flex-col">
@@ -81,28 +80,7 @@ export default function Layout() {
         </div>
       </main>
 
-      {/* 导航守卫确认：任一页面注册了未保存数据（navGuard），切页前拦截 */}
-      <Modal.Backdrop isOpen={!!pendingNav} onOpenChange={(open) => !open && setPendingNav(null)}>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>离开当前页面？</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <Typography color="muted">{getNavBlock()}，离开将丢弃未保存的内容。</Typography>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                留在此页
-              </Button>
-              <Button variant="danger" onPress={confirmLeave}>
-                丢弃并离开
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+
     </div>
   );
 }

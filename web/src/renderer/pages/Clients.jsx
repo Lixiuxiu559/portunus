@@ -1,942 +1,370 @@
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, FolderInput, Info, Terminal, Braces, Eye, EyeOff } from 'lucide-react';
-import { Button, Card, Chip, Input, Label, Modal, Tabs, TextField, Typography, toast } from '@heroui/react';
-import CodeEditor from '../components/CodeEditor';
-import { setNavBlock } from '../utils/navGuard';
-import { readCodexKey, readActiveProviderId, upsertCodexKey, readTopLevelKey, upsertTopLevelKey } from '../utils/codexToml';
-import { readAuthApiKey, applyAuthApiKey } from '../utils/authJson';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BookOpen, Copy, Eye, EyeOff, ExternalLink, Info, RefreshCw } from 'lucide-react';
+import { Button, Typography, Modal, Select, ListBox, Label, toast } from '@heroui/react';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
-import { getAPIKey } from '../api/apikey';
+import { getAPIKey, regenerateAPIKey } from '../api/apikey';
+import { buildConnectionGuide } from '../utils/connectionGuide';
+import { additionalClientGuides } from '../utils/clientGuides';
+import { buildServiceExamples, selectServiceGroup } from '../utils/serviceAccess';
+import './service-access.css';
 
-// 是否在 Electron 桌面端（有 preload 注入 clientConfig 桥）；纯浏览器开发时不存在。
-const hasElectron = typeof window !== 'undefined' && !!window.clientConfig;
+async function copy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success('已复制');
+  } catch {
+    toast.danger('复制失败，请手动选择并复制');
+  }
+}
 
-// Claude Code 模型映射槽位（复刻 client-config-editor.html 的 MODEL_SLOTS）。
-const MODEL_SLOTS = [
-  { id: 'sonnet', label: 'Sonnet', key: 'ANTHROPIC_DEFAULT_SONNET_MODEL', keyName: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME', has1m: true },
-  { id: 'opus', label: 'Opus', key: 'ANTHROPIC_DEFAULT_OPUS_MODEL', keyName: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME', has1m: true },
-  { id: 'fable', label: 'Fable', key: 'ANTHROPIC_DEFAULT_FABLE_MODEL', keyName: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME', has1m: true },
-  { id: 'haiku', label: 'Haiku', key: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', keyName: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME', has1m: false },
-  { id: 'subagent', label: 'Subagent', key: 'CLAUDE_CODE_SUBAGENT_MODEL', nameDash: true, has1m: true },
-  { id: 'default', label: '默认兜底模型', key: 'ANTHROPIC_MODEL', has1m: true, solo: true },
+function CopyValue({ label, value, display = value, disabled = false }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2 py-3">
+      <div className="min-w-0 flex-1">
+        <Typography type="body-xs" className="text-muted mb-1">{label}</Typography>
+        <code className="block truncate text-xs" title={String(display)}>{display}</code>
+      </div>
+      <Button isIconOnly size="sm" variant="tertiary" aria-label={`复制${label}`} isDisabled={disabled} onPress={() => copy(value)}>
+        <Copy className="size-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+const clients = [
+  { id: 'claude', label: 'Claude Code', icon: <ClaudeMark className="size-4" />, description: '使用本地网关，为 Claude Code 接入你的模型分组。', command: 'claude', docs: 'https://code.claude.com/docs/zh-CN/setup' },
+  { id: 'codex', label: 'Codex', icon: <OpenAIMark className="size-4" />, description: '使用 OpenAI Responses 接口，将 Codex CLI 的请求交给 Portunus 路由。', command: 'codex', docs: 'https://developers.openai.com/codex/cli/' },
+  ...additionalClientGuides.map((c) => ({ ...c, icon: <BookOpen className="size-4 shrink-0" /> })),
 ];
 
-function parseModel(val) {
-  if (typeof val === 'string' && val.slice(-4) === '[1M]') return { base: val.slice(0, -4), onem: true };
-  return { base: val || '', onem: false };
+function DocLink({ href, children }) {
+  return <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline underline-offset-4" onClick={(e) => {
+    if (window.api?.openExternal) {
+      e.preventDefault();
+      window.api.openExternal(href).catch(() => toast.danger('无法打开链接，请复制地址到浏览器'));
+    }
+  }}>{children}<ExternalLink className="size-3 shrink-0" /></a>;
 }
 
-function rightNow() {
-  const d = new Date();
-  const p = (n) => (n < 10 ? '0' : '') + n;
-  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-}
-
-// ─── 解析 ───
-function readClaudeBase(t) {
-  const m = t.match(/"ANTHROPIC_BASE_URL"\s*:\s*"([^"]*)"/);
-  return m ? m[1] : '';
-}
-function readClaudeToken(t) {
-  const m = t.match(/"ANTHROPIC_AUTH_TOKEN"\s*:\s*"([^"]*)"/);
-  return m ? m[1] : '';
-}
-function readClaudeEnv(t) {
-  try {
-    const o = JSON.parse(t);
-    return o && o.env && typeof o.env === 'object' ? o.env : {};
-  } catch {
-    return {};
-  }
-}
-// Codex 读取锚定激活 provider 段（model_provider 指向的表），不读全文第一个匹配
-const readCodexBase = (t) => readCodexKey(t, 'base_url');
-
-// 把单个 env 键写回 settings.json（JSON round-trip，与 applyModels 同套路）。
-// 键缺失自动补进 env（避免正则不命中静默丢改动）；解析失败返回 null 由调用方报告。
-function setClaudeEnv(t, key, value) {
-  let obj;
-  try {
-    obj = JSON.parse(t);
-  } catch {
-    return null;
-  }
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) obj = {};
-  const env = obj.env && typeof obj.env === 'object' && !Array.isArray(obj.env) ? obj.env : {};
-  if (value) env[key] = value;
-  else delete env[key];
-  obj.env = env;
-  return JSON.stringify(obj, null, 2);
-}
-
-// 统一的键写回：JSON 写 env.<jsonKey>，TOML 写激活段 <tomlKey>。
-// 返回 { text, ok, reason }：ok=false 时 reason 说明原因，调用方须警告而非假成功。
-function applyKey(t, lang, jsonKey, tomlKey, value) {
-  if (lang === 'json') {
-    const next = setClaudeEnv(t, jsonKey, value);
-    return next === null
-      ? { text: t, ok: false, reason: 'settings.json 不是合法 JSON，未能写入' }
-      : { text: next, ok: true, reason: '' };
-  }
-  const r = upsertCodexKey(t, tomlKey, value);
-  return r.ok
-    ? { ...r, reason: '' }
-    : { ...r, reason: '未找到激活的 [model_providers.*] 段，请先在编辑器里补全 provider 段骨架' };
-}
-
-const applyBaseUrl = (t, lang, baseUrl) => applyKey(t, lang, 'ANTHROPIC_BASE_URL', 'base_url', baseUrl);
-
-// 令牌（仅 JSON/Claude）：即时写回 env。TOML/Codex 的 API Key 正典在 auth.json，
-// 编辑只改本地 state、保存时经 saveCodexAuth 落盘（见 handleSave）。
-const applyToken = (t, token) => {
-  const next = setClaudeEnv(t, 'ANTHROPIC_AUTH_TOKEN', token);
-  return next === null
-    ? { text: t, ok: false, reason: 'settings.json 不是合法 JSON，未能写入' }
-    : { text: next, ok: true, reason: '' };
-};
-
-// 把模型映射写回源码 env（JSON round-trip）
-function applyModels(t, models) {
-  let obj;
-  try {
-    obj = JSON.parse(t);
-  } catch {
-    return t;
-  }
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) obj = {};
-  const env = obj.env && typeof obj.env === 'object' && !Array.isArray(obj.env) ? obj.env : {};
-  MODEL_SLOTS.forEach((slot) => {
-    const m = models[slot.id] || {};
-    const val = m.base ? m.base + (m.onem ? '[1M]' : '') : '';
-    if (val) env[slot.key] = val;
-    else delete env[slot.key];
-    if (slot.keyName) {
-      if (m.name) env[slot.keyName] = m.name;
-      else delete env[slot.keyName];
-    }
-  });
-  obj.env = env;
-  return JSON.stringify(obj, null, 2);
-}
-
-function ClientPanel({ id, title, lang, fileName, path, config, modelSlots, modelSelect, defaultBase, icon, hint, active = true }) {
-  const [text, setText] = useState('');
-  const [savedText, setSavedText] = useState('');
-  const [savedAt, setSavedAt] = useState('');
-  const [baseUrl, setBaseUrl] = useState(defaultBase);
-  const [token, setToken] = useState('');
-  const [model, setModel] = useState('');
-  const [models, setModels] = useState({});
-  const [modelOptions, setModelOptions] = useState([]);
-  // auth.json 源码（API Key 正典文件）：与 config.toml 同一「原文编辑 + 整写保存」模型
-  const [authText, setAuthText] = useState('');
-  const [savedAuthText, setSavedAuthText] = useState('');
-  const [authSavedAt, setAuthSavedAt] = useState('');
-  const [authBackupExists, setAuthBackupExists] = useState(false);
-  const [authBackupText, setAuthBackupText] = useState(null);
-  const [authSaving, setAuthSaving] = useState(false);
-  // 模型映射表格（catalog 行）：本地编辑，保存 config.toml 时统一生成目录文件
-  const [catalogRows, setCatalogRows] = useState([]);
-  const [savedCatalogRows, setSavedCatalogRows] = useState([]);
-  const [backupExists, setBackupExists] = useState(false);
-  const [backupText, setBackupText] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const [showToken, setShowToken] = useState(false);
-  const [confirmRollback, setConfirmRollback] = useState(null);
-  const [confirmReread, setConfirmReread] = useState(null);
-
-  // 源码 → 表单反解析的防抖计时器
-  const parseTimer = useRef(null);
-
-  const dirty = text !== savedText;
-  const authDirty = authText !== savedAuthText;
-  const catalogDirty = JSON.stringify(catalogRows) !== JSON.stringify(savedCatalogRows);
-
-  // 有未保存改动时注册导航守卫：切页前 Layout 拦截确认，防误触丢失
-  useEffect(() => {
-    setNavBlock(`client-${id}`, dirty || authDirty || catalogDirty ? '客户端配置' : null);
-    return () => setNavBlock(`client-${id}`, null);
-  }, [dirty, authDirty, catalogDirty, id]);
-
-  const parseForm = (t) => {
-    if (lang === 'json') {
-      setBaseUrl(readClaudeBase(t));
-      setToken(readClaudeToken(t));
-      const env = readClaudeEnv(t);
-      const next = {};
-      MODEL_SLOTS.forEach((slot) => {
-        const pm = parseModel(env[slot.key]);
-        next[slot.id] = { base: pm.base, onem: pm.onem, name: slot.keyName ? env[slot.keyName] || '' : '' };
-      });
-      setModels(next);
-    } else {
-      setBaseUrl(readCodexBase(t));
-      // API Key 框的值是 authText 的投影（readAuthApiKey），不随 config.toml 解析
-      if (modelSelect) setModel(readTopLevelKey(t, 'model'));
-    }
-  };
-
-  // 表单 → 源码写回：立即生效并取消未决的反解析，保证源码是唯一真相
-  const writeText = (updater) => {
-    clearTimeout(parseTimer.current);
-    setText(updater);
-  };
-
-  // 编辑器 → 表单同步：立即更新 text，停顿后把表单重解析为源码的投影
-  const handleTextChange = (t) => {
-    setText(t);
-    clearTimeout(parseTimer.current);
-    parseTimer.current = setTimeout(() => parseForm(t), 300);
-  };
-
-  const load = async () => {
-    const r = await config.read();
-    if (r && r.ok) {
-      const { text: t } = r.data;
-      setText(t);
-      setSavedText(t);
-      setBackupExists(r.data.backupExists);
-      parseForm(t);
-      setSavedAt(rightNow());
-    } else {
-      toast.danger((r && r.error) || '读取配置失败');
-    }
-    // 读取备份内容（供「备份」视图预览）
-    const rb = await config.readBackup();
-    if (rb && rb.ok && rb.data && rb.data.exists) {
-      setBackupText(rb.data.text);
-    } else {
-      setBackupText(null);
-    }
-    // Codex 面板：auth.json 源码与备份 + 模型映射表格（catalog 文件反解析）
-    if (lang === 'toml') {
-      await loadAuth();
-      const rc = await window.clientConfig.readCodexCatalog();
-      const rows = rc && rc.ok && Array.isArray(rc.rows) ? rc.rows : [];
-      setCatalogRows(rows);
-      setSavedCatalogRows(rows);
-    }
-  };
-
-  // 读取 auth.json 原文与备份（独立于 config.toml，可单独重读/回滚）
-  const loadAuth = async () => {
-    const ra = await window.clientConfig.readCodexAuth();
-    if (ra && ra.ok) {
-      const { text: at } = ra.data;
-      setAuthText(at);
-      setSavedAuthText(at);
-      setAuthBackupExists(ra.data.backupExists);
-      setAuthSavedAt(rightNow());
-    } else {
-      toast.danger((ra && ra.error) || '读取 auth.json 失败');
-    }
-    const rb = await window.clientConfig.readBackupCodexAuth();
-    setAuthBackupText(rb && rb.ok && rb.data && rb.data.exists ? rb.data.text : null);
-  };
-
-  // 获取分组列表作为模型映射选项；返回是否成功（挂载时静默调用，失败不打扰）
-  const fetchModels = async () => {
-    try {
-      const gs = await listGroups();
-      setModelOptions((Array.isArray(gs) ? gs : []).map((g) => ({ id: g.name, label: g.name })));
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    if (hasElectron) {
-      load();
-      if (modelSlots || modelSelect) fetchModels();
-    }
-    return () => clearTimeout(parseTimer.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    // Codex：映射表格非空则生成模型目录（Codex /model 菜单的数据源）并注入指针键；
-    // 目录生成失败仅告警，不阻塞 config.toml 保存；表格为空则不动用户自管的目录
-    let t = text;
-    if (lang === 'toml' && catalogRows.some((r) => r.model)) {
-      const rc = await window.clientConfig.writeCodexCatalog(catalogRows);
-      if (rc && rc.ok) {
-        t = upsertTopLevelKey(t, 'model_catalog_json', rc.data.path).text;
-        // 网关不保证支持 web_search hosted tool，声明目录即禁用，别给 Codex 一个死工具
-        t = upsertTopLevelKey(t, 'web_search', 'disabled').text;
-        setText(t);
-        setSavedCatalogRows(catalogRows);
-      } else {
-        toast.danger(`${(rc && rc.error) || '模型目录生成失败'} · config.toml 保存不受影响`);
-      }
-    }
-    const r = await config.save(t);
-    setSaving(false);
-    if (r && r.ok) {
-      setSavedText(t);
-      setSavedAt(rightNow());
-      setBackupExists(!!(r.data && r.data.backupExists));
-      toast.success('配置已原子写入');
-      parseForm(t);
-    } else {
-      toast.danger(`${(r && r.error) || '保存失败'} · 可修正后重试，或点「重新读取」恢复磁盘版本`);
-    }
-  };
-
-  // auth.json 独立保存：JSON 校验 + 首写备份 + 原子写（主进程）
-  const handleAuthSave = async () => {
-    setAuthSaving(true);
-    const r = await window.clientConfig.saveCodexAuth(authText);
-    setAuthSaving(false);
-    if (r && r.ok) {
-      setSavedAuthText(authText);
-      setAuthSavedAt(rightNow());
-      setAuthBackupExists(!!(r.data && r.data.backupExists));
-      toast.success('auth.json 已原子写入');
-    } else {
-      toast.danger(`${(r && r.error) || 'auth.json 保存失败'} · 可修正后重试，或点「重新读取」恢复磁盘版本`);
-    }
-  };
-
-  const performRollback = async (target) => {
-    const r = target === 'auth' ? await window.clientConfig.rollbackCodexAuth() : await config.rollback();
-    if (r && r.ok) {
-      setConfirmRollback(null);
-      toast.success(target === 'auth' ? '已从 .portunus.bak 回滚 auth.json' : '已从 .portunus.bak 回滚到接入前配置');
-      if (target === 'auth') await loadAuth();
-      else await load();
-    } else {
-      toast.danger((r && r.error) || '回滚失败');
-    }
-  };
-
-  const performReread = async (target) => {
-    setConfirmReread(null);
-    if (target === 'auth') {
-      await loadAuth();
-      toast.success('已从磁盘重新读取 auth.json');
-    } else {
-      await load();
-      toast.success('已从磁盘重新读取');
-    }
-  };
-
-  const handleFillUrl = () => {
-    setBaseUrl(defaultBase);
-    const r = applyBaseUrl(text, lang, defaultBase);
-    writeText(() => r.text);
-    if (r.ok) toast.success('已填写 Portunus URL');
-    else toast.danger(r.reason);
-  };
-
-  const handleImportToken = async () => {
-    try {
-      const k = await getAPIKey();
-      if (!k || !k.key) {
-        toast.danger('暂无令牌，请先到「设置」获取');
-        return;
-      }
-      if (lang === 'json') {
-        setToken(k.key);
-        const r = applyToken(text, k.key);
-        writeText(() => r.text);
-        if (!r.ok) {
-          toast.danger(r.reason);
-          return;
-        }
-        toast.success('已导入 Portunus 令牌');
-      } else {
-        setAuthText((prev) => applyAuthApiKey(prev, k.key));
-        toast.success('已点改 auth.json 源码，保存后生效');
-      }
-    } catch {
-      // toast 由 request 拦截器统一提示
-    }
-  };
-
-  const handleFetchModels = async () => {
-    setFetching(true);
-    const ok = await fetchModels();
-    if (ok) toast.success('已获取模型列表');
-    setFetching(false);
-  };
-
-  // Codex 请求模型下拉：写入顶层 model 键；清空 = 删除该键（回落 Codex 内置默认）
-  const handleModelSelect = (v) => {
-    setModel(v);
-    writeText((prev) => upsertTopLevelKey(prev, 'model', v === '' ? null : v).text);
-  };
-
-  // 模型映射表格：增删改均为本地态，保存 config.toml 时统一落成目录文件
-  const handleAddRow = () => setCatalogRows((prev) => [...prev, { model: '', displayName: '', contextWindow: null }]);
-
-  const handleAddAllGroups = () =>
-    setCatalogRows((prev) => {
-      const have = new Set(prev.map((r) => r.model));
-      return [
-        ...prev,
-        ...modelOptions.filter((o) => !have.has(o.id)).map((o) => ({ model: o.id, displayName: '', contextWindow: null })),
-      ];
-    });
-
-  const handleRemoveRow = (i) => setCatalogRows((prev) => prev.filter((_, j) => j !== i));
-
-  const handleRowChange = (i, patch) =>
-    setCatalogRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-
-  // 默认请求模型下拉选项 = 模型映射行 ∪ 分组列表（cc-switch 同源合并，映射行优先去重）
-  const defaultModelOptions = (() => {
-    const seen = new Set();
-    const opts = [];
-    for (const r of catalogRows) {
-      if (!r.model || seen.has(r.model)) continue;
-      seen.add(r.model);
-      opts.push({ id: r.model, label: r.displayName || r.model });
-    }
-    for (const o of modelOptions) {
-      if (seen.has(o.id)) continue;
-      seen.add(o.id);
-      opts.push(o);
-    }
-    return opts;
-  })();
-
-  const setSlot = (slotId, patch) => {
-    const next = { ...models, [slotId]: { ...(models[slotId] || { base: '', onem: false, name: '' }), ...patch } };
-    setModels(next);
-    // 模型映射即改即写回源码，编辑器所见即所存
-    if (modelSlots) writeText((prev) => applyModels(prev, next));
-  };
-
-  // 请求模型下拉 + 1M 勾选（各槽位共用）；无 1M 的槽位用等宽隐形占位保持对齐
-  const renderModelControls = (slot, m) => {
-    // 选项只有"不映射 + 分组"。当前映射值不在分组里（分组已删 / env 手写）时，
-    // 以禁用项展示悬空状态——可见、不可再选，不自动清洗用户手写的配置。
-    const dangling = m.base && !modelOptions.some((o) => o.id === m.base);
-    return (
-      <div className="mm-model">
-        <div className="mm-select-wrap">
-          <select
-            className="mm-select"
-            aria-label={`${slot.label} 请求模型`}
-            value={m.base}
-            onChange={(e) => {
-              const v = e.target.value;
-              // 选择请求模型后显示名同步跟随所选模型；清空时一并清空（之后手改显示名不会反向影响请求模型）
-              setSlot(slot.id, v === '' ? { base: '', name: '' } : { base: v, name: v });
-            }}
-          >
-            <option value="">— 不映射 —</option>
-            {dangling && (
-              <option value={m.base} disabled>
-                {m.base}（分组不存在）
-              </option>
-            )}
-            {modelOptions.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-        {slot.has1m !== false ? (
-          <label className="mm-1m">
-            <input type="checkbox" checked={m.onem} onChange={(e) => setSlot(slot.id, { onem: e.target.checked })} />
-            <span>1M</span>
-          </label>
-        ) : (
-          <span className="mm-1m mm-1m--ghost" aria-hidden="true">
-            <span className="mm-1m-box" />
-            <span>1M</span>
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const renderSlot = (slot) => {
-    const m = models[slot.id] || { base: '', onem: false, name: '' };
-    return (
-      <div className="mm-row" key={slot.id}>
-        <div className="mm-slot">
-          <span className="mm-label">{slot.label}</span>
-          <span className="mm-key" title={slot.key}>{slot.key}</span>
-        </div>
-        {slot.keyName ? (
-          <input
-            className="mm-input"
-            type="text"
-            placeholder="显示名"
-            aria-label={`${slot.label} 显示名`}
-            value={m.name}
-            onChange={(e) => setSlot(slot.id, { name: e.target.value })}
-            spellCheck={false}
-          />
-        ) : slot.nameDash ? (
-          <span className="mm-na" aria-hidden="true">—</span>
-        ) : (
-          <span />
-        )}
-        {renderModelControls(slot, m)}
-      </div>
-    );
-  };
-
-  // solo 槽（默认兜底模型）独立于映射表：无显示名概念，只有请求模型 + 1M
-  const renderSolo = (slot) => {
-    const m = models[slot.id] || { base: '', onem: false, name: '' };
-    return (
-      <div className="mm-solo" key={slot.id}>
-        <div className="mm-slot">
-          <span className="mm-label">{slot.label}</span>
-          <span className="mm-key" title={slot.key}>{slot.key}</span>
-        </div>
-        {renderModelControls(slot, m)}
-      </div>
-    );
-  };
-
-  const curBase = lang === 'json' ? readClaudeBase(text) : readCodexBase(text);
-  const activeProvider = lang === 'toml' ? readActiveProviderId(text) : null;
-  const status = dirty
-    ? { color: 'warning', label: '有未保存改动' }
-    : activeProvider && activeProvider !== 'portunus'
-      ? { color: 'warning', label: `激活 provider：${activeProvider}（非 portunus）` }
-      : /306[01]|13060|portunus/i.test(curBase)
-        ? { color: 'success', label: '已指向 Portunus' }
-        : { color: 'default', label: '未指向 Portunus' };
-
+function GuideStep({ number, title, children }) {
   return (
-    <Card className="gap-4 p-5">
-      {/* 卡片头 */}
-      <Card.Header className="flex-row items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-secondary text-foreground">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <Typography className="font-medium">{title}</Typography>
-            <Typography type="body-xs" className="text-muted">
-              <span className="font-mono">{fileName}</span> · {lang === 'json' ? 'JSON' : 'TOML'}
-            </Typography>
-          </div>
-        </div>
-        <Chip variant="soft" size="sm" color={status.color}>{status.label}</Chip>
-      </Card.Header>
+    <section id={`guide-step-${number}`} className="scroll-mt-5">
+      <h2 className="mb-4 flex items-center gap-3 text-base font-semibold">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm text-accent">{number}</span>
+        {title}
+      </h2>
+      <div className="space-y-4 pl-10 text-sm leading-7">{children}</div>
+    </section>
+  );
+}
 
-      <Card.Content className="flex flex-col gap-4">
-        {/* 文件路径行 */}
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <FolderInput className="size-3.5 shrink-0" />
-          <span className="truncate font-mono">{path}</span>
-          <Chip variant="soft" size="sm" color={backupExists ? 'success' : 'default'} className="shrink-0">
-            {backupExists ? '已备份 .portunus.bak' : '尚未备份'}
-          </Chip>
-        </div>
+function CodeSample({ title, code, preview = code, disabled = false }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-separator bg-background/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-secondary/70 px-4 py-2">
+        <span className="text-xs text-muted">{title}</span>
+        <Button size="sm" variant="tertiary" aria-label={`复制${title}`} isDisabled={disabled} onPress={() => copy(code)}>
+          <Copy className="size-3.5" />复制
+        </Button>
+      </div>
+      <pre className="service-code m-0 overflow-auto p-4 text-xs leading-6 select-text"><code>{preview}</code></pre>
+    </div>
+  );
+}
 
-        {/* 连接 */}
-        <Typography type="body-sm" className="text-muted">连接</Typography>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-end gap-2">
-            <TextField
-              value={baseUrl}
-              onChange={(v) => {
-                setBaseUrl(v);
-                writeText((prev) => applyBaseUrl(prev, lang, v).text);
-              }}
-              className="flex-1"
-            >
-              <Label>base_url</Label>
-              <Input spellCheck={false} />
-            </TextField>
-            <Button variant="secondary" onPress={handleFillUrl} className="shrink-0">同步 Portunus</Button>
-          </div>
-          <div className="flex items-end gap-2">
-            <TextField
-              type={showToken ? 'text' : 'password'}
-              value={lang === 'json' ? token : readAuthApiKey(authText)}
-              onChange={(v) => {
-                // JSON 即时写回 env；TOML 点改 auth.json 源码里的 OPENAI_API_KEY 值
-                if (lang === 'json') {
-                  setToken(v);
-                  writeText((prev) => applyToken(prev, v).text);
-                } else {
-                  setAuthText((prev) => applyAuthApiKey(prev, v));
-                }
-              }}
-              autoComplete="off"
-              className="flex-1"
-            >
-              <Label>API Key</Label>
-              <Input spellCheck={false} />
-            </TextField>
-            <Button
-              variant="secondary"
-              onPress={() => setShowToken((v) => !v)}
-              className="shrink-0"
-              aria-label={showToken ? '隐藏令牌' : '显示令牌'}
-              title={showToken ? '隐藏令牌' : '显示令牌'}
-            >
-              {showToken ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </Button>
-            <Button variant="secondary" onPress={handleImportToken} className="shrink-0">从 Portunus 导入</Button>
-          </div>
-          {modelSelect && (
-            <div className="flex items-end gap-2">
-              <div className="flex flex-1 flex-col gap-1">
-                <Label>默认请求模型</Label>
-                <div className="mm-select-wrap">
-                  <select
-                    className="mm-select"
-                    aria-label="Codex 默认请求模型"
-                    value={model}
-                    onChange={(e) => handleModelSelect(e.target.value)}
-                  >
-                    <option value="">— 不设置 —</option>
-                    {model && !defaultModelOptions.some((o) => o.id === model) && (
-                      <option value={model} disabled>
-                        {model}（不在分组/映射中）
-                      </option>
-                    )}
-                    {defaultModelOptions.map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-          {modelSelect && model && catalogRows.length > 0 && !catalogRows.some((r) => r.model === model) && (
-            <div className="flex items-center gap-2">
-              <Typography type="body-sm" className="text-muted">
-                该模型不在模型映射中，Codex 的 /model 菜单不会列出它（直接请求仍然有效）。
-              </Typography>
-              <Button
-                variant="tertiary"
-                size="sm"
-                onPress={() => setCatalogRows((prev) => [...prev, { model, displayName: model, contextWindow: null }])}
-              >
-                加入模型映射
-              </Button>
-            </div>
-          )}
-          {modelSelect && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Typography type="body-sm" className="text-muted">
-                  模型映射（Codex /model 菜单，保存 config.toml 时生成）
-                </Typography>
-                <div className="flex gap-2">
-                  <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching}>
-                    <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
-                    获取模型
-                  </Button>
-                  <Button variant="tertiary" size="sm" onPress={handleAddAllGroups} isDisabled={!modelOptions.length}>
-                    全部添加
-                  </Button>
-                  <Button variant="tertiary" size="sm" onPress={handleAddRow}>添加行</Button>
-                </div>
-              </div>
-              {catalogRows.length === 0 ? (
-                <Typography type="body-sm" className="text-muted">
-                  先「获取模型」再「全部添加」，或「添加行」逐个选择；显示名 / 上下文留空用默认值。
-                </Typography>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {catalogRows.map((row, i) => (
-                    <div className="flex items-center gap-2" key={i}>
-                      <div className="mm-select-wrap w-48 shrink-0">
-                        <select
-                          className="mm-select"
-                          aria-label={`映射行 ${i + 1} 请求模型`}
-                          value={row.model}
-                          onChange={(e) => handleRowChange(i, { model: e.target.value })}
-                        >
-                          <option value="">— 请选择 —</option>
-                          {row.model && !modelOptions.some((o) => o.id === row.model) && (
-                            <option value={row.model} disabled>
-                              {row.model}（分组不存在）
-                            </option>
-                          )}
-                          {modelOptions.map((o) => (
-                            <option key={o.id} value={o.id}>{o.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <input
-                        className="mm-input flex-1"
-                        placeholder="显示名（默认=模型名）"
-                        aria-label={`映射行 ${i + 1} 显示名`}
-                        value={row.displayName}
-                        onChange={(e) => handleRowChange(i, { displayName: e.target.value })}
-                        spellCheck={false}
-                      />
-                      <input
-                        className="mm-input w-32 shrink-0"
-                        type="number"
-                        min={1}
-                        placeholder="上下文 128k"
-                        aria-label={`映射行 ${i + 1} 上下文窗口`}
-                        value={row.contextWindow ?? ''}
-                        onChange={(e) => handleRowChange(i, { contextWindow: e.target.value === '' ? null : Number(e.target.value) || null })}
-                      />
-                      <Button
-                        variant="tertiary"
-                        size="sm"
-                        onPress={() => handleRemoveRow(i)}
-                        className="shrink-0"
-                        aria-label={`删除映射行 ${i + 1}`}
-                      >
-                        删除
-                      </Button>
-                    </div>
-                  ))}
-                  <Typography type="body-sm" className="text-muted">
-                    显示名只影响 /model 菜单；上下文留空按 128k 生成。
-                  </Typography>
-                </div>
-              )}
-            </div>
-          )}
-          <Typography type="body-sm" className="text-muted">{hint}</Typography>
-        </div>
+function Note({ children }) {
+  return <div className="flex gap-2.5 rounded-lg border border-accent/15 bg-accent/5 p-3 text-sm leading-6"><Info className="mt-1 size-4 shrink-0 text-accent" /><div className="min-w-0">{children}</div></div>;
+}
 
-        {/* 模型映射（仅 Claude） */}
-        {modelSlots && (
-          <>
-            <div className="flex items-center justify-between">
-              <Typography type="body-sm" className="text-muted">模型映射</Typography>
-              <Button variant="tertiary" size="sm" onPress={handleFetchModels} isDisabled={fetching}>
-                <RefreshCw className={`size-4 ${fetching ? 'animate-spin' : ''}`} />
-                获取模型
-              </Button>
-            </div>
-            <div className="models-pane">
-              <div className="mm-list">
-                <div className="mm-head">
-                  <span>角色</span>
-                  <span>显示名</span>
-                  <span>请求模型</span>
-                </div>
-                {modelSlots.filter((s) => !s.solo).map(renderSlot)}
-              </div>
-              {modelSlots.filter((s) => s.solo).map(renderSolo)}
-              <Typography type="body-sm" className="text-muted">
-                显示名只影响 /model 菜单；1M 只是给 Claude Code 的上下文能力声明。
-              </Typography>
-            </div>
-          </>
-        )}
-
-        {/* 源码编辑器 */}
-        <Typography type="body-sm" className="text-muted">配置文件（源码）</Typography>
-        <CodeEditor
-          lang={lang}
-          fileName={fileName}
-          text={text}
-          backupText={backupText}
-          onTextChange={handleTextChange}
-          dirty={dirty}
-          savedAt={savedAt}
-          canRollback={backupExists}
-          active={active}
-          onSave={handleSave}
-          onRollback={() => setConfirmRollback('config')}
-          onReread={dirty ? () => setConfirmReread('config') : () => performReread('config')}
-          saving={saving}
-        />
-
-        {/* auth.json 源码（API Key 正典，仅 Codex）：与 config.toml 同一编辑模型 */}
-        {lang === 'toml' && (
-          <>
-            <Typography type="body-sm" className="text-muted">
-              auth.json（API Key 正典源码）· 上方 API Key 框改写的就是这里的 OPENAI_API_KEY 值
-            </Typography>
-            <CodeEditor
-              lang="json"
-              fileName="auth.json"
-              text={authText}
-              backupText={authBackupText}
-              onTextChange={(t) => setAuthText(t)}
-              dirty={authDirty}
-              savedAt={authSavedAt}
-              canRollback={authBackupExists}
-              active={active}
-              onSave={handleAuthSave}
-              onRollback={() => setConfirmRollback('auth')}
-              onReread={authDirty ? () => setConfirmReread('auth') : () => performReread('auth')}
-              saving={authSaving}
-            />
-          </>
-        )}
-      </Card.Content>
-
-      {/* 重新读取二次确认：有未保存改动时拦截，防止被磁盘内容静默覆盖（config / auth 双目标） */}
-      <Modal.Backdrop isOpen={!!confirmReread} onOpenChange={(o) => !o && setConfirmReread(null)}>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{confirmReread === 'auth' ? '重新读取 auth.json' : '重新读取配置'}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <Typography color="muted">
-                当前{confirmReread === 'auth' ? ' auth.json ' : ' 配置文件 '}有未保存改动，重新读取将用磁盘内容覆盖并丢弃这些改动，确定继续吗？
-              </Typography>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                取消
-              </Button>
-              <Button variant="danger" onPress={() => performReread(confirmReread)}>
-                丢弃并重新读取
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-
-      {/* 回滚二次确认（config / auth 双目标） */}
-      <Modal.Backdrop isOpen={!!confirmRollback} onOpenChange={(o) => !o && setConfirmRollback(null)}>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>从备份回滚</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <Typography color="muted">
-                {confirmRollback === 'auth'
-                  ? `${authDirty ? '当前 auth.json 有未保存改动，回滚后将一并丢弃。' : ''}确定把 auth.json 恢复为备份（.portunus.bak）吗？`
-                  : `${dirty ? '当前有未保存改动，回滚后将一并丢弃。' : ''}确定把配置恢复为接入 Portunus 之前的备份（.portunus.bak）吗？`}
-              </Typography>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                取消
-              </Button>
-              <Button variant="danger" onPress={() => performRollback(confirmRollback)}>
-                回滚
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Card>
+function Parameters({ rows }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-separator">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-surface-secondary/70 text-muted"><tr><th className="px-3 py-2 font-medium">字段</th><th className="px-3 py-2 font-medium">说明</th></tr></thead>
+        <tbody>{rows.map(([key, description]) => <tr key={key} className="border-t border-separator"><td className="px-3 py-2 align-top"><code className="text-xs break-all">{key}</code></td><td className="px-3 py-2 text-muted">{description}</td></tr>)}</tbody>
+      </table>
+    </div>
   );
 }
 
 export default function Clients() {
-  const [client, setClient] = useState('claude');
-  // 纯浏览器开发时 window.api 不存在，兜底空串避免下方 defaultBase 拼 URL 时崩溃
-  const serverUrl = window.api?.getServerUrl?.() ?? '';
+  const [client, setClient] = useState('api');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedGroup = searchParams.get('group');
+  const [networkMode, setNetworkMode] = useState(null);
+  const [savingMode, setSavingMode] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [stream, setStream] = useState(false);
+  const [apiProtocol, setAPIProtocol] = useState('chat');
+  const scrollRef = useRef(null);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  // 桌面端取实际 sidecar 地址；浏览器开发环境直连开发后端，不把 Vite 端口交给客户端。
+  const serverUrl = window.api?.getServerUrl?.() || 'http://127.0.0.1:3060';
 
-  const panels = [
-    {
-      id: 'claude',
-      title: 'Claude Code CLI',
-      tabLabel: 'claude-cli',
-      mark: <ClaudeMark className="size-3.5" />,
-      fileName: 'settings.json',
-      lang: 'json',
-      path: '~/.claude/settings.json',
-      modelSlots: MODEL_SLOTS,
-      defaultBase: serverUrl,
-      icon: <Terminal className="size-4" />,
-      hint: (
-        <>
-          写入 <span className="font-mono">env.ANTHROPIC_BASE_URL</span> 与 <span className="font-mono">env.ANTHROPIC_AUTH_TOKEN</span>，其余字段原样保留。
-        </>
-      ),
-      config: hasElectron
-        ? {
-            read: () => window.clientConfig.readClaude(),
-            readBackup: () => window.clientConfig.readBackupClaude(),
-            save: (t) => window.clientConfig.saveClaude(t),
-            rollback: () => window.clientConfig.rollbackClaude(),
-          }
-        : null,
-    },
-    {
-      id: 'codex',
-      title: 'Codex',
-      tabLabel: 'codex-cli',
-      mark: <OpenAIMark className="size-3.5" />,
-      fileName: 'config.toml',
-      lang: 'toml',
-      path: '~/.codex/config.toml',
-      modelSlots: null,
-      modelSelect: true,
-      defaultBase: `${serverUrl.replace(/\/+$/, '')}/v1`,
-      icon: <Braces className="size-4" />,
-      hint: (
-        <>
-          API Key 框改写的是 <span className="font-mono">~/.codex/auth.json</span> 源码里的 <span className="font-mono">OPENAI_API_KEY</span> 值（下方源码可见，保存整写落盘）；「模型映射」表格策展 Codex /model 菜单（保存 config.toml 时生成 <span className="font-mono">portunus-model-catalog.json</span>）；config.toml 的 <span className="font-mono">experimental_bearer_token</span> 优先级高于 auth.json，手写了它会盖过 API Key 框的值。
-        </>
-      ),
-      config: hasElectron
-        ? {
-            read: () => window.clientConfig.readCodex(),
-            readBackup: () => window.clientConfig.readBackupCodex(),
-            save: (t) => window.clientConfig.saveCodex(t),
-            rollback: () => window.clientConfig.rollbackCodex(),
-          }
-        : null,
-    },
-  ];
+  const load = async () => {
+    setLoading(true);
+    const [groupResult, keyResult] = await Promise.allSettled([listGroups(), getAPIKey()]);
+    setLoadError(groupResult.status === 'rejected' || keyResult.status === 'rejected');
+    if (groupResult.status === 'fulfilled') {
+      const next = groupResult.value || [];
+      setGroups(next);
+      setSelectedGroup((old) => selectServiceGroup(next, requestedGroup, old));
+    } else {
+      setGroups([]);
+      setSelectedGroup('');
+    }
+    setApiKey(keyResult.status === 'fulfilled' ? keyResult.value?.key || '' : '');
+    setLoading(false);
+  };
 
-  if (!hasElectron) {
-    return (
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-1 space-y-4">
-          <Card className="gap-4 p-5">
-            <Card.Content className="flex items-center gap-2 text-muted">
-              <Info className="size-5 shrink-0" />
-              <Typography type="body" className="text-sm">
-                本功能需在 Portunus 桌面端使用（依赖本地文件访问），当前浏览器环境不可用。
-              </Typography>
-            </Card.Content>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    setSelectedGroup((old) => selectServiceGroup(groups, requestedGroup, old));
+  }, [groups, requestedGroup]);
+  useEffect(() => {
+    window.api?.getNetworkMode?.().then((mode) => setNetworkMode(mode)).catch(() => toast.danger('访问范围加载失败'));
+  }, []);
+
+  const saveNetworkMode = async (mode) => {
+    if (mode === networkMode || !window.api?.setNetworkMode) return;
+    setSavingMode(true);
+    try {
+      const result = await window.api.setNetworkMode(mode);
+      setNetworkMode(result?.networkMode ?? mode);
+      toast.success(result?.restarted ? '访问范围已保存，服务已自动重启' : '访问范围已保存');
+    } catch (error) { toast.danger(`保存失败：${error?.message || ''}`); }
+    finally { setSavingMode(false); }
+  };
+  const generateKey = async () => {
+    setRegenerating(true);
+    try {
+      const key = await regenerateAPIKey();
+      setApiKey(key?.key || '');
+      setRegenerateOpen(false);
+      toast.success('令牌已生成，请更新所有调用方的配置');
+    } catch { /* 请求拦截器显示错误 */ }
+    finally { setRegenerating(false); }
+  };
+  const chooseGroup = (name) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('group', name);
+    setSearchParams(next, { replace: true });
+  };
+
+  const guide = buildConnectionGuide({ serverUrl, apiKey, model: selectedGroup });
+  const preview = buildConnectionGuide({ serverUrl, apiKey: showKey ? apiKey : '', model: selectedGroup });
+  const ready = !loading && !loadError && !!apiKey && !!selectedGroup;
+  const selected = groups.find((g) => g.name === selectedGroup);
+
+  const examples = buildServiceExamples({ serverUrl, apiKey, model: selectedGroup, stream });
+  const examplePreview = buildServiceExamples({ serverUrl, apiKey: showKey ? apiKey : '', model: selectedGroup, stream });
+  const missingRequestedGroup = requestedGroup !== null && !groups.some((g) => g.name === requestedGroup);
+  const current = clients.find((c) => c.id === client) || clients[0];
+  const isClaude = client === 'claude';
+  const isCodex = client === 'codex';
+  const fileName = isClaude ? 'settings.json' : 'config.toml';
+  const directory = isClaude ? '.claude' : '.codex';
+  const parameterRows = isClaude ? [
+    ['ANTHROPIC_BASE_URL', 'Portunus 网关地址，不包含 /v1；客户端会自动拼接请求路径。'],
+    ['ANTHROPIC_AUTH_TOKEN', 'Portunus 令牌，用于访问本地网关。'],
+    ['ANTHROPIC_MODEL', '默认使用的分组名称，不是上游渠道的模型 ID。'],
+    ['ANTHROPIC_DEFAULT_*_MODEL', '将 Sonnet、Opus、Haiku 档位映射到分组；也可分别填写不同分组。'],
+  ] : isCodex ? [
+    ['model_provider', '选择下方定义的 portunus provider。'],
+    ['model', 'Portunus 中的分组名称，由网关选择实际调用的上游模型。'],
+    ['base_url', 'OpenAI 兼容地址，需要包含 /v1。'],
+    ['wire_api', '使用 responses，与 Portunus 的 Responses 接口对接。'],
+    ['experimental_bearer_token', '该 provider 使用的 Portunus 令牌，无需修改 auth.json。'],
+  ] : current.parameters;
+
+  const chooseClient = (id) => {
+    setClient(id);
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+  const protocolIndex = Math.max(0, examples.findIndex((example) => example.id === apiProtocol));
+  const protocolExample = examples[protocolIndex];
+  const strategyLabels = { manual: '手动选择', round_robin: '轮询', failover: '故障转移' };
+  const selectedDescription = selected ? `${strategyLabels[selected.strategy] || selected.strategy} · ${selected.items?.length || 0} 个成员` : '';
+  const logsPath = selectedGroup ? `/logs?group=${encodeURIComponent(selectedGroup)}` : '/logs';
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-        <div className="px-1 flex flex-col gap-5">
-          <Typography type="body" className="text-muted max-w-[65ch]">
-            把 Portunus 配成 Claude Code / Codex 的上游；下方直接编辑配置文件源码，保存即原子写入，写前自动备份。
-          </Typography>
-
-          <Tabs selectedKey={client} onSelectionChange={setClient} className="w-fit">
-            <Tabs.ListContainer>
-              <Tabs.List aria-label="客户端">
-                {panels.map((p) => (
-                  <Tabs.Tab id={p.id} key={p.id} className="gap-1.5 min-w-max whitespace-nowrap">
-                    {p.mark}
-                    {p.tabLabel}
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                ))}
-              </Tabs.List>
-            </Tabs.ListContainer>
-          </Tabs>
-
-          {/* 双面板常驻：切换 Tab 不卸载，未保存改动得以保留；切换时 page-in 弱化高度跳变 */}
-          {panels.map((p) => (
-            <div
-              key={p.id}
-              className={p.id === client ? 'page-in' : 'hidden'}
-              aria-hidden={p.id !== client}
-            >
-              <ClientPanel {...p} active={p.id === client} />
+    <div className="flex flex-1 min-h-0 flex-col">
+      <header className="mb-5 shrink-0 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">服务接入</h1>
+          <p className="mt-1 text-sm text-muted">选择模型分组，为你的应用提供一个稳定入口。</p>
+        </div>
+        <Button size="sm" variant="tertiary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-3.5" />刷新连接</Button>
+      </header>
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-3">
+        <div className="service-access-grid">
+          <aside className="service-connection-panel rounded-2xl border border-separator bg-surface/70 p-5" aria-label="连接配置">
+            <div className="mb-5 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">连接配置</h2>
+              <span className="rounded-md bg-surface-secondary px-2 py-1 text-[11px] text-muted">本地网关</span>
             </div>
-          ))}
+            <Select
+              placeholder={loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}
+              selectedKey={selectedGroup || null}
+              onSelectionChange={(key) => { if (key !== null) chooseGroup(String(key)); }}
+              isDisabled={loading || !groups.length}
+              className="w-full min-w-0"
+            >
+              <Label className="mb-1 text-xs text-muted">模型分组 · 客户端 model</Label>
+              <Select.Trigger aria-label={selected ? `模型分组：${selected.name}` : '选择模型分组'} aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
+                <Select.Value className="min-w-0 flex-1 text-left">
+                  {() => selected ? <span className="block min-w-0"><span className="block truncate font-medium text-sm" title={selected.name}>{selected.name}</span><span className="mt-1 block truncate text-[11px] text-muted">{selectedDescription}</span></span> : <span className="text-sm text-muted">{loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}</span>}
+                </Select.Value>
+                <Select.Indicator className="size-4 shrink-0 text-muted" />
+              </Select.Trigger>
+              <Select.Popover className="service-group-popover">
+                <ListBox aria-label="可接入的模型分组">
+                  {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
+                    <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{strategyLabels[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>)}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+            {!loading && missingRequestedGroup && <p role="alert" className="mt-3 text-xs leading-5 text-warning">链接中的分组「{requestedGroup || '空名称'}」不存在，请重新选择。未替换为其他分组。</p>}
+            {!loading && !groups.length && <p className="mt-3 text-xs leading-5 text-muted">添加<Link to="/channels" className="text-accent underline">上游渠道</Link>后，创建<Link to="/groups" className="text-accent underline">模型分组</Link>再接入。</p>}
+            {selected && !selected.items?.length && <p className="mt-3 text-xs leading-5 text-warning">分组尚无成员，请先添加上游模型。</p>}
+            <div className="mt-5 divide-y divide-separator border-y border-separator">
+              <CopyValue label="网关地址" value={guide.baseUrl} />
+              <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} />
+              <CopyValue label="访问令牌" value={apiKey} display={loading ? '加载中…' : apiKey ? (showKey ? apiKey : '••••••••••••••••') : '尚未生成'} disabled={!apiKey || loading} />
+            </div>
+            {loadError && <p role="alert" className="mt-3 text-xs text-danger">连接信息加载失败，请刷新重试。</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-1">
+              <Button size="sm" variant="tertiary" isDisabled={!apiKey} onPress={() => setShowKey(!showKey)}>{showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}{showKey ? '隐藏令牌' : '显示令牌'}</Button>
+              <Button size="sm" variant="tertiary" isDisabled={loading || loadError} isPending={regenerating} onPress={() => apiKey ? setRegenerateOpen(true) : generateKey()}>{apiKey ? '重置令牌' : '生成令牌'}</Button>
+            </div>
+            <div className="mt-3 border-t border-separator pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">访问范围</span>
+                {window.api?.setNetworkMode ? <div className="service-network-segment" role="group" aria-label="服务访问范围" aria-busy={savingMode}>
+                  {[['local', '仅本机'], ['lan', '局域网']].map(([mode, label]) => <button type="button" key={mode} className="service-network-option" aria-pressed={networkMode === mode} disabled={savingMode || networkMode === null} onClick={() => saveNetworkMode(mode)}>{label}</button>)}
+                </div> : <span className="text-xs text-muted">{networkMode === 'lan' ? '局域网' : networkMode === 'local' ? '仅本机' : window.api?.getNetworkMode ? '正在读取' : '由启动配置决定'}</span>}
+              </div>
+              <details className="service-disclosure mt-2 text-xs text-muted">
+                <summary>访问与令牌说明</summary>
+                <div className="space-y-2 pt-3 leading-6"><p>网关地址供本机调用。其他设备请使用本机局域网 IP 和端口 {new URL(serverUrl).port || '80'}，不能使用 127.0.0.1 或 0.0.0.0 作为目标地址。</p><p>切换范围会自动重启服务，进行中的请求可能中断。管理操作仅限本机，服务请求始终需要令牌。</p><p>重置令牌后旧令牌立即失效，所有调用方都需更新。上游 API Key 只在上游渠道中保存。</p><p>应用运行期间提供服务，退出后停止。分组名称就是客户端 model，调整组内上游无需修改客户端。</p></div>
+              </details>
+            </div>
+          </aside>
+
+          <section className="min-w-0 rounded-2xl border border-separator bg-surface/50" aria-label="接入示例">
+            <div className="border-b border-separator px-5 pt-5 pb-4">
+              <div className="mb-4 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">接入示例</h2><span className="text-[11px] text-muted">手动配置 · 保留现有设置</span></div>
+              <nav aria-label="选择接入工具" className="service-tool-nav flex gap-1 overflow-x-auto no-scrollbar">
+                {[{ id: 'api', label: 'API', icon: <BookOpen className="size-3.5" /> }, ...clients].map((tool) => <Button key={tool.id} size="sm" variant={client === tool.id ? 'secondary' : 'tertiary'} aria-pressed={client === tool.id} onPress={() => chooseClient(tool.id)} className={`shrink-0 ${client === tool.id ? 'text-accent' : 'text-muted'}`}>{tool.icon}{tool.label}</Button>)}
+              </nav>
+            </div>
+            <div ref={scrollRef} className="min-w-0 p-5">
+              {client === 'api' ? <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="API 协议">
+                    {examples.map((example) => <Button key={example.id} size="sm" variant={example.id === apiProtocol ? 'secondary' : 'tertiary'} aria-pressed={example.id === apiProtocol} onPress={() => setAPIProtocol(example.id)}>{example.label}</Button>)}
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted"><input className="service-stream-check" type="checkbox" checked={stream} onChange={(event) => setStream(event.target.checked)} />流式响应</label>
+                </div>
+                <CodeSample title={`POST ${protocolExample.path}`} code={protocolExample.code} preview={examplePreview[protocolIndex].code} disabled={!ready} />
+                <p className="text-xs leading-6 text-muted">输出预算 128 token。复制不会调用上游；手动执行可能产生费用。预览默认隐藏令牌，复制包含真实令牌。</p>
+                <details className="service-disclosure border-t border-separator pt-4 text-sm">
+                  <summary>验证接入与模型列表</summary>
+                  <div className="mt-4 space-y-3 text-xs leading-6 text-muted"><CopyValue label="模型列表 · GET，需相同 Bearer 令牌" value={`${guide.openAIBaseUrl}/models`} /><p>执行示例后，到<Link to={logsPath} className="text-accent hover:underline">调用记录</Link>查看分组、命中上游与结果。模型列表只验证基础连接，一次生成成功只证明当前请求路径。</p><p>思考模型的预算可能包含思考 token。思考强度和输出预算在调用方设置，无需在分组重复配置。</p></div>
+                </details>
+              </div> : <div className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-base font-medium">{current.label}</h3><p className="mt-1 text-xs leading-6 text-muted">{current.description}</p></div>{current.docs && <span className="text-xs"><DocLink href={current.docs}>官方文档</DocLink></span>}</div>
+                <CodeSample title={isClaude || isCodex ? `${fileName} · 合并示例` : current.sampleTitle} code={isClaude || isCodex ? guide[client] : guide[current.sampleKey]} preview={isClaude || isCodex ? preview[client] : preview[current.sampleKey]} disabled={!ready} />
+                <p className="text-xs leading-6 text-muted">手动合并到现有配置，保留 MCP、权限及其他服务商。复制包含真实令牌，Portunus 不读取或修改客户端文件。</p>
+                <details key={client} className="service-disclosure border-t border-separator pt-4 text-sm">
+                  <summary>详细配置步骤与常见问题</summary>
+                  <div className="service-manual mt-6 space-y-7">
+          <GuideStep number={1} title="开始之前">
+            <p>请先完成以下准备：</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted">
+              <li>保持 Portunus 运行，在<Link to="/channels" className="text-accent hover:underline">上游渠道</Link>中添加上游服务，并确认模型已同步。</li>
+              <li>在<Link to="/groups" className="text-accent hover:underline">模型分组</Link>中创建分组并添加模型，在本页上方生成 Portunus 访问令牌。</li>
+              {current.command ? <li>已安装 {current.label}。在终端执行 <code>{current.command} --version</code> 确认安装；尚未安装可参考 <DocLink href={current.docs}>{current.label} 官方安装说明</DocLink>。</li> : <li>{current.requirement}{current.docs && <> <DocLink href={current.docs}>{current.label} 官方配置文档</DocLink></>}</li>}
+            </ul>
+          </GuideStep>
+
+          <GuideStep number={2} title="确认分组与连接参数">
+            <p>当前分组为 <code>{selectedGroup || '尚未选择'}</code>。需要更换时，在上方“选择模型分组”中操作，以下配置随选择更新。</p>
+          </GuideStep>
+
+          <GuideStep number={3} title="手动配置客户端">
+            {isClaude || isCodex ? <>
+              <p>用文本编辑器打开下面的配置文件。目录或文件不存在时，请手动创建。</p>
+              <div className="space-y-1 rounded-lg bg-surface-secondary/60 px-4 py-3 text-xs">
+                <p><span className="mr-3 text-muted">macOS / Linux</span><code>~/{directory}/{fileName}</code></p>
+                <p><span className="mr-3 text-muted">Windows</span><code>%USERPROFILE%\{directory}\{fileName}</code></p>
+              </div>
+              <p>{isClaude ? <>将示例中的字段合并到文件的 <code>env</code> 对象。文件为空时，可以直接粘贴完整示例。</> : <>将下面两个顶层字段放在所有 <code>[表头]</code> 之前，再添加 <code>[model_providers.portunus]</code> 表。已有同名字段或表时，请修改原项。</>}</p>
+              <Note>已有配置时只合并相关字段，保留 MCP、权限和其他设置。{isClaude ? 'JSON 不支持注释或末尾多余的逗号；已有 env 对象时，请把字段合并进去，避免出现两个 env。' : 'TOML 中同名字段和同名表不能重复；本示例在 provider 内配置令牌，不需要修改 auth.json。'}</Note>
+            </> : <>
+              <ol className="list-decimal space-y-2 pl-5">{current.setup.map((step) => <li key={step}>{step}</li>)}</ol>
+              {client === 'opencode' && <details className="rounded-lg border border-separator">
+                <summary className="cursor-pointer px-4 py-2 font-medium">使用 OpenCode 2.x？</summary>
+                <div className="space-y-3 p-3"><p>在项目的 opencode.jsonc 中合并以下结构。2.x 使用 providers / package / settings；不要和上面的 1.x 配置混用。</p>
+                  <CodeSample title="opencode.jsonc · OpenCode 2.x 合并示例" code={guide.opencodeV2} preview={preview.opencodeV2} disabled={!ready} />
+                  <DocLink href="https://opencode.ai/v2/docs/providers">OpenCode 2.x 官方配置说明</DocLink>
+                </div>
+              </details>}
+              <Note>{current.note}</Note>
+
+            </>}
+            <details className="rounded-lg border border-separator">
+              <summary className="cursor-pointer px-4 py-2 text-sm font-medium">这些字段分别代表什么？</summary>
+              <div className="px-3 pb-3"><Parameters rows={parameterRows} /></div>
+            </details>
+          </GuideStep>
+
+          <GuideStep number={4} title="启动客户端并验证接入">
+            {current.command ? <>
+              <p>保存配置，关闭已有的 {current.label} 会话，在项目目录重新打开终端并运行：</p>
+              <CodeSample title="终端" code={current.command} />
+            </> : <p>{current.launch}</p>}
+            <p>发送一条简单消息，例如「你好，请简短介绍自己」，然后打开 Portunus 的<Link to={logsPath} className="text-accent hover:underline">调用记录</Link>页面。</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted">
+              <li>出现新的请求记录，且分组为 <code>{selectedGroup || '所选分组'}</code>：请求已到达 Portunus。</li>
+              <li>请求成功并收到客户端回复：说明本次网关、路由和上游调用已连通。</li>
+              <li>没有新记录：优先检查客户端使用的地址、令牌，以及配置是否已生效。</li>
+            </ul>
+          </GuideStep>
+
+          <section id="guide-faq" className="scroll-mt-5 border-t border-separator pt-6">
+            <h2 className="mb-4 text-base font-semibold">常见问题</h2>
+            <div className="divide-y divide-separator text-sm leading-7">
+              <details className="py-3"><summary className="cursor-pointer font-medium">连接被拒绝，或提示无法连接到服务？</summary><p className="pt-2 text-muted">确认 Portunus 正在运行，且客户端和网关在同一台电脑上。当前网关地址为 <code>{guide.baseUrl}</code>。远程容器、SSH 会话或其他设备中的 127.0.0.1 指向它们自身，需要使用可访问的网关地址；局域网访问可在本页服务访问范围中开启。</p></details>
+              <details className="py-3"><summary className="cursor-pointer font-medium">返回 401，或提示令牌无效？</summary><p className="pt-2 text-muted">客户端应填写 Portunus 令牌。若在服务接入中重新生成过令牌，请重新复制并手动更新客户端配置；渠道中填写的上游 API Key 不能代替网关令牌。</p></details>
+              <details className="py-3"><summary className="cursor-pointer font-medium">提示模型不存在，或分组没有可用模型？</summary><p className="pt-2 text-muted">确认模型名与分组名称完全一致，分组中已添加模型，所选路由策略配置完整，并检查上游渠道是否可用。可在调用记录中查看具体错误。</p></details>
+              <details className="py-3"><summary className="cursor-pointer font-medium">已经保存配置，为什么仍连接原来的服务商？</summary><p className="pt-2 text-muted">关闭旧会话后重新启动客户端。检查终端环境变量、项目级配置或启动参数是否覆盖了刚修改的设置；Codex 还需确认顶层 model_provider 已选为 portunus。</p></details>
+            </div>
+          </section>
+
+                  </div>
+                </details>
+              </div>}
+            </div>
+          </section>
         </div>
       </div>
+      <Modal.Backdrop isOpen={regenerateOpen} onOpenChange={setRegenerateOpen}>
+        <Modal.Container size="sm"><Modal.Dialog><Modal.CloseTrigger /><Modal.Header><Modal.Heading>重新生成访问令牌</Modal.Heading></Modal.Header>
+          <Modal.Body><Typography>旧令牌会立即失效，所有已接入的应用与客户端都需更新配置。是否继续？</Typography></Modal.Body>
+          <Modal.Footer><Button slot="close" variant="secondary">取消</Button><Button variant="danger" isPending={regenerating} onPress={generateKey}>重新生成</Button></Modal.Footer>
+        </Modal.Dialog></Modal.Container>
+      </Modal.Backdrop>
     </div>
   );
 }

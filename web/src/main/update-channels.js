@@ -2,6 +2,7 @@
 // 渲染层侧（useUpdater.js）因 vite 构建隔离无法 import 本模块，
 // 经 preload 桥按同一组 channel 名订阅（见 preload.js 白名单）。
 const UPDATE_CHANNELS = {
+  state: 'update:state',
   checking: 'update:checking',
   available: 'update:available',
   notAvailable: 'update:not-available',

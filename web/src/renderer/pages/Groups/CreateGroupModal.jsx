@@ -103,9 +103,10 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
                 autoComplete="off"
                 validate={(v) => (!v || !v.trim()) ? '请填写分组名称' : null}
               >
-                <Label>分组名称</Label>
-                <Input placeholder="例如：GPT-4 负载均衡" />
+                <Label>分组名称（客户端 model）</Label>
+                <Input placeholder="例如：coding、daily" />
                 <FieldError />
+                <p className="text-xs text-muted">客户端使用这个名称调用分组；更换组内模型时无需修改客户端。</p>
               </TextField>
 
               <Select

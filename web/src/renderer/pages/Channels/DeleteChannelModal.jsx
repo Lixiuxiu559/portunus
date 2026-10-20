@@ -31,7 +31,7 @@ export default function DeleteChannelModal({ channel, isOpen, onOpenChange, onDe
           </Modal.Header>
           <Modal.Body>
             <Typography color="muted">
-              确定删除渠道「{channel?.name}」吗？删除后不可恢复。
+              确定删除渠道「{channel?.name}」吗？该渠道下的模型及其分组关联也会移除，可能导致分组缺少候选或失去手动选定项。分组名称会保留，删除后不可恢复。
             </Typography>
           </Modal.Body>
           <Modal.Footer>

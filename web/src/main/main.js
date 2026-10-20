@@ -4,7 +4,6 @@ const { forwardEvents, checkForUpdates, register: registerUpdate } = require('./
 const { createBackend } = require('./sidecar');
 const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
-const clientConfig = require('./client-config');
 const { createTray } = require('./tray');
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -123,10 +122,10 @@ function createWindow() {
     });
   }
 
-  // 页面加载完成后探测 preload 桥是否注入成功（诊断 window.api / window.clientConfig）
+  // 页面加载完成后探测 preload 桥是否注入成功（诊断 window.api）
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents
-      .executeJavaScript('({ api: typeof window.api !== "undefined", clientConfig: typeof window.clientConfig !== "undefined" })')
+      .executeJavaScript('({ api: typeof window.api !== "undefined" })')
       .then((r) => console.log('[main] preload 桥探测:', JSON.stringify(r)))
       .catch((e) => console.warn('[main] preload 桥探测失败:', e.message));
   });
@@ -158,11 +157,10 @@ function showMainWindow() {
 }
 
 // ─── IPC：无编排依赖的家族由各模块 register 收口 ───
-// update:* → updater.register；client-config:* → client-config.register；
+// update:* → updater.register；
 // config:get-network-mode → app-config.register。这些模块 electron-free，
 // register 只注入 ipcMain，注册与实现同模块（locality）。
 registerUpdate(ipcMain);
-clientConfig.register(ipcMain);
 appConfig.register(ipcMain);
 
 // ─── IPC：应用信息（依赖 electron app，留 main.js）───
