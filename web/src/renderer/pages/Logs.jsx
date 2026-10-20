@@ -8,7 +8,9 @@ import { Search, RotateCw, X } from 'lucide-react';
 import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/date';
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
-import { listLogs, getLogStats } from '../api';
+import { listLogs, getLogStats, listChannels } from '../api';
+import { errKindLabels, logChannelLabel } from '../utils/logDetails';
+import LogDetailModal from './LogDetailModal';
 import './logs.css';
 
 const successOptions = [
@@ -28,18 +30,6 @@ const clientProtocolOptions = [
   { id: 'gemini', label: 'Gemini' },
 ];
 
-// 失败类别中文标签（与后端 gateway.classifyErr 的 err_kind 取值对应）
-const errKindLabels = {
-  client_cancel: '用户取消',
-  upstream_error: '上游错误',
-  watchdog_timeout: '流静默超时',
-  stream_interrupted: '流中断',
-  convert_error: '转换失败',
-  network: '网络错误',
-  internal: '内部错误',
-  circuit_open: '熔断开路',
-};
-
 export default function Logs() {
   const [searchParams] = useSearchParams();
   const linkedGroup = searchParams.get('group') || '';
@@ -47,6 +37,14 @@ export default function Logs() {
   const requestSequence = useRef(0);
   const [logs, setLogs] = useState({ total: 0, data: [] });
   const [stats, setStats] = useState(null);
+  const [channels, setChannels] = useState([]);
+  const [channelError, setChannelError] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const fetchChannels = async () => {
+    try { const result = await listChannels(); setChannels(Array.isArray(result) ? result : []); setChannelError(false); }
+    catch { setChannelError(true); }
+  };
+  useEffect(() => { fetchChannels(); }, []);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
@@ -57,6 +55,8 @@ export default function Logs() {
   const [filters, setFilters] = useState({
     group_name: linkedGroup,
     model_name: '',
+    channel_id: 'all',
+    request_id: '',
     client_protocol: 'all',
     success: 'all',
     range: null,
@@ -96,6 +96,8 @@ export default function Logs() {
 
   useEffect(() => { fetchLogs(); }, [page, query]);
 
+  const channelIds = [...new Set([...channels.map((item) => String(item.id)), ...(logs.data || []).map((item) => item.channel_id).filter((id) => id > 0).map(String), ...(filters.channel_id !== 'all' ? [filters.channel_id] : [])])];
+
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
 
   const defaultDate = (() => { const d = today(getLocalTimeZone()); return new CalendarDateTime(d.year, d.month, d.day, 0, 0, 0); })();
@@ -113,13 +115,11 @@ export default function Logs() {
       ),
     },
     {
-      title: '上游模型',
+      title: '实际渠道 / 模型',
       dataIndex: 'model_name',
       key: 'model_name',
       width: '200px',
-      render: (val) => (val ? (
-        <span className="block truncate text-center" title={String(val)}>{val}</span>
-      ) : '—'),
+      render: (val, record) => <span className="block text-center"><span className="block truncate" title={String(val || '')}>{val || '未记录模型'}</span><span className="block truncate text-xs text-muted" title={logChannelLabel(record.channel_id, channels)}>{logChannelLabel(record.channel_id, channels)}</span></span>,
     },
     {
       title: '分组',
@@ -239,6 +239,7 @@ export default function Logs() {
         </span>
       ),
     },
+    { title: '详情', dataIndex: 'id', key: 'detail', width: '90px', render: (id, record) => <Button size="sm" variant="secondary" aria-label={`查看日志 ${id} 详情`} onPress={() => setDetail(record)}>详情</Button> },
   ];
 
   return (
@@ -274,6 +275,18 @@ export default function Logs() {
 
       {/* 筛选栏 */}
       <div className="logs-filters">
+        <Select aria-label="日志渠道" selectedKey={filters.channel_id} onSelectionChange={(value) => setFilters((current) => ({ ...current, channel_id: value || 'all' }))} className="logs-filter-channel">
+          <Label>渠道</Label><Select.Trigger className="logs-control"><Select.Value /><Select.Indicator /></Select.Trigger>
+          <Select.Popover className="dialog-options"><ListBox>
+            <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
+            {channelIds.map((id) => <ListBox.Item key={id} id={id} textValue={logChannelLabel(id, channels)}>{logChannelLabel(id, channels)}<ListBox.ItemIndicator /></ListBox.Item>)}
+          </ListBox></Select.Popover>
+        </Select>
+        <TextField name="request_id" value={filters.request_id} onChange={(value) => setFilters((current) => ({ ...current, request_id: value }))} className="logs-filter-request">
+          <Label>请求 ID</Label><Input className="logs-control" placeholder="精确匹配 request_id" />
+        </TextField>
+        {channelError && <Button size="sm" variant="secondary" onPress={fetchChannels}>重试渠道名称</Button>}
+
         <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
           <Label>模型分组</Label>
           <Input className="logs-control" placeholder="按分组名称查询" />
@@ -420,13 +433,15 @@ export default function Logs() {
         loading={loading}
         refreshing={refreshing}
         emptyText={
-          query.group_name || query.model_name || query.client_protocol !== 'all' || query.success !== 'all' || query.range
+          query.channel_id !== 'all' || query.request_id.trim() || query.group_name || query.model_name || query.client_protocol !== 'all' || query.success !== 'all' || query.range
             ? '没有符合条件的调用记录，可调整或清除筛选'
             : '暂无调用记录'
         }
         errorText={loadError ? '调用记录加载失败，请检查后端服务后重试' : undefined}
         onRetry={() => fetchLogs()}
       />
+
+      <LogDetailModal record={detail} channels={channels} onClose={() => setDetail(null)} />
 
       {/* 分页 */}
       <div className="logs-pagination">

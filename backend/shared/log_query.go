@@ -15,6 +15,7 @@ type LogFilter struct {
 	ChannelID int64
 	GroupName string
 	ModelName string
+	RequestID string // 按请求关联 ID 精确匹配，同一次请求可能包含多次上游尝试。
 	// ClientProtocol 按客户端入口协议过滤（openai / anthropic / …）。用于把
 	// DSH 与 Claude Code 的流量分开比较缓存命中率——此前日志无此字段，两者
 	// 共用同一 APIKey，数据里无法区分。
@@ -87,6 +88,9 @@ func applyLogFilter(db *gorm.DB, f LogFilter) *gorm.DB {
 	}
 	if f.ModelName != "" {
 		db = db.Where("model_name = ?", f.ModelName)
+	}
+	if f.RequestID != "" {
+		db = db.Where("request_id = ?", f.RequestID)
 	}
 	if f.ClientProtocol != "" {
 		db = db.Where("client_protocol = ?", f.ClientProtocol)

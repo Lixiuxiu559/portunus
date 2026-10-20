@@ -1,0 +1,18 @@
+{
+  "baseline": "97a95de",
+  "synthetic_rows": 46,
+  "request_exact_total_observed": 25,
+  "channel_1_combined_total": 12,
+  "input_tokens": 120,
+  "output_tokens": 24,
+  "empty_result_zero_stats_observed": true,
+  "page_reset_observed": true,
+  "request_id_clipboard_paste_verified": true,
+  "error_summary_clipboard_paste_verified": true,
+  "injected_clipboard_failure_message_verified": true,
+  "deleted_channel_fallback_verified": true,
+  "unknown_error_kind_retained": true,
+  "html_error_not_executed": true,
+  "narrow_dialog_client_width": 398,
+  "narrow_dialog_scroll_width": 398
+}

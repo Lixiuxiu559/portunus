@@ -3,7 +3,7 @@ import request from './request';
 /**
  * 日志：一次对外 LLM 调用的记录与汇总
  * 查询参数（query string）：
- *   api_key_id, channel_id, group_name, model_name, success,
+ *   api_key_id, channel_id, request_id（精确匹配）, group_name, model_name, client_protocol, success,
  *   start_time, end_time（RFC3339）, page, page_size
  */
 

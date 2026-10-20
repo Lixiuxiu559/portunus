@@ -29,6 +29,7 @@ func parseLogFilter(c *gin.Context) shared.LogFilter {
 	}
 	f.GroupName = c.Query("group_name")
 	f.ModelName = c.Query("model_name")
+	f.RequestID = c.Query("request_id")
 	f.ClientProtocol = c.Query("client_protocol")
 	if v := c.Query("success"); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {

@@ -67,3 +67,12 @@ test('分组入口筛选保留准确 model 标识，空分组省略', () => {
   assert.equal(buildLogParams(filters, 1, 20).group_name, filters.group_name);
   assert.equal('group_name' in buildLogParams({ ...filters, group_name: '' }, 1, 20), false);
 });
+
+test('渠道与请求 ID 同分组/状态组合，保持特殊字符并复用分页参数', () => {
+  const filters = { channel_id: '22', request_id: '  req_%&=中  ', group_name: 'coding', success: 'false' };
+  assert.deepEqual(buildLogParams(filters, 2, 20), { page: 2, page_size: 20, channel_id: 22, request_id: 'req_%&=中', group_name: 'coding', success: 'false' });
+  for (const channel_id of ['all', '', 0, -1, 'bad']) {
+    const params = buildLogParams({ channel_id, request_id: '  ', success: 'all' }, 1, 20);
+    assert.deepEqual(params, { page: 1, page_size: 20 });
+  }
+});

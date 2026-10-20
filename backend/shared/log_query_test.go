@@ -293,3 +293,51 @@ func TestLogRetirementPreservesHistoricalDataAndCacheStats(t *testing.T) {
 		}
 	}
 }
+
+func TestLogRequestIDFilterMatchesExactlyAndCombinesWithPagination(t *testing.T) {
+	setupLogTest(t)
+	rows := []Log{
+		{RequestID: "req_%", ChannelID: 1, GroupName: "selected", ModelName: "same", InputToken: 10, OutputToken: 1, CacheReadToken: 2, CacheWriteToken: 3},
+		{RequestID: "req_%", ChannelID: 2, GroupName: "selected", ModelName: "same", InputToken: 20},
+		{RequestID: "req_%", ChannelID: 1, GroupName: "selected", ModelName: "same", InputToken: 30, OutputToken: 4, CacheReadToken: 5, CacheWriteToken: 6},
+		{RequestID: "req_%", ChannelID: 1, GroupName: "other", ModelName: "same", InputToken: 100},
+		{RequestID: "req_%extra", ChannelID: 1, GroupName: "selected", ModelName: "same", InputToken: 200},
+		{RequestID: "req-X", ChannelID: 1, GroupName: "selected", ModelName: "same", InputToken: 300},
+		{ChannelID: 1, GroupName: "selected", ModelName: "same", InputToken: 400},
+	}
+	if err := LogDB.Create(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	filter := LogFilter{RequestID: "req_%", ChannelID: 1, GroupName: "selected", ModelName: "same", Page: 1, PageSize: 1}
+	first, total, err := ListLogs(filter)
+	if err != nil || total != 2 || len(first) != 1 || first[0].ID != rows[2].ID {
+		t.Fatalf("组合查询第一页不正确: rows=%+v total=%d err=%v", first, total, err)
+	}
+	filter.Page = 2
+	second, total, err := ListLogs(filter)
+	if err != nil || total != 2 || len(second) != 1 || second[0].ID != rows[0].ID {
+		t.Fatalf("组合查询第二页不正确: rows=%+v total=%d err=%v", second, total, err)
+	}
+	stats, err := LogStatsBy(filter)
+	if err != nil || stats.TotalRequests != 2 || stats.RecentRequests != 2 || stats.InputTokens != 40 || stats.OutputTokens != 5 || stats.CacheReadTokens != 7 || stats.CacheWriteTokens != 9 {
+		t.Fatalf("统计应与分页前的组合筛选一致: %+v err=%v", stats, err)
+	}
+	// 请求 ID 单独查询保留所有同请求上游尝试；通配符按字面值处理。
+	if got, total, err := ListLogs(LogFilter{RequestID: "req_%"}); err != nil || total != 4 || len(got) != 4 {
+		t.Fatalf("请求 ID 精确匹配错误: total=%d rows=%+v err=%v", total, got, err)
+	}
+	for _, id := range []string{"req", "%", "req_", "missing"} {
+		got, total, err := ListLogs(LogFilter{RequestID: id})
+		if err != nil || total != 0 || len(got) != 0 {
+			t.Fatalf("%q 不应匹配: total=%d rows=%+v err=%v", id, total, got, err)
+		}
+		stats, err := LogStatsBy(LogFilter{RequestID: id})
+		if err != nil || stats != (LogStats{}) {
+			t.Fatalf("%q 空匹配统计不为零: %+v err=%v", id, stats, err)
+		}
+	}
+	got, total, err := ListLogs(LogFilter{})
+	if err != nil || total != int64(len(rows)) || len(got) != len(rows) || got[0].RequestID != "" {
+		t.Fatalf("空筛选应保留无 ID 历史记录: total=%d rows=%+v err=%v", total, got, err)
+	}
+}
