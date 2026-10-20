@@ -41,3 +41,18 @@ macOS 预览路径：`web/dist-dev/mac-arm64/Portunus Dev.app`（Intel 为 `mac/
 - 退出或切换监听范围：只停止或重启当前主进程创建的子进程，不按进程名批量结束应用。
 - 不通过 `HOME`、任意数据目录覆盖参数或正式数据库副本实现隔离。
 - 端到端脚本使用 Dev 数据目录（正常启动检查不写业务配置）；不会重写 HOME，也不会停止正式版。
+
+
+## 持续集成与发布检查
+
+配置提交：`337e216`。工作流见 [CI](../../.github/workflows/ci.yml) 和 [Release](../../.github/workflows/release.yml)。
+
+- 分支 push、PR 和手动触发 CI 时，在 Ubuntu 上执行两个独立任务：`Go checks`、`Web checks`。PR 更新会取消同组旧检查。
+- Go 版本取自 `go.mod`；执行 `go test ./... -count=1`、`go vet ./...`、`go build ./...`。
+- 前端使用 Node 24、pnpm 10 与依赖缓存；在 `web/` 执行 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run build:renderer`。仅构建 renderer，跳过 Electron 运行时下载，不启动桌面应用。
+- `v*` 标签及手动 Release 均先复用上述 CI，全部通过才进入三平台安装包构建。标签创建草稿 Release；手动 Release 只构建产物。草稿仍需人工确认发布。
+- CI 不加载用户配置、正式/Dev 数据或上游密钥，不执行真实生成调用。桌面启动检查 `pnpm test:e2e`、跨设备 LAN 和真实上游验证单独进行，不能以 CI 通过代替。
+
+本地已通过工作流 actionlint 检查、Go 全量测试/静态检查/构建，以及临时干净目录锁文件安装后的 94 项前端测试和 renderer 构建。尚未验证 GitHub 线上首次运行，未修改远端分支保护或 ruleset。构建大 chunk 和 Node module type 提示仍为现有非阻断项。
+
+若需要禁止失败的 PR 合并，待远端产生实际检查结果后，将 `Go checks`、`Web checks` 设为必需状态检查。新增工作流本身不会启用合并限制。
