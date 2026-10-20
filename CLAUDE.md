@@ -58,3 +58,7 @@ backend/
 ```
 
 桌面局域网模式保留 `/v1` 令牌鉴权服务；管理 `/api` 始终限制真实回环对端，并检查 Host / Origin。不得通过公开反向代理暴露管理接口。模型同步只新增发现的模型；日志记录数与客户端请求数需区分。产品不提供价格配置、默认价格套用或调用费用计算；保留 token、缓存用量和调用诊断。历史数据库 price/currency/cost 列及旧值保留，不删除或清零，也不再进入活跃管理接口与统计聚合。真实调用仍可能由上游收费。
+
+## 桌面开发隔离
+
+桌面本地开发与预览统一使用 Portunus Dev（端口 13061、Bundle ID `com.portunus.app.dev`）。macOS 独立数据目录为 `~/Library/Application Support/Portunus Dev`；不迁移或复制正式配置。`cd web && pnpm dev` 自动编译并管理后端；`pnpm build:dev && pnpm preview:dev` 构建独立预览。不覆盖 `/Applications/Portunus.app`，不停止正式版，不使用 `killall`/`pkill Portunus`。正式发布仍用原有 `build:mac` / `build:win`。详细边界见 `docs/product/DEVELOPMENT.md`。

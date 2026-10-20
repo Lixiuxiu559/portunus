@@ -51,6 +51,7 @@ export default function EditGroupEditor({ group, onClose, onUpdated }) {
   return (
     <>
     <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="dialog-form-content">
       <TextField
         isRequired
         name="name"
@@ -77,7 +78,7 @@ export default function EditGroupEditor({ group, onClose, onUpdated }) {
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
-        <Select.Popover>
+        <Select.Popover className="dialog-options">
           <ListBox>
             {strategyOptions.map((o) => (
               <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
@@ -90,7 +91,8 @@ export default function EditGroupEditor({ group, onClose, onUpdated }) {
       </Select>
       <p className="text-xs text-muted">{strategyDescriptions[form.strategy]}</p>
 
-      <div className="flex justify-end gap-2 border-t border-separator pt-4">
+      </div>
+        <div className="dialog-form-actions">
         <Button variant="secondary" onPress={onClose}>
           取消
         </Button>

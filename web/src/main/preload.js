@@ -2,12 +2,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 const { addressOf } = require('./server-address');
 const { UPDATE_CHANNEL_NAMES } = require('./update-channels');
 
-// 后端固定本机；端口按模式区分：开发 3060（外部 go run），打包正式版 13060（sidecar）。
-// 地址由 server-address 纯模块唯一产出（url 恒回环 127.0.0.1，与监听 host 解耦）。
-const SERVER_URL = addressOf({ isPackaged: process.env.NODE_ENV !== 'development' }).url;
+const { preloadProfile } = require('./runtime-profile');
+const runtime = preloadProfile(process.argv);
+const SERVER_URL = addressOf({ profile: runtime.profile }).url;
 
 contextBridge.exposeInMainWorld('api', {
   // ─── 应用信息 ───
+  appName: runtime.appName,
+  isDevelopment: runtime.isDevelopment,
+  updatesEnabled: runtime.updatesEnabled,
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   // 平台标识
   platform: process.platform,

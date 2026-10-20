@@ -1,0 +1,23 @@
+/* Keep the existing glass material; align the log page with resource-page rhythm. */
+.logs-page { min-width: 0; }
+.logs-heading > div:first-child { flex: 1 1 560px; }
+.logs-heading p.logs-heading-note { font-size: 12px; line-height: 18px; }
+.logs-stat-card.card { gap: 6px; padding: 14px 16px; border-radius: 18px; }
+.logs-stat-value { font-size: 20px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.logs-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin-bottom: 16px; flex-shrink: 0; }
+.logs-filter-field { width: 148px; }
+.logs-filter-status { width: 112px; }
+.logs-filter-protocol { width: 128px; }
+.logs-filter-date { width: fit-content; max-width: 100%; }
+.logs-filters .label { font-size: 12px; line-height: 18px; }
+.logs-filters .logs-control { min-height: 36px; height: 36px; font-size: 14px; padding-block: 6px; }
+.logs-filters .logs-filter-action { height: 36px; min-height: 36px; }
+.logs-refresh-action { height: 36px; min-height: 36px; }
+.logs-table { border-radius: 18px; font-variant-numeric: tabular-nums; }
+.logs-table [role="grid"] { table-layout: fixed; min-width: 1280px; }
+.logs-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 639px) {
+  .logs-stats { gap: 12px; }
+  .logs-filter-field { flex: 1 1 144px; }
+  .logs-filter-date { overflow-x: auto; }
+}

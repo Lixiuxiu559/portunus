@@ -64,7 +64,7 @@ export default function CreateModelModal({ isOpen, onOpenChange, channels, onSub
                   <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
-                <Select.Popover>
+                <Select.Popover className="dialog-options">
                   <ListBox>
                     {channels.map((c) => (
                       <ListBox.Item key={String(c.id)} id={String(c.id)} textValue={c.name}>

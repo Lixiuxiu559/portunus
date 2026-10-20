@@ -6,7 +6,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * 全局 axios 实例
- * - 开发模式：baseURL /api（Vite 代理到后端 3060）
+ * - 开发模式：baseURL /api（Vite 代理到后端 13061）
  * - 生产模式：baseURL {serverUrl}/api（直连 Go sidecar，地址经 preload 从 server-address 取）
  * - timeout: 30s
  *

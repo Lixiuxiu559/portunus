@@ -128,12 +128,12 @@ export default function Groups() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 shrink-0">
+      <div className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold">模型分组</h1>
           <p className="mt-1 text-sm text-muted">按用途组织上游模型，让每个分组成为稳定的调用入口。</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="resource-page-actions">
           <Button
             variant="secondary"
             size="md"
@@ -187,7 +187,6 @@ export default function Groups() {
                   <span className="group-service-icon"><Layers2 className="size-4" /></span>
                   <div className="min-w-0 flex-1">
                     <h2 className="group-service-name" title={g.name}>{g.name}</h2>
-                    <span className="group-service-subtitle">客户端模型名 · {g.items?.length || 0} 个成员</span>
                   </div>
                   <IconButton label={`编辑分组 ${g.name}`} onClick={(e) => {
                     setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
@@ -199,6 +198,8 @@ export default function Groups() {
                   <span className="group-strategy" title={`${strategyDescriptions[g.strategy]} 流式已提交后不自动重放。`}>
                     {STRATEGIES.find((strategy) => strategy.key === g.strategy)?.label || g.strategy}
                     <Info className="size-3 text-muted" aria-hidden="true" />
+                    <span className="group-meta-separator" aria-hidden="true">·</span>
+                    <span>{g.items?.length || 0} 个成员</span>
                   </span>
                   <span className={`group-configuration ${configuration.complete ? '' : 'group-configuration--incomplete'}`} title={`${configuration.label}；配置状态不代表上游在线。`}>
                     <span className="group-configuration-dot" />{configuration.complete ? '已配置' : '待完善'}

@@ -9,7 +9,7 @@ test('preload 只暴露网关应用能力，不再暴露客户端文件读写桥
   const exposed = {};
   const invoked = [];
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'preload.js'), 'utf8'), {
-    process: { env: { NODE_ENV: 'production' }, platform: 'darwin' },
+    process: { argv: ['--portunus-profile=production'], env: { NODE_ENV: 'production' }, platform: 'darwin' },
     require(id) {
       if (id === 'electron') return {
         contextBridge: { exposeInMainWorld(name, value) { exposed[name] = value; } },

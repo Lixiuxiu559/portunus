@@ -109,7 +109,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
 
           <Modal.Body>
             <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="dialog-form-grid grid grid-cols-2 gap-3">
                 <TextField
                   isRequired
                   name="name"
@@ -135,7 +135,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                     <Select.Value />
                     <Select.Indicator />
                   </Select.Trigger>
-                  <Select.Popover>
+                  <Select.Popover className="dialog-options">
                     <ListBox>
                       {providerOptions.map((o) => (
                         <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
@@ -208,7 +208,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                       className="w-full mb-2"
                     />
                     <ScrollShadow
-                      className="flex flex-wrap gap-2 max-h-[190px] p-1"
+                      className="dialog-models flex flex-wrap gap-2 max-h-[190px] p-1"
                       orientation="vertical"
                       hideScrollBar
                     >
@@ -221,7 +221,7 @@ export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) 
                           size="sm"
                         >
                           <span className="flex items-center gap-1">
-                            {name}
+                            <span className="dialog-model-name" title={name}>{name}</span>
                             <button
                               onClick={() => handleRemoveModel(name)}
                               className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"

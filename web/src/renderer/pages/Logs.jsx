@@ -9,6 +9,7 @@ import { today, getLocalTimeZone, CalendarDateTime } from '@internationalized/da
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
 import { listLogs, getLogStats } from '../api';
+import './logs.css';
 
 const successOptions = [
   { id: 'all', label: '全部' },
@@ -104,6 +105,7 @@ export default function Logs() {
       title: '时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: '160px',
       render: (val) => (
         <span className="block whitespace-nowrap text-center font-mono text-xs text-muted">
           {val ? new Date(val).toLocaleString('zh-CN') : '—'}
@@ -240,15 +242,29 @@ export default function Logs() {
   ];
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="mb-4 shrink-0">
-        <h1 className="text-xl font-semibold">调用记录</h1>
-        <p className="mt-1 text-sm text-muted">查看分组实际调用的模型、用量和结果。记录数按日志行统计，一次客户端请求可能产生多条记录。</p>
-        <p className="mt-1 text-xs text-muted">用量来自上游报告；输入明细保留缓存读取和写入 token。近期记录指近 60 秒。</p>
+    <div className="logs-page flex flex-col flex-1 min-h-0">
+      <div className="resource-page-heading logs-heading">
+        <div>
+          <h1 className="text-xl font-semibold">调用记录</h1>
+          <p className="mt-1 text-sm text-muted">查看分组实际调用的模型、用量和结果。记录数按日志行统计，一次客户端请求可能产生多条记录。</p>
+          <p className="logs-heading-note">用量来自上游报告；输入明细保留缓存读取和写入 token。近期记录指近 60 秒。</p>
+        </div>
+        <div className="resource-page-actions">
+        <Button
+          size="md"
+          variant="secondary"
+          aria-label="刷新调用记录"
+          onPress={() => fetchLogs(true)}
+          isPending={refreshing}
+          className="logs-refresh-action"
+        >
+          <RotateCw className="size-4" />
+        </Button>
+        </div>
       </div>
       {/* 统计按当前查询范围汇总，不把日志行数当作独立客户端请求数。 */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="logs-stats grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <StatCard label="记录数" value={String(stats.total_requests || 0)} />
           <StatCard label="非缓存输入 Token" value={formatNum(stats.input_tokens)} detail={`缓存读 ${formatNum(stats.cache_read_tokens)} · 缓存写 ${formatNum(stats.cache_write_tokens)}`} />
           <StatCard label="输出 Token" value={formatNum(stats.output_tokens)} />
@@ -257,29 +273,29 @@ export default function Logs() {
       )}
 
       {/* 筛选栏 */}
-      <div className="flex flex-wrap items-end gap-3 mb-4">
-        <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="w-40">
+      <div className="logs-filters">
+        <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
           <Label>模型分组</Label>
-          <Input placeholder="按分组名称查询" />
+          <Input className="logs-control" placeholder="按分组名称查询" />
         </TextField>
         <TextField
           name="model_name"
           value={filters.model_name}
           onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
-          className="w-40"
+          className="logs-filter-field"
         >
           <Label>模型名</Label>
-          <Input placeholder="筛选模型" />
+          <Input className="logs-control" placeholder="筛选模型" />
         </TextField>
 
         <Select
           name="success"
           selectedKey={filters.success}
           onSelectionChange={(v) => setFilters((f) => ({ ...f, success: v }))}
-          className="w-28"
+          className="logs-filter-status"
         >
           <Label>状态</Label>
-          <Select.Trigger>
+          <Select.Trigger className="logs-control">
             <Select.Value />
             <Select.Indicator />
           </Select.Trigger>
@@ -299,10 +315,10 @@ export default function Logs() {
           name="client_protocol"
           selectedKey={filters.client_protocol}
           onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
-          className="w-32"
+          className="logs-filter-protocol"
         >
           <Label>客户端</Label>
-          <Select.Trigger>
+          <Select.Trigger className="logs-control">
             <Select.Value />
             <Select.Indicator />
           </Select.Trigger>
@@ -325,10 +341,10 @@ export default function Logs() {
           value={filters.range}
           onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
           placeholderValue={defaultDate}
-          className="w-fit"
+          className="logs-filter-date"
         >
           <Label>时间范围</Label>
-          <DateField.Group fullWidth>
+          <DateField.Group fullWidth className="logs-control">
             <DateField.Input slot="start">
               {(segment) => <DateField.Segment segment={segment} />}
             </DateField.Input>
@@ -374,7 +390,7 @@ export default function Logs() {
             size="md"
             variant="secondary"
             onPress={() => setFilters((f) => ({ ...f, range: null }))}
-            className="gap-1"
+            className="logs-filter-action gap-1"
           >
             <X className="size-4" /> 清除时间
           </Button>
@@ -384,6 +400,7 @@ export default function Logs() {
         <Button
           size="md"
           variant="primary"
+          className="logs-filter-action"
           onPress={() => {
             setPage(1);
             setQuery({ ...filters });
@@ -392,21 +409,12 @@ export default function Logs() {
           <Search className="size-4" /> 查询
         </Button>
 
-        {/* 全局刷新靠右：与筛选同行，不再独占一行 */}
-        <Button
-          size="md"
-          variant="secondary"
-          aria-label="刷新调用记录"
-          onPress={() => fetchLogs(true)}
-          isPending={refreshing}
-          className="ml-auto"
-        >
-          <RotateCw className="size-4" />
-        </Button>
       </div>
 
       {/* 日志表格 */}
       <DataTable
+        className="logs-table"
+        ariaLabel="调用记录"
         dataSource={logs.data || []}
         columns={columns}
         loading={loading}
@@ -421,7 +429,7 @@ export default function Logs() {
       />
 
       {/* 分页 */}
-      <div className="flex items-center justify-between mt-3">
+      <div className="logs-pagination">
         <Typography type="body-sm" className="text-muted">
           共 {logs.total} 条，第 {page}/{totalPages} 页
         </Typography>
@@ -436,12 +444,12 @@ export default function Logs() {
 
 function StatCard({ label, value, detail }) {
   return (
-    <Card className="gap-1 px-4 py-2 rounded-2xl">
+    <Card className="logs-stat-card">
       <Card.Header className="p-0">
         <Typography type="body-sm" className="text-muted">{label}</Typography>
       </Card.Header>
       <Card.Content className="p-0">
-        <Typography type="body" className="font-semibold">{value}</Typography>
+        <Typography type="body" className="logs-stat-value">{value}</Typography>
         {detail && <Typography type="body-xs" className="mt-1 text-muted">{detail}</Typography>}
       </Card.Content>
     </Card>

@@ -56,12 +56,12 @@ export default function Channels() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 shrink-0">
+      <div className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold">上游渠道</h1>
           <p className="mt-1 text-sm text-muted">统一接入官方 API 和各类中转站。获取模型列表后，将模型加入分组对外提供服务。</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="resource-page-actions">
           <Button
             variant="secondary"
             size="md"
@@ -99,14 +99,14 @@ export default function Channels() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+          <div className="resource-grid">
             {channels.map((ch) => (
-              <Card key={ch.id} data-expand-card className="gap-4 p-5">
+              <Card key={ch.id} data-expand-card className="resource-card">
                 {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与分组卡同模式 */}
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="resource-card-identity">
                     <ProviderIcon type={ch.type} className="size-6 shrink-0" />
-                    <Typography className="font-medium text-lg truncate" title={ch.name}>
+                    <Typography className="resource-card-title" title={ch.name}>
                       {ch.name}
                     </Typography>
                   </div>
@@ -137,14 +137,12 @@ export default function Channels() {
                   <Chip variant="soft" size="sm">
                     {ch.type.replace(/_/g, ' ')}
                   </Chip>
-                  <div className="mt-3">
-                    <div className="text-xs text-muted mb-1">Base URL</div>
-                    <span
-                      className="block truncate font-mono text-xs text-foreground/70"
+                  <div className="resource-card-address">
+                    <code
                       title={ch.base_url}
                     >
                       {ch.base_url}
-                    </span>
+                    </code>
                   </div>
                 </Card.Content>
               </Card>

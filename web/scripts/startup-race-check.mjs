@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 启动竞态红线脚本：打包目录版 Portunus 启动，经 CDP 监听渲染进程的 console 与网络，
+// 启动竞态红线脚本：打包目录版 Portunus Dev 启动，经 CDP 监听渲染进程的 console 与网络，
 // 断言「启动窗口内后端 API 零连接失败」——这是 scripts 侧对启动竞态红 toast 的
 // 自动化判据（与 request.js 拦截器 toast 同源的 [HTTP Error] console 信号）。
 //
@@ -7,18 +7,17 @@
 //   node scripts/startup-race-check.mjs                    # 全量构建（vite + electron-builder --dir）+ 3s 延迟钩子
 //   node scripts/startup-race-check.mjs --skip-build       # 复用已有构建产物（改过 src/main/src/renderer 后必须全量）
 //   node scripts/startup-race-check.mjs --delay-ms 0       # 自然启动冒烟（不注入延迟）
-//   node scripts/startup-race-check.mjs --mode degraded    # 后端二进制缺失的降级路径：内容照常加载而非白屏
+//   node scripts/startup-race-check.mjs --mode degraded    # 后端二进制缺失：显示 Dev 错误页，不请求业务 API
 //
 // 判据：
 //   normal:   PASS = 窗口内 0 次 [HTTP Error] 且 >=1 个 /api 请求成功（apiOk=0 视为脚本失效而非通过）
-//   degraded: PASS = 渲染层照常加载（Page.loadEventFired），即主进程 startServer 失败也放行
+//   degraded: PASS = 错误页加载且业务 API 请求为零
 //
 // 退出码：0 通过 / 1 判据失败 / 2 环境错误（端口占用、产物缺失、CDP 连不上）。
 
 import { spawn, execSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { existsSync, mkdtempSync, renameSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, renameSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import serverAddress from '../src/main/server-address.js';
@@ -34,8 +33,8 @@ const delayMs = Number(argOf('--delay-ms', '3000'));
 const windowMs = Number(argOf('--window-ms', '12000'));
 const mode = argOf('--mode', 'normal'); // normal | degraded
 const CDP_PORT = 9333;
-// 后端端口单一来源：与 server-address.js 的 PROD_PORT 对齐（e2e 只针对打包版 13060）。
-const BACKEND_PORT = serverAddress.PROD_PORT;
+// 仅测试独立 Dev 端口，正式版保持运行。
+const BACKEND_PORT = serverAddress.DEV_PORT;
 const BACKEND_API_RE = new RegExp(`:${BACKEND_PORT}/api`);
 
 const webRoot = path.resolve(import.meta.dirname, '..');
@@ -45,27 +44,27 @@ const fail2 = (msg) => {
   process.exit(2);
 };
 
-// ─── 定位打包产物（--dir 产物：dist-electron/mac*/Portunus.app）───
+// ─── 定位打包产物（--dir 产物：dist-dev/mac*/Portunus Dev.app）───
 function findAppExe() {
-  const outDir = path.join(webRoot, 'dist-electron');
+  const outDir = path.join(webRoot, 'dist-dev');
   if (!existsSync(outDir)) return null;
   for (const entry of readdirSync(outDir)) {
     if (!entry.startsWith('mac')) continue;
-    const exe = path.join(outDir, entry, 'Portunus.app', 'Contents', 'MacOS', 'Portunus');
+    const exe = path.join(outDir, entry, 'Portunus Dev.app', 'Contents', 'MacOS', 'Portunus Dev');
     if (existsSync(exe)) return exe;
   }
   return null;
 }
 function findAppDir() {
   const exe = findAppExe();
-  return exe ? path.resolve(exe, '../../../..') : null;
+  return exe ? path.resolve(path.dirname(exe), '../..') : null;
 }
 
 // ─── 端口预检：被占用（如本机跑着已安装版）会让旧实例应答 ping，产生假绿 ───
 async function assertPortFree(port) {
   await new Promise((resolve, reject) => {
     const srv = createServer();
-    srv.once('error', (e) => reject(new Error(`端口 ${port} 被占用（先退出本机在跑的 Portunus / 调试实例）`)));
+    srv.once('error', (e) => reject(new Error(`端口 ${port} 被占用（仅需先退出占用该端口的 Dev 调试实例，正式版可继续运行）`)));
     srv.listen(port, '127.0.0.1', () => srv.close(() => resolve()));
   });
 }
@@ -78,11 +77,7 @@ function run(cmd) {
 async function build() {
   const exe = findAppExe();
   if (skipBuild && exe) return;
-  if (!existsSync(path.join(webRoot, 'bin', 'mac', 'portunus'))) {
-    run('node scripts/build-go.mjs');
-  }
-  run('pnpm run build:renderer');
-  run('pnpm exec electron-builder --dir');
+  run('pnpm run build:dev');
 }
 
 // ─── CDP 监听 ───
@@ -185,7 +180,6 @@ async function attachCdp() {
 
 // ─── 主流程 ───
 let child = null;
-let tmpHome = null;
 let finished = false;
 let cleanupDone = false;
 
@@ -195,7 +189,7 @@ function verdict() {
   console.log(`[e2e] /api 成功响应: ${stats.apiOk}  失败请求: ${stats.apiFail}  页面加载完成: ${stats.pageLoaded}`);
   let pass;
   if (mode === 'degraded') {
-    pass = stats.pageLoaded; // 后端缺失时渲染层仍照常加载 = 降级放行分支成立
+    pass = stats.pageLoaded && stats.apiOk === 0 && stats.apiFail === 0; // Dev 失败时不加载业务页
   } else {
     pass = stats.httpErrorSeen === 0 && stats.apiOk >= 1;
   }
@@ -231,11 +225,7 @@ function cleanup() {
     const bak = appDir && path.join(appDir, 'Contents', 'Resources', 'bin', 'portunus.bak');
     if (bak && existsSync(bak)) renameSync(bak, bak.replace(/\.bak$/, ''));
   }
-  try {
-    rmSync(tmpHome, { recursive: true, force: true });
-  } catch {
-    // 临时目录清理失败不影响结论
-  }
+
 }
 
 async function main() {
@@ -245,10 +235,9 @@ async function main() {
 
   await build();
   const exe = findAppExe();
-  if (!exe) fail2('找不到 dist-electron 下的 Portunus.app（先不带 --skip-build 跑一次）');
+  if (!exe) fail2('找不到 dist-dev 下的 Portunus Dev.app（先不带 --skip-build 跑一次）');
 
-  // HOME 指向临时目录：userData / 数据库隔离，不污染真实数据
-  tmpHome = mkdtempSync(path.join(tmpdir(), 'portunus-e2e-'));
+  // 仅运行 Dev 身份产物；数据由 runtime-profile 隔离，不重写 HOME。
 
   if (mode === 'degraded') {
     const appBin = path.join(findAppDir(), 'Contents', 'Resources', 'bin', 'portunus');
@@ -259,7 +248,7 @@ async function main() {
 
   console.log(`[e2e] 启动 ${exe}（delay=${delayMs}ms, window=${windowMs}ms, mode=${mode}）`);
   child = spawn(exe, [`--remote-debugging-port=${CDP_PORT}`], {
-    env: { ...process.env, HOME: tmpHome, PORTUNUS_SIDECAR_DELAY_MS: String(delayMs) },
+    env: { ...process.env, PORTUNUS_SIDECAR_DELAY_MS: String(delayMs) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (d) => process.stdout.write(`[app] ${d}`));

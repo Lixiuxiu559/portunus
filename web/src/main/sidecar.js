@@ -15,6 +15,7 @@ const http = require('http');
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('node:crypto');
 
 const DEFAULT_PING_RETRIES = 60;
 const DEFAULT_PING_INTERVAL_MS = 500;
@@ -25,16 +26,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 默认 ping：GET /api/ping，200 即就绪（reject = 未就绪 / 连接失败）。 */
-function defaultPing(port) {
+/** 默认 ping：GET /api/ping；要求 200 与当前实例标识一致。 */
+function defaultPing(port, instanceId) {
   return new Promise((resolve, reject) => {
     http
       .get(`http://127.0.0.1:${port}/api/ping`, (res) => {
         res.resume();
-        if (res.statusCode === 200) resolve();
+        if (res.statusCode === 200 && (!instanceId || res.headers['x-portunus-instance'] === instanceId)) resolve();
         else reject(new Error(`/api/ping 返回 ${res.statusCode}`));
       })
-      .on('error', reject);
+      .on('error', reject)
+      .setTimeout(2000, function () { this.destroy(new Error('健康检查超时')); });
   });
 }
 
@@ -55,6 +57,7 @@ function defaultPortFree(port) {
  *   portFree?,           // () => Promise<boolean>（已释放 true）；默认 net 探测
  *   binPath,             // string | null；null = 开发模式（不 spawn，只等外部后端）
  *   dataDir,             // 数据库目录（spawn 前确保存在）
+ *   cwd?,                // 后端工作目录（开发版应指向独立 userData）
  *   port,                // 后端监听端口
  *   host,                // () => string，每次 spawn 现算（restart 后随 networkMode 变）
  *   delayMs,             // 冷启动延迟，只作用 start、不影响 restart
@@ -66,7 +69,8 @@ function defaultPortFree(port) {
  */
 function createBackend(deps) {
   const spawn = deps.spawn || defaultSpawn;
-  const ping = deps.ping || (() => defaultPing(deps.port));
+  const ping = deps.ping || (() => defaultPing(deps.port, instanceId));
+  let instanceId = null;
   const portFree = deps.portFree || (() => defaultPortFree(deps.port));
   const { binPath, dataDir, port } = deps;
   const host = deps.host || (() => '127.0.0.1');
@@ -78,6 +82,7 @@ function createBackend(deps) {
   let state = 'stopped';
   let error = null;
   let child = null;
+  let generation = 0;
   let settleFirst;
   const ready = new Promise((resolve) => {
     settleFirst = resolve;
@@ -89,37 +94,70 @@ function createBackend(deps) {
     if (next === 'ready' || next === 'failed') settleFirst();
   }
 
-  function spawnBackend() {
-    if (!binPath) return Promise.reject(new Error('后端二进制不存在'));
-    if (!fs.existsSync(binPath)) return Promise.reject(new Error(`后端二进制缺失: ${binPath}`));
+  function assertCurrent(run, expectedChild) {
+    if (run !== generation) throw new Error('后端启动已取消');
+    if (binPath && (!expectedChild || child !== expectedChild ||
+        expectedChild.exitCode != null || expectedChild.signalCode != null || expectedChild.killed)) {
+      throw new Error(error || '后端已退出');
+    }
+  }
+
+  async function spawnBackend(run) {
+    if (!binPath) throw new Error('后端二进制不存在');
+    if (!fs.existsSync(binPath)) throw new Error(`后端二进制缺失: ${binPath}`);
+    // 不接管已有服务，也不根据它的 /api/ping 将自己标为 ready。
+    if (!await portFree()) throw new Error(`后端端口 ${port} 已被占用`);
+    if (run !== generation) throw new Error('后端启动已取消');
     fs.mkdirSync(dataDir, { recursive: true });
 
+    instanceId = randomUUID();
     const env = {
       ...process.env,
+      PORTUNUS_INSTANCE_ID: instanceId,
+      ...(deps.databaseType ? { PORTUNUS_DATABASE_TYPE: deps.databaseType } : {}),
       PORTUNUS_SERVER_HOST: host(),
       PORTUNUS_SERVER_PORT: String(port),
       PORTUNUS_DATABASE_PATH: path.join(dataDir, 'portunus.db'),
       PORTUNUS_DATABASE_LOG_PATH: path.join(dataDir, 'portunus-log.db'),
     };
 
-    child = spawn(binPath, [], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    child.stdout?.on('data', (d) => console.log('[backend]', d.toString().trimEnd()));
-    child.stderr?.on('data', (d) => console.error('[backend]', d.toString().trimEnd()));
-    child.on('exit', (code) => {
-      console.log(`[sidecar] 后端退出，code=${code}`);
-      child = null;
+    const ownedChild = spawn(binPath, [], {
+      env, stdio: ['ignore', 'pipe', 'pipe'],
+      ...(deps.cwd ? { cwd: deps.cwd } : {}),
     });
-    return Promise.resolve();
+    child = ownedChild;
+    ownedChild.stdout?.on('data', (d) => console.log('[backend]', d.toString().trimEnd()));
+    ownedChild.stderr?.on('data', (d) => console.error('[backend]', d.toString().trimEnd()));
+    const failChild = (message) => {
+      // 旧进程延迟退出不能清空 restart 创建的新进程。
+      if (child !== ownedChild || run !== generation) return;
+      child = null;
+      setState('failed', message);
+    };
+    ownedChild.on('exit', (code) => {
+      console.log(`[sidecar] 后端退出，code=${code}`);
+      failChild(`后端已退出，code=${code}`);
+    });
+    ownedChild.on('error', (err) => {
+      const isCurrent = child === ownedChild && run === generation;
+      failChild(`后端进程错误: ${err.message || String(err)}`);
+      if (isCurrent) ownedChild.kill();
+    });
+    return ownedChild;
   }
 
-  async function waitForReady() {
+  async function waitForReady(run, expectedChild) {
     for (let i = 0; i < pingRetries; i++) {
+      assertCurrent(run, expectedChild);
+      let reachable = false;
       try {
         await ping();
-        return;
+        reachable = true;
       } catch {
         /* 未就绪，继续轮询 */
       }
+      assertCurrent(run, expectedChild);
+      if (reachable) return;
       await sleep(pingIntervalMs);
     }
     throw new Error('服务端启动超时');
@@ -133,48 +171,57 @@ function createBackend(deps) {
     throw new Error('端口释放超时');
   }
 
-  // 拉起（打包 spawn / 开发等外部）并一直等就绪：starting → ready | failed。
-  async function boot() {
-    setState('starting');
-    if (binPath) {
-      await spawnBackend();
-    }
-    await waitForReady();
+  // 只操作本次创建的进程；清空引用后再 kill，避免同步 exit 改写状态。
+  function stopChild() {
+    const ownedChild = child;
+    child = null;
+    if (ownedChild) ownedChild.kill();
+  }
+
+  async function boot(run) {
+    const expectedChild = binPath ? await spawnBackend(run) : null;
+    await waitForReady(run, expectedChild);
+    assertCurrent(run, expectedChild);
     setState('ready');
   }
 
   async function start() {
     if (state === 'starting' || state === 'ready') return;
-    const delay = Number(deps.delayMs || 0);
-    if (delay > 0) {
-      console.log(`[sidecar] 启动延迟 ${delay}ms`);
-      await sleep(delay);
-    }
+    const run = ++generation;
+    stopChild();
+    setState('starting');
     try {
-      await boot();
+      const delay = Number(deps.delayMs || 0);
+      if (delay > 0) {
+        console.log(`[sidecar] 启动延迟 ${delay}ms`);
+        await sleep(delay);
+      }
+      if (run !== generation) return;
+      await boot(run);
     } catch (err) {
+      if (run !== generation) return;
+      stopChild();
       setState('failed', err.message || String(err));
     }
   }
 
   function stop() {
-    if (child) {
-      child.kill();
-      child = null;
-    }
+    generation++;
+    stopChild();
     setState('stopped');
   }
 
   async function restart() {
-    if (child) {
-      child.kill();
-      child = null;
-    }
-    setState('stopped');
+    const run = ++generation;
+    stopChild();
+    setState('starting');
     try {
       await waitForPortFree();
-      await boot();
+      if (run !== generation) return;
+      await boot(run);
     } catch (err) {
+      if (run !== generation) return;
+      stopChild();
       setState('failed', err.message || String(err));
     }
   }

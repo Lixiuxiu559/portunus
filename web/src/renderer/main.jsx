@@ -5,6 +5,7 @@ import App from './App';
 import { initModalOrigin } from './utils/modalOrigin';
 import './index.css';
 
+document.title = window.api?.appName || 'Portunus';
 initModalOrigin();
 
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -91,7 +91,8 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
   return (
     <>
       <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="dialog-form-content">
+        <div className="dialog-form-grid grid grid-cols-2 gap-3">
           <TextField
             isRequired
             name="name"
@@ -117,7 +118,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
-            <Select.Popover>
+            <Select.Popover className="dialog-options">
               <ListBox>
                 {providerOptions.map((o) => (
                   <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
@@ -204,7 +205,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
                 className="w-full mb-2"
               />
               <ScrollShadow
-                className="flex flex-wrap gap-2 max-h-[190px] p-1"
+                className="dialog-models flex flex-wrap gap-2 max-h-[190px] p-1"
                 orientation="vertical"
                 hideScrollBar
               >
@@ -213,7 +214,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
                   .map((m) => (
                   <Chip key={m.id} variant="soft" size="sm">
                     <span className="flex items-center gap-1">
-                      {m.name}
+                      <span className="dialog-model-name" title={m.name}>{m.name}</span>
                       <button
                         onClick={() => setDeleteTarget(m)}
                         className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
@@ -229,7 +230,8 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-separator pt-4">
+        </div>
+        <div className="dialog-form-actions">
           <Button variant="secondary" onPress={onClose}>
             取消
           </Button>

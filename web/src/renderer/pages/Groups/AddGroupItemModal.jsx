@@ -91,7 +91,7 @@ export default function AddGroupItemModal({ group, models, channels, isOpen, onO
                   <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
-                <Select.Popover>
+                <Select.Popover className="dialog-options">
                   <ListBox>
                     <ListBox.Item key="" id="" textValue="全部渠道">
                       全部渠道
@@ -134,7 +134,7 @@ export default function AddGroupItemModal({ group, models, channels, isOpen, onO
                   <ComboBox.Trigger />
                 </ComboBox.InputGroup>
                 <FieldError />
-                <ComboBox.Popover>
+                <ComboBox.Popover className="dialog-options">
                   {filtered.length === 0 ? (
                     <div className="p-3 text-center text-sm text-muted">无匹配模型</div>
                   ) : (

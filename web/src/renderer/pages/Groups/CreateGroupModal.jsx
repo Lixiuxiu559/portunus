@@ -120,7 +120,7 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
                   <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
-                <Select.Popover>
+                <Select.Popover className="dialog-options">
                   <ListBox>
                     {strategyOptions.map((o) => (
                       <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
@@ -145,7 +145,7 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
                   <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
-                <Select.Popover>
+                <Select.Popover className="dialog-options">
                   <ListBox>
                     {channels.map((c) => (
                       <ListBox.Item key={String(c.id)} id={String(c.id)} textValue={c.name}>
@@ -186,7 +186,7 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
                   <ComboBox.Trigger />
                 </ComboBox.InputGroup>
                 <FieldError />
-                <ComboBox.Popover>
+                <ComboBox.Popover className="dialog-options">
                   {filteredModels.length === 0 ? (
                     <div className="p-3 text-center text-sm text-muted">无匹配模型</div>
                   ) : (

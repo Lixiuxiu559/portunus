@@ -4,6 +4,7 @@ import { Typography, Button, Card, Spinner, Input, TextField, toast } from '@her
 import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
+import './settings.css';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
 
@@ -90,55 +91,61 @@ export default function Settings() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-6">
+    <div className="settings-page flex flex-col flex-1 min-h-0">
+      <div className="resource-page-heading">
+        <div>
+          <h1>设置</h1>
+          <p>管理模型同步与应用更新。</p>
+        </div>
+      </div>
+      <div className="settings-sections flex-1 min-h-0 overflow-y-auto no-scrollbar">
       {/* 上游模型同步 */}
-      <Card className="gap-4 p-5">
+      <Card className="settings-card">
         <Card.Header className="p-0">
-          <Typography type="body-sm" className="text-muted">
+          <Typography className="settings-section-title">
             上游模型同步
           </Typography>
         </Card.Header>
         <Card.Content className="p-0">
-          <div className="flex flex-col gap-4">
+          <div className="settings-rows">
             {/* 自动同步间隔 */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <Typography className="font-medium">自动同步间隔（分钟）</Typography>
-                <Typography type="body-sm" className="text-muted">
+            <div className="settings-row">
+              <div className="settings-row-copy">
+                <Typography className="settings-label">自动同步间隔（分钟）</Typography>
+                <Typography type="body-sm" className="settings-hint">
                   0 表示关闭自动同步；对所有开启自动同步的渠道生效
                 </Typography>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="settings-row-actions">
                 <TextField
                   size="sm"
                   type="number"
                   min="0"
                   value={syncInterval}
                   onChange={setSyncIntervalState}
-                  className="w-24"
+                  className="settings-interval-field"
                   aria-label="自动同步间隔（分钟）"
                 >
                   <Input />
                 </TextField>
-                <Button variant="secondary" size="sm" onPress={handleSaveInterval} isPending={savingInterval}>
+                <Button className="settings-control" variant="secondary" size="sm" onPress={handleSaveInterval} isPending={savingInterval}>
                   保存
                 </Button>
               </div>
             </div>
 
             {/* 上次同步时间 */}
-            <div className="flex items-center justify-between">
-              <Typography className="font-medium">上次同步时间</Typography>
-              <Typography type="body-sm" className="text-muted">
+            <div className="settings-row">
+              <Typography className="settings-label">上次同步时间</Typography>
+              <Typography type="body-sm" className="settings-value">
                 {lastSyncAt > 0 ? new Date(lastSyncAt * 1000).toLocaleString() : '从未同步'}
               </Typography>
             </div>
 
             {/* 立即同步 */}
-            <div className="flex items-center justify-between">
-              <Typography className="font-medium">立即同步</Typography>
-              <Button variant="primary" size="sm" onPress={handleSyncNow} isPending={syncing}>
+            <div className="settings-row">
+              <Typography className="settings-label">立即同步</Typography>
+              <Button className="settings-control" variant="primary" size="sm" onPress={handleSyncNow} isPending={syncing}>
                 <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
                 立即同步
               </Button>
@@ -147,77 +154,81 @@ export default function Settings() {
         </Card.Content>
       </Card>
 
-      <Card className="gap-3 p-5">
-        <Card.Header className="p-0"><Typography className="font-medium">服务接入</Typography></Card.Header>
-        <Card.Content className="p-0 space-y-2">
-          <Typography type="body-sm" className="text-muted">网关地址、访问令牌、监听范围及 API / 客户端接入示例统一在服务接入页维护。</Typography>
-          <Link to="/clients" className="text-sm text-accent hover:underline">前往服务接入 →</Link>
+      <Card className="settings-card">
+        <Card.Header className="p-0"><Typography className="settings-section-title">服务接入</Typography></Card.Header>
+        <Card.Content className="settings-access p-0">
+          <Typography type="body-sm" className="settings-hint">网关地址、访问令牌、监听范围及 API / 客户端接入示例统一在服务接入页维护。</Typography>
+          <Link to="/clients" className="settings-access-link text-sm text-accent hover:underline">前往服务接入 →</Link>
         </Card.Content>
       </Card>
 
       {/* 版本信息 */}
-      <Card className="gap-4 p-5">
+      <Card className="settings-card">
         <Card.Header className="p-0">
-          <Typography type="body-sm" className="text-muted">
-            关于 Portunus
+          <Typography className="settings-section-title">
+            关于 {window.api?.appName || "Portunus"}
           </Typography>
         </Card.Header>
         <Card.Content className="p-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
+          <div className="settings-about">
+            <div className="settings-about-copy">
+              <div className="settings-version-details">
                 <a
                   href={GITHUB_URL}
                   onClick={openGitHub}
                   aria-label="查看项目仓库"
                   title={GITHUB_URL}
-                  className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-80 hover:underline decoration-accent underline-offset-4"
+                  className="settings-repository transition-opacity hover:opacity-80 hover:underline decoration-accent underline-offset-4"
                 >
-                  <GitHubIcon className="size-4" />
-                  <span className="text-sm text-accent">github.com/Lixiuxiu559/portunus</span>
-                  <ExternalLink className="size-3.5 text-accent" />
+                  <GitHubIcon className="size-4 shrink-0" />
+                  <span className="settings-repository-name text-sm text-accent">github.com/Lixiuxiu559/portunus</span>
+                  <ExternalLink className="size-3.5 shrink-0 text-accent" />
                 </a>
-                <Tag className="size-4 ml-2" />
-                <Typography className="text-sm text-muted">当前 v{appVersion || '—'}</Typography>
+                <div className="settings-version">
+                  <Tag className="size-3.5 shrink-0" />
+                  <Typography className="text-xs text-muted">当前 v{appVersion || '—'}</Typography>
+                </div>
                 {latestVersion && (
                   <Typography
-                    className={`text-sm ${available ? 'text-accent' : 'text-muted'}`}
+                    className={`settings-latest-version text-xs ${available ? 'text-accent' : 'text-muted'}`}
                   >
-                    · 最新 v{latestVersion}
+                    最新 v{latestVersion}
                     {available ? '（可更新）' : '（已是最新）'}
                   </Typography>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            {window.api?.updatesEnabled === false ? (
+              <Typography className="text-xs text-muted">开发环境 · 13061 · 独立数据 · 禁用正式更新</Typography>
+            ) : <div className="settings-update-actions">
               {checking && (
                 <Spinner size="sm" />
               )}
               {!downloaded && !checking && (
-                <Button variant="tertiary" size="sm" onPress={check} isDisabled={downloading}>
+                <Button className="settings-control" variant="tertiary" size="sm" onPress={check} isDisabled={downloading}>
                   <RotateCw className="size-4" />
                   检查更新
                 </Button>
               )}
               {available && !downloaded && !checking && !downloading && error && (
-                <Button variant="primary" size="sm" onPress={download}>
+                <Button className="settings-control" variant="primary" size="sm" onPress={download}>
                   <Download className="size-4" />
                   重新下载
                 </Button>
               )}
               {downloaded && (
-                <Button variant="primary" size="sm" onPress={install} isDisabled={installing}>
+                <Button className="settings-control" variant="primary" size="sm" onPress={install} isDisabled={installing}>
                   <CheckCircle className="size-4" />
                   {installing ? '正在重启…' : '重启以更新'}
                 </Button>
               )}
-            </div>
+            </div>}
           </div>
         </Card.Content>
 
         {/* 发现新版本时即预留状态高度，开始下载、失败或完成都在原位更新。 */}
         {(available || downloaded || error) && (
-          <div className="mt-1 h-12 shrink-0 min-w-0">
+          <div className="settings-update-status">
             <div
               className="w-full h-2 rounded-full bg-accent/10 overflow-hidden"
               role={showDownloadProgress ? 'progressbar' : undefined}
@@ -233,7 +244,7 @@ export default function Settings() {
             </div>
             <Typography
               type="body-sm"
-              className={`${error ? 'text-danger' : 'text-muted'} mt-1 truncate`}
+              className={`${error ? 'text-danger' : 'text-muted'} settings-update-message`}
               role="status"
               title={error ? `更新出错：${error}` : undefined}
             >

@@ -1,5 +1,7 @@
 /* HeroUI v3 样式（内部已引入 Tailwind CSS v4），必须放在最前 */
 @import '@heroui/styles';
+@import './resource-style.css';
+@import './dialog-style.css';
 
 /* 本地字体：Inter（正文拉丁/数字）+ JetBrains Mono（等宽）；中文回退系统字体（苹方/微软雅黑） */
 @font-face {
@@ -301,11 +303,12 @@ html.dark .glass {
  * 质感四件套：内亮外暗双圈描边（厚度）、顶部 specular + 底部弱反光（受光不对称）、
  * 磨砂颗粒噪声（消除纯 blur 的塑料感）、分层悬浮投影（elevation）。
  */
+/* 前缀声明在前、标准声明在后，确保打包后保留 Chromium 使用的标准模糊属性。 */
 .modal__dialog {
   background-color: color-mix(in oklch, var(--surface) 80%, transparent);
   background-image: var(--glass-noise);
-  backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
   box-shadow:
     var(--glass-shadow-float),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -320,8 +323,8 @@ html.dark .modal__dialog {
 
 .modal__backdrop {
   background: color-mix(in oklch, var(--background) 55%, transparent);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 
 /* 暗色蒙层改用近黑 scrim：背景世界整体沉下去，让玻璃边缘高光显形 */
@@ -513,8 +516,8 @@ html.dark .button--secondary:hover {
 .popover {
   background-color: color-mix(in oklch, var(--surface) 62%, transparent);
   background-image: var(--glass-noise);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -528,8 +531,8 @@ html.dark .popover {
 .tooltip {
   background-color: color-mix(in oklch, var(--surface) 72%, transparent);
   background-image: var(--glass-noise);
-  backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -1095,8 +1098,8 @@ header .theme-switch {
   position: absolute;
   inset: 0;
   background: color-mix(in oklch, var(--background) 42%, transparent);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   opacity: 0;
   transition: opacity var(--dur-expand) var(--ease-expand);
 }
@@ -1127,8 +1130,8 @@ html.dark .expand-editor__scrim {
   /* 玻璃材质（同卡片/弹窗体系）；去掉 inset 高光以保持 box-shadow 层数一致可插值 */
   background-color: color-mix(in oklch, var(--surface) 82%, transparent);
   background-image: var(--glass-noise);
-  backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
   box-shadow: var(--glass-shadow-float);
   transition:
     transform var(--dur-expand) var(--ease-expand),
@@ -1225,3 +1228,5 @@ html.dark .expand-editor__panel {
     transition-delay: 0ms;
   }
 }
+
+.brand-name.brand-name--dev { font-size: 18px; }

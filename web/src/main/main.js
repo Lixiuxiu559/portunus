@@ -1,20 +1,13 @@
 const { app, BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
+const { initializeProfile } = require('./runtime-profile');
+const runtime = initializeProfile(app, require('../../package.json'));
+const useDevServer = !app.isPackaged && process.env.NODE_ENV === 'development';
 const { forwardEvents, checkForUpdates, register: registerUpdate } = require('./updater');
 const { createBackend } = require('./sidecar');
 const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
 const { createTray } = require('./tray');
-
-const isDev = process.env.NODE_ENV === 'development';
-
-// dev 与打包版读同一份 package.json（顶层无 productName）→ app.name 同为 "@portunus/web"，
-// userData 与单实例锁全部撞在一起：打包版常驻托盘时，dev 实例请求锁失败秒退（code 0），
-// 打包版反被 second-instance 唤醒到前台。dev 隔离出独立 userData（锁文件按 userData
-// 路径落位，故必须放在 requestSingleInstanceLock 之前）。
-if (isDev) {
-  app.setPath('userData', path.join(app.getPath('userData'), 'dev'));
-}
 
 // 开发模式下应用跑在 node_modules 的 Electron 默认 bundle 里，Dock/任务栏显示的是
 // Electron 官方图标；这里显式换成我们的 logo。打包版由 electron-builder 把
@@ -46,16 +39,20 @@ let isQuitting = false;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
+  return;
 }
+
+if (runtime.isDevelopment) require('fs').mkdirSync(path.join(app.getPath('userData'), 'backend'), { recursive: true });
 
 // 后端守护（sidecar）单例：生命周期状态机。环境（二进制路径 / 数据库目录 / 端口 /
 // 监听 host）在 main 进程组装；sidecar 模块本身 electron-free（见 sidecar.js）。
 const backend = createBackend({
   binPath: app.isPackaged
     ? path.join(process.resourcesPath, 'bin', process.platform === 'win32' ? 'portunus.exe' : 'portunus')
-    : null,
+    : path.join(__dirname, '../../bin', { darwin: 'mac', win32: 'win', linux: 'linux' }[process.platform], process.platform === 'win32' ? 'portunus.exe' : 'portunus'),
+  ...(runtime.isDevelopment ? { cwd: path.join(app.getPath('userData'), 'backend'), databaseType: 'sqlite' } : {}),
   dataDir: path.join(app.getPath('userData'), 'data'),
-  port: addressOf({ isPackaged: app.isPackaged }).port,
+  port: addressOf({ profile: runtime.profile }).port,
   // 监听 host 随 networkMode 变，spawn 时现算（restart 后重读）
   host: () => hostFor(appConfig.getNetworkMode()),
   // 冷启动延迟：供 e2e 脚本（scripts/startup-race-check.mjs）注入放大启动竞态窗口
@@ -67,7 +64,7 @@ const backend = createBackend({
  * 打包模式下本函数由 backend.ready 门控触发（见 createWindow）。
  */
 function loadRenderer(win) {
-  if (isDev) {
+  if (useDevServer) {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools({ mode: 'detach' });
     return;
@@ -77,7 +74,7 @@ function loadRenderer(win) {
   // 仅生产模式检查（dev 无 app-update.yml，调了只会报错）。
   win
     .loadFile(path.join(__dirname, '../../dist/renderer/index.html'))
-    .then(() => checkForUpdates())
+    .then(() => runtime.updatesEnabled && checkForUpdates())
     .catch(() => {
       // 静默失败：loadFile 失败或更新检查失败都不阻塞主流程
     });
@@ -90,7 +87,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 576,
     resizable: true,
-    title: 'Portunus',
+    title: runtime.appName,
     // win/linux 无系统顶栏，Electron 默认在窗口内渲染应用菜单（File Edit View Window 白条）；
     // 平时隐藏不占空间，按 Alt 可临时呼出（保留 Ctrl+C/V 等菜单快捷键注册）。
     // mac 忽略此选项（菜单始终在屏幕顶部系统栏）。
@@ -100,6 +97,7 @@ function createWindow() {
     ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--portunus-profile=${runtime.profile}`],
       contextIsolation: true,
       nodeIntegration: false,
       // Electron 20 起 sandbox 默认 true，会导致 preload 里 require('fs')/require('path')
@@ -108,19 +106,16 @@ function createWindow() {
     },
   });
 
-  if (isDev) {
-    // 开发模式行为保持不变：立即加载，外部后端起没起都不等
-    loadRenderer(mainWindow);
-  } else {
-    // 打包模式：窗口壳先显示（保留原设计意图），内容等后端就绪（或失败降级）后再加载，
-    // 消除「渲染层先发请求、后端尚未监听」的启动竞态红 toast。ready 恒 settle，
-    // 失败也放行——让渲染层照常报错而非永久白屏。
-    // 捕获窗口引用：gate 未放行期间关窗再 activate 重建时，只加载新窗口、跳过已销毁旧窗口。
-    const win = mainWindow;
-    backend.ready.then(() => {
-      if (!win.isDestroyed()) loadRenderer(win);
-    });
-  }
+  const win = mainWindow;
+  backend.ready.then(() => {
+    if (win.isDestroyed()) return;
+    if (runtime.isDevelopment && backend.state !== 'ready') {
+      // Dev 启动失败时不加载会访问端口的业务页面，避免接管已有服务。
+      win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent('<h2>Portunus Dev 启动失败</h2><p>请查看开发日志，确认 13061 未被占用、后端二进制已经构建。</p>')}`);
+      return;
+    }
+    loadRenderer(win);
+  });
 
   // 页面加载完成后探测 preload 桥是否注入成功（诊断 window.api）
   mainWindow.webContents.on('did-finish-load', () => {
@@ -130,8 +125,7 @@ function createWindow() {
       .catch((e) => console.warn('[main] preload 桥探测失败:', e.message));
   });
 
-  // 更新事件转发 dev 下也要注册：否则渲染层点"检查更新"后，
-  // checking / error 事件到不了 UI，看起来就是"点了没反应"。
+  // Dev 更新服务是无副作用实现；正式版继续转发更新状态。
   forwardEvents(mainWindow);
   // 更新检查已移到 loadRenderer 的 loadFile 成功后（见彼处注释）
 
@@ -180,8 +174,8 @@ ipcMain.handle('open-external', (_event, url) => {
 ipcMain.handle('config:set-network-mode', async (_event, mode) => {
   const normalized = mode === 'lan' ? 'lan' : 'local';
   appConfig.setNetworkMode(normalized);
-  // 打包模式：监听范围变了要重启后端子进程才生效；开发模式后端是外部的，仅落盘。
-  const restarted = app.isPackaged;
+  // Dev 与正式版都只重启各自主进程持有的后端。
+  const restarted = true;
   if (restarted) {
     await backend.restart();
   }
@@ -189,6 +183,7 @@ ipcMain.handle('config:set-network-mode', async (_event, mode) => {
 });
 
 app.whenReady().then(() => {
+  if (runtime.isDevelopment && process.platform === 'darwin') app.dock?.setBadge('DEV');
   // 开发模式下把 Dock 图标换成我们的 logo（macOS 专属；app.dock 仅 ready 后可用）
   if (process.platform === 'darwin' && appIcon) {
     app.dock?.setIcon(appIcon);
@@ -197,15 +192,14 @@ app.whenReady().then(() => {
   // 系统托盘/菜单栏常驻图标（win + mac）：关窗后仍可从托盘恢复窗口或退出。
   // linux 不建托盘（AppImage 指示器兼容性差），保持关窗即退出的原行为。
   if (process.platform !== 'linux') {
-    createTray({ showMainWindow, quit: () => app.quit() });
+    createTray({ name: runtime.appName, showMainWindow, quit: () => app.quit() });
   }
 
   // 先创建窗口，让用户看到 UI
   createWindow();
 
-  // 后台拉起 Go 后端（打包模式 spawn 子进程；开发模式等外部后端），不阻塞窗口显示。
-  // 打包模式：ready settle（就绪或失败降级）后才放行渲染层内容加载；失败也必须放行——
-  // 让渲染层照常报错，而不是永久白屏。dev 模式不走门控分支。
+  // Dev 与正式版各自拉起自己的 Go 后端，不阻塞窗口壳显示。
+  // 等待自身后端就绪后加载页面；Dev 失败时显示错误页，正式版保留既有降级行为。
   backend.start();
   backend.ready.then(() => {
     if (backend.state === 'ready') {

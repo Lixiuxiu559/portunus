@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,9 @@ import (
 func Register(r *gin.RouterGroup) {
 	r.Use(localManagementOnly())
 	r.GET("/ping", func(c *gin.Context) {
+		if instance := os.Getenv("PORTUNUS_INSTANCE_ID"); instance != "" {
+			c.Header("X-Portunus-Instance", instance)
+		}
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 

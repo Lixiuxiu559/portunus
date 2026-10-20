@@ -59,7 +59,7 @@
     }
   },
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:web\" \"wait-on tcp:localhost:5173 && pnpm run dev:main\"",
+    "dev": "pnpm run build:go && concurrently \"pnpm run dev:web\" \"wait-on tcp:127.0.0.1:5173 && pnpm run dev:main\"",
     "dev:web": "vite --open",
     "dev:main": "cross-env NODE_ENV=development electron .",
     "build:go": "node scripts/build-go.mjs",
@@ -69,7 +69,9 @@
     "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis zip --x64",
     "start": "electron .",
     "test": "node --test \"src/**/*.test.js\"",
-    "test:e2e": "node scripts/startup-race-check.mjs"
+    "test:e2e": "node scripts/startup-race-check.mjs",
+    "build:dev": "node scripts/build-dev.mjs",
+    "preview:dev": "node scripts/preview-dev.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.6.2"

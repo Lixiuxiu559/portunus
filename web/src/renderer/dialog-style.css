@@ -1,0 +1,44 @@
+/* Layout only: existing glass recipes, semantic colors and animations remain in index.css. */
+.modal__container .modal__dialog {
+  max-height: 100%;
+  min-height: 0;
+  padding: 20px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.modal__dialog .modal__header { flex-shrink: 0; padding-right: 32px; }
+.modal__dialog .modal__heading { font-size: 18px; line-height: 26px; font-weight: 600; overflow-wrap: anywhere; }
+.modal__dialog .modal__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 22px; }
+.modal__dialog .modal__header + .modal__body { margin-top: 16px; }
+.modal__dialog .modal__footer { flex-shrink: 0; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.modal__dialog .modal__footer .button, .dialog-form-actions .button { min-height: 36px; font-size: 14px; }
+.modal__dialog .modal__close-trigger { top: 16px; right: 16px; }
+.modal__dialog form, .expand-editor__body form { gap: 16px; }
+.modal__dialog .label, .expand-editor__body .label { font-size: 14px; line-height: 20px; }
+.modal__dialog .input:not(textarea), .expand-editor__body .input:not(textarea),
+.modal__dialog .select__trigger, .expand-editor__body .select__trigger,
+.modal__dialog .combo-box__input-group, .expand-editor__body .combo-box__input-group {
+  min-height: 36px;
+  font-size: 14px;
+}
+.modal__dialog .text-xs, .expand-editor__body .text-xs { line-height: 18px; }
+.expand-editor .expand-editor__panel { --expand-radius-end: 20px; }
+.expand-editor .expand-editor__head { padding: 16px 20px; gap: 12px; }
+.expand-editor .expand-editor__identity { gap: 12px; overflow-wrap: anywhere; }
+.expand-editor .expand-editor__identity > :last-child { min-width: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.expand-editor .expand-editor__body { display: flex; flex-direction: column; padding: 20px; min-height: 0; overflow: hidden; }
+.expand-editor__body > form { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.dialog-form-content { display: flex; flex-direction: column; flex: 1 1 auto; gap: 16px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -3px; padding: 3px; }
+.dialog-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; flex-shrink: 0; gap: 8px; border-top: 1px solid var(--separator); padding-top: 16px; }
+.dialog-options { width: var(--trigger-width); max-width: calc(100vw - 32px); }
+.dialog-options .list-box { max-height: min(320px, calc(100dvh - 120px)); overflow-y: auto; }
+.dialog-options [role="option"] { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.dialog-models .chip { max-width: 100%; }
+.dialog-models .chip__label, .dialog-models .chip__label > span { min-width: 0; max-width: 100%; }
+.dialog-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog-models button { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .modal__container .modal__dialog { padding: 16px; }
+  .dialog-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .expand-editor .expand-editor__head, .expand-editor .expand-editor__body { padding: 16px; }
+}

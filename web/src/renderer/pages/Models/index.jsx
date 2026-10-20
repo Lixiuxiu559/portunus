@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Typography, Chip, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
-import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
+import { Button, Typography, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
+import { Plus, Trash2, RotateCw, X, Search, Box } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
@@ -116,26 +116,28 @@ export default function Models() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="mb-4 shrink-0">
-        <h1 className="text-xl font-semibold">上游模型</h1>
-        <p className="mt-1 text-sm text-muted">按渠道维护分组可使用的模型资源。客户端应填写分组名称，而不是这里的上游模型 ID。</p>
+    <div className="flex flex-col flex-1 min-h-0 min-w-0">
+      <div className="resource-page-heading">
+        <div>
+          <h1 className="text-xl font-semibold">上游模型</h1>
+          <p className="mt-1 text-sm text-muted">按渠道维护分组可使用的模型资源。客户端应填写分组名称，而不是这里的上游模型 ID。</p>
+        </div>
+        <div className="resource-page-actions">
+          <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={loading || refreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
+          <Button variant="primary" size="md" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
+        </div>
       </div>
-      <div className="model-filters flex flex-wrap items-center gap-2 mb-3 shrink-0">
-        <TextField size="sm" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
+      <div className="model-filters resource-model-filters">
+        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
         {draftName && <IconButton size="sm" label="清除名称筛选" onClick={() => { setDraftName(''); performSearch(draftChannel, '', 1); }}><X className="size-3.5" /></IconButton>}
         <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="w-52">
-          <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-          <Select.Popover><ListBox>
+          <Select.Trigger aria-label="按上游渠道筛选" aria-labelledby={null}><Select.Value /><Select.Indicator /></Select.Trigger>
+          <Select.Popover className="resource-channel-popover"><ListBox aria-label="上游渠道">
             <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
-            {channels.map((c) => <ListBox.Item key={c.id} id={String(c.id)} textValue={c.name}>{c.name}<ListBox.ItemIndicator /></ListBox.Item>)}
+            {channels.map((c) => <ListBox.Item key={c.id} id={String(c.id)} textValue={c.name}><span className="min-w-0 truncate" title={c.name}>{c.name}</span><ListBox.ItemIndicator /></ListBox.Item>)}
           </ListBox></Select.Popover>
         </Select>
         <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}><Search className="size-4" />查询</Button>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="secondary" size="sm" onPress={() => performSearch(queryChannel, queryName, page)} isPending={loading || refreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
-          <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
-        </div>
       </div>
       {loading ? <div className="flex justify-center py-12"><Spinner size="sm" /></div>
       : loadError && models.length === 0 ? <div className="flex flex-col items-center gap-3 py-16 text-muted">
@@ -147,15 +149,20 @@ export default function Models() {
           <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
         </div>
       : <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+          <div className="resource-grid">
             {models.map((m) => {
               const channelName = channelMap[m.channel_id] || m.channel_id;
-              return <Card key={m.id} className="gap-3 p-4">
+              return <Card key={m.id} className="resource-card">
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
-                  <Typography className="min-w-0 flex-1 truncate font-medium text-lg" title={m.name}>{m.name}</Typography>
-                  <div className="flex items-center gap-1 shrink-0"><IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton></div>
+                  <div className="resource-card-identity">
+                    <span className="resource-card-symbol" aria-hidden="true"><Box className="size-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <Typography className="resource-card-title resource-card-model" title={m.name}>{m.name}</Typography>
+                      <span className="resource-card-source" title={String(channelName)}>{channelName}</span>
+                    </div>
+                  </div>
+                  <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
                 </Card.Header>
-                <Card.Content className="min-w-0"><Chip variant="soft" size="sm" color="default" className="min-w-0 max-w-full"><span className="truncate" title={String(channelName)}>{channelName}</span></Chip></Card.Content>
               </Card>;
             })}
           </div>

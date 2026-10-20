@@ -39,7 +39,7 @@ export default function Layout() {
         {/* traffic-light 留空区：左侧 pl-[88px] 让 logo 与 macOS 红黄绿灯之间留出间距 */}
         <div className="flex items-center gap-2.5">
           <img src={logo} alt="" aria-hidden="true" className="h-10 w-auto pointer-events-none" />
-          <span className="brand-name">Portunus</span>
+          <span className={`brand-name${window.api?.isDevelopment ? " brand-name--dev" : ""}`} title={window.api?.isDevelopment ? "开发环境 · 13061" : undefined}>{window.api?.appName || "Portunus"}</span>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2">
           <Tabs

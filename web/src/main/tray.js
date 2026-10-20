@@ -11,7 +11,7 @@ let tray = null;
  * @param {() => void} deps.showMainWindow 显示（必要时重建）主窗口
  * @param {() => void} deps.quit 真正退出应用
  */
-function createTray({ showMainWindow, quit }) {
+function createTray({ name = 'Portunus', showMainWindow, quit }) {
   // 图标随 src/main 进 asar：win 用 16pt 彩色 logo；mac 用 Template 模板图
   // （纯黑 + alpha，系统自动适配明暗菜单栏，与系统图标风格统一；@2x 自动拾取）
   const iconFile = process.platform === 'win32' ? '16x16.png' : 'trayTemplate.png';
@@ -21,10 +21,10 @@ function createTray({ showMainWindow, quit }) {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('Portunus');
+  tray.setToolTip(name);
 
   const menu = Menu.buildFromTemplate([
-    { label: '打开 Portunus', click: () => showMainWindow() },
+    { label: `打开 ${name}`, click: () => showMainWindow() },
     { type: 'separator' },
     { label: '退出', click: () => quit() },
   ]);

@@ -6,7 +6,7 @@ import serverAddress from './src/main/server-address.js';
 import { localManagementProxyGuard } from './dev-management-access.mjs';
 
 // 开发后端的地址单一来源：vite 代理把 /api、/v1 转发到它（见 server-address.js）。
-const devBackendUrl = serverAddress.addressOf({ isPackaged: false }).url;
+const devBackendUrl = serverAddress.addressOf({ profile: 'development' }).url;
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), {

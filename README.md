@@ -168,17 +168,18 @@ go run .
 
 后端默认监听 `0.0.0.0:3060`，SQLite 数据文件默认位于 `data/`。可通过 `config.json` 或 `PORTUNUS_*` 环境变量调整配置，例如 `PORTUNUS_SERVER_HOST`、`PORTUNUS_SERVER_PORT`、`PORTUNUS_DATABASE_PATH`。
 
-保持后端运行，在另一个终端启动管理界面：
+桌面开发使用独立的 **Portunus Dev**，无需另外运行 `go run .`：
 
 ```bash
 cd web
 pnpm install
-pnpm run dev:web    # 浏览器：http://localhost:5173
-# 或使用桌面开发窗口：
-pnpm run dev
+pnpm run dev        # 自动编译并管理 Dev 后端，Vite http://127.0.0.1:5173
+# 或构建并启动独立桌面预览：
+pnpm run build:dev
+pnpm run preview:dev
 ```
 
-开发服务器将 `/api` 和 `/v1` 代理到 `localhost:3060`。服务接入页也可在浏览器中使用，示例指向开发后端地址。管理界面和开发代理只供本机使用，代理不要向远端转发 `/api`。
+Dev 后端固定 `127.0.0.1:13061`（局域网模式可另行启用），正式安装版继续使用 `13060`。两者的数据、配置、缓存和更新互相隔离；Dev 从空配置开始，不自动复制正式凭据。单独运行 `dev:web` 需要先启动 Dev 后端。管理界面和开发代理只供本机使用，代理不要向远端转发 `/api`。详见[开发隔离说明](docs/product/DEVELOPMENT.md)。
 
 </details>
 

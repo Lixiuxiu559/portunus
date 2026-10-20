@@ -197,12 +197,12 @@ export default function Clients() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      <header className="mb-5 shrink-0 flex flex-wrap items-start justify-between gap-3">
+      <header className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">服务接入</h1>
           <p className="mt-1 text-sm text-muted">选择模型分组，为你的应用提供一个稳定入口。</p>
         </div>
-        <Button size="sm" variant="tertiary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-3.5" />刷新连接</Button>
+        <Button size="md" variant="tertiary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
       </header>
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-3">
         <div className="service-access-grid">

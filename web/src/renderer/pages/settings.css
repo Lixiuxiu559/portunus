@@ -1,0 +1,50 @@
+/* Settings share the existing warm glass surfaces and resource-page rhythm. */
+.settings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-card.card {
+  flex-shrink: 0;
+  min-width: 0;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+}
+.settings-section-title { font-size: 16px; line-height: 24px; font-weight: 500; }
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  min-width: 0;
+  padding: 12px 0;
+}
+.settings-row:first-child { padding-top: 0; }
+.settings-row:last-child { padding-bottom: 0; }
+.settings-row + .settings-row { border-top: 1px solid var(--separator); }
+.settings-row-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.settings-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+.settings-hint { font-size: 12px; line-height: 20px; color: var(--muted); }
+.settings-value { font-size: 12px; line-height: 20px; color: var(--muted); text-align: right; }
+.settings-row-actions, .settings-update-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.settings-control.button { min-height: 36px; }
+.settings-interval-field { width: 96px; }
+.settings-interval-field .input { min-height: 36px; }
+.settings-access { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px 24px; }
+.settings-access-link { flex-shrink: 0; }
+.settings-about { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; min-width: 0; }
+.settings-about-copy { min-width: 0; }
+.settings-version-details { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
+.settings-repository { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.settings-repository-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-version { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.settings-version > *, .settings-latest-version { overflow-wrap: anywhere; }
+.settings-update-actions { flex-wrap: wrap; justify-content: flex-end; }
+.settings-update-status { min-width: 0; min-height: 48px; padding-top: 4px; }
+.settings-update-message { margin-top: 4px; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .settings-row, .settings-access, .settings-about { flex-wrap: wrap; gap: 8px 16px; }
+  .settings-row-copy { flex-basis: 100%; }
+  .settings-update-actions { justify-content: flex-start; }
+}
