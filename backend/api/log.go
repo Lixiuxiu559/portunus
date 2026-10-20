@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +16,24 @@ func registerLogRoutes(r *gin.RouterGroup) {
 	g := r.Group("/logs")
 	g.GET("", listLogs)
 	g.GET("/stat", getLogStats)
+	g.GET("/attempts", listUpstreamAttempts)
 	g.DELETE("", deleteOldLogs)
+}
+
+func listUpstreamAttempts(c *gin.Context) {
+	requestID := c.Query("request_id")
+	if strings.TrimSpace(requestID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 request_id 参数"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	rows, total, err := shared.ListUpstreamAttempts(requestID, page, size)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"total": total, "data": rows})
 }
 
 // parseLogFilter 从 query string 解析筛选条件。

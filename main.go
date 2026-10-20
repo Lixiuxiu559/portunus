@@ -60,7 +60,8 @@ func main() {
 			}
 			return k.ID, true
 		},
-		LogWrite: func(e *shared.Log) { shared.LogDB.Create(e) },
+		LogWrite:     func(e *shared.Log) { shared.LogDB.Create(e) },
+		AttemptWrite: shared.WriteUpstreamAttempt,
 	})
 	api.Register(r.Group("/api")) // 管理 API
 

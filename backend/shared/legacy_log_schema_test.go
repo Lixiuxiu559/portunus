@@ -57,6 +57,10 @@ func TestLegacyLogSchemaPreservesRetiredColumns(t *testing.T) {
 	if err := InitLogDB(cfg); err != nil {
 		t.Fatal(err)
 	}
+	var attemptCount int64
+	if err := LogDB.Model(&UpstreamAttempt{}).Count(&attemptCount).Error; err != nil || attemptCount != 0 {
+		t.Fatalf("旧日志升级不应回填尝试 count=%d err=%v", attemptCount, err)
+	}
 	var row Log
 	if err := LogDB.First(&row, 51).Error; err != nil {
 		t.Fatal(err)

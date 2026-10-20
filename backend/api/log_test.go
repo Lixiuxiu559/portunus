@@ -71,3 +71,58 @@ func TestLogRoutesRequestIDFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestUpstreamAttemptRoutes(t *testing.T) {
+	setupCascadeTest(t)
+	if err := shared.InitLogDB(&shared.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, sequence := range []int{3, 1, 2} {
+		if err := shared.WriteUpstreamAttempt(&shared.UpstreamAttempt{RequestID: "exact_%+'", Sequence: sequence}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := shared.WriteUpstreamAttempt(&shared.UpstreamAttempt{RequestID: "exact_XX+'", Sequence: 1}); err != nil {
+		t.Fatal(err)
+	}
+	r := gin.New()
+	registerLogRoutes(r.Group("/api"))
+	for _, tc := range []struct {
+		name, requestID, page, size string
+		status                      int
+		total                       int64
+		sequence                    int
+	}{
+		{"second-page", "exact_%+'", "2", "1", 200, 3, 2},
+		{"first-page", "exact_%+'", "1", "1", 200, 3, 1},
+		{"last-page", "exact_%+'", "3", "1", 200, 3, 3},
+		{"out-of-range", "exact_%+'", "4", "1", 200, 3, 0},
+		{"literal-percent", "%", "1", "20", 200, 0, 0},
+		{"prefix", "exact_", "1", "20", 200, 0, 0},
+		{"historical", "old-request", "1", "20", 200, 0, 0},
+		{"empty", "", "1", "20", 400, 0, 0},
+		{"blank", "  ", "1", "20", 400, 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query := url.Values{"request_id": {tc.requestID}, "page": {tc.page}, "page_size": {tc.size}}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/logs/attempts?"+query.Encode(), nil))
+			if w.Code != tc.status {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			if tc.status != http.StatusOK {
+				return
+			}
+			var response struct {
+				Total int64                    `json:"total"`
+				Data  []shared.UpstreamAttempt `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if response.Total != tc.total || response.Data == nil || (tc.sequence == 0 && len(response.Data) != 0) || (tc.sequence > 0 && (len(response.Data) != 1 || response.Data[0].Sequence != tc.sequence)) {
+				t.Fatalf("精确查询/分页/数组格式错误: %+v", response)
+			}
+		})
+	}
+}

@@ -97,6 +97,7 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 
 		apiKeyID := c.GetInt64("api_key_id")
 
+		sequence, relaySequence := 0, 0
 		var lastErr error
 		anyAttempted := false
 		var skipped []string // 被熔断挡掉的目标描述，全跳过时用于日志
@@ -108,7 +109,21 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 			budgetRetry := &chatBudgetRetry{} // 当前目标内记住字段切换，普通重试不重新触发兼容重试
 			for attempt := 0; attempt <= s.deps.Cfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking, budgetRetry)
+				reason := "initial"
+				if relaySequence > 0 {
+					reason = "failover"
+				}
+				if attempt > 0 {
+					reason = "retry"
+				}
+				relaySequence++
+				trace := &relayAttemptTrace{sequence: &sequence, template: shared.UpstreamAttempt{
+					RequestID: requestID, RelayAttempt: relaySequence, Reason: reason,
+					APIKeyID: apiKeyID, GroupName: g.Name, ChannelID: t.Channel.ID,
+					ModelID: t.Model.ID, ModelName: t.Model.Name,
+					ClientProtocol: string(clientProto), UpstreamProtocol: string(t.Channel.Type), Stream: meta.Stream,
+				}}
+				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking, budgetRetry, trace)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -189,7 +204,7 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig, budgetRetry *chatBudgetRetry) (out []byte, status int, err error) {
+func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig, budgetRetry *chatBudgetRetry, trace *relayAttemptTrace) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -206,8 +221,10 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		if logErr == nil {
 			logErr = failReason
 		}
+		durationMs := time.Since(start).Milliseconds() // 采样先于新增记录写库，保持旧日志耗时边界
+		s.finishAttempt(trace, status, success, logErr)
 		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
-		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, time.Since(start).Milliseconds(), firstTokenMs, requestID, logErr)
+		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, durationMs, firstTokenMs, requestID, logErr)
 		if !success {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
@@ -258,7 +275,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	headers := upstream.ChatHeaders()
 	headers.Set("X-Request-Id", requestID)
 	allowBudgetRetry := clientProto != protocol.ProviderOpenAI && t.Channel.Type == protocol.ProviderOpenAI
-	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry)
+	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry, trace)
 	if err != nil {
 		return nil, 0, err
 	}

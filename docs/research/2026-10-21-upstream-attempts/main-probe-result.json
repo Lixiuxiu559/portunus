@@ -1,0 +1,240 @@
+{
+  "calls": [
+    {
+      "target": "A",
+      "request_id": "03c56f9ec9ff4e6d",
+      "budget_fields": [
+        "max_tokens"
+      ]
+    },
+    {
+      "target": "A",
+      "request_id": "03c56f9ec9ff4e6d",
+      "budget_fields": [
+        "max_completion_tokens"
+      ]
+    },
+    {
+      "target": "A",
+      "request_id": "03c56f9ec9ff4e6d",
+      "budget_fields": [
+        "max_completion_tokens"
+      ]
+    },
+    {
+      "target": "B",
+      "request_id": "03c56f9ec9ff4e6d",
+      "budget_fields": [
+        "max_tokens"
+      ]
+    }
+  ],
+  "attempts": {
+    "data": [
+      {
+        "id": 1,
+        "request_id": "03c56f9ec9ff4e6d",
+        "sequence": 1,
+        "relay_attempt": 1,
+        "reason": "initial",
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 1,
+        "model_id": 1,
+        "model_name": "model-a",
+        "client_protocol": "openai_responses",
+        "upstream_protocol": "openai",
+        "stream": false,
+        "budget_field": "max_tokens",
+        "status": 400,
+        "success": false,
+        "err_kind": "upstream_error",
+        "err_msg": "上游返回 400: {\"error\": {\"message\": \"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.\", \"param\": \"max_tokens\", \"code\": \"unsupported_parameter\"}}",
+        "duration_ms": 0,
+        "started_at": "2026-10-21T03:15:54.148423+08:00",
+        "created_at": "2026-10-21T03:15:54.149133+08:00"
+      },
+      {
+        "id": 2,
+        "request_id": "03c56f9ec9ff4e6d",
+        "sequence": 2,
+        "relay_attempt": 1,
+        "reason": "budget_compat",
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 1,
+        "model_id": 1,
+        "model_name": "model-a",
+        "client_protocol": "openai_responses",
+        "upstream_protocol": "openai",
+        "stream": false,
+        "budget_field": "max_completion_tokens",
+        "status": 503,
+        "success": false,
+        "err_kind": "upstream_error",
+        "err_msg": "上游返回 503: {\"error\": {\"message\": \"synthetic overload\"}}",
+        "duration_ms": 0,
+        "started_at": "2026-10-21T03:15:54.149639+08:00",
+        "created_at": "2026-10-21T03:15:54.150059+08:00"
+      },
+      {
+        "id": 3,
+        "request_id": "03c56f9ec9ff4e6d",
+        "sequence": 3,
+        "relay_attempt": 2,
+        "reason": "retry",
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 1,
+        "model_id": 1,
+        "model_name": "model-a",
+        "client_protocol": "openai_responses",
+        "upstream_protocol": "openai",
+        "stream": false,
+        "budget_field": "max_completion_tokens",
+        "status": 503,
+        "success": false,
+        "err_kind": "upstream_error",
+        "err_msg": "上游返回 503: {\"error\": {\"message\": \"synthetic overload\"}}",
+        "duration_ms": 0,
+        "started_at": "2026-10-21T03:15:54.150933+08:00",
+        "created_at": "2026-10-21T03:15:54.151227+08:00"
+      },
+      {
+        "id": 4,
+        "request_id": "03c56f9ec9ff4e6d",
+        "sequence": 4,
+        "relay_attempt": 3,
+        "reason": "failover",
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 2,
+        "model_id": 2,
+        "model_name": "model-b",
+        "client_protocol": "openai_responses",
+        "upstream_protocol": "openai",
+        "stream": false,
+        "budget_field": "max_tokens",
+        "status": 200,
+        "success": true,
+        "duration_ms": 0,
+        "started_at": "2026-10-21T03:15:54.151985+08:00",
+        "created_at": "2026-10-21T03:15:54.152436+08:00"
+      }
+    ],
+    "total": 4
+  },
+  "logs": {
+    "data": [
+      {
+        "id": 3,
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 2,
+        "model_name": "model-b",
+        "status": 200,
+        "success": true,
+        "stream": false,
+        "request_id": "03c56f9ec9ff4e6d",
+        "input_token": 7,
+        "output_token": 1,
+        "cache_read_token": 0,
+        "cache_write_token": 0,
+        "duration_ms": 0,
+        "first_token_ms": 0,
+        "client_protocol": "openai_responses",
+        "bridge_decoded": 0,
+        "shim_rewrites": 0,
+        "hosted_tools_stripped": 0,
+        "created_at": "2026-10-21T03:15:54.153001+08:00"
+      },
+      {
+        "id": 2,
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 1,
+        "model_name": "model-a",
+        "status": 503,
+        "success": false,
+        "stream": false,
+        "request_id": "03c56f9ec9ff4e6d",
+        "input_token": 0,
+        "output_token": 0,
+        "cache_read_token": 0,
+        "cache_write_token": 0,
+        "duration_ms": 0,
+        "first_token_ms": 0,
+        "err_kind": "upstream_error",
+        "err_msg": "上游返回 503: {\"error\": {\"message\": \"synthetic overload\"}}",
+        "client_protocol": "openai_responses",
+        "bridge_decoded": 0,
+        "shim_rewrites": 0,
+        "hosted_tools_stripped": 0,
+        "created_at": "2026-10-21T03:15:54.151577+08:00"
+      },
+      {
+        "id": 1,
+        "api_key_id": 1,
+        "group_name": "probe",
+        "channel_id": 1,
+        "model_name": "model-a",
+        "status": 503,
+        "success": false,
+        "stream": false,
+        "request_id": "03c56f9ec9ff4e6d",
+        "input_token": 0,
+        "output_token": 0,
+        "cache_read_token": 0,
+        "cache_write_token": 0,
+        "duration_ms": 1,
+        "first_token_ms": 0,
+        "err_kind": "upstream_error",
+        "err_msg": "上游返回 503: {\"error\": {\"message\": \"synthetic overload\"}}",
+        "client_protocol": "openai_responses",
+        "bridge_decoded": 0,
+        "shim_rewrites": 0,
+        "hosted_tools_stripped": 0,
+        "created_at": "2026-10-21T03:15:54.15046+08:00"
+      }
+    ],
+    "total": 3
+  },
+  "stats": {
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "input_tokens": 7,
+    "output_tokens": 1,
+    "total_requests": 3,
+    "recent_requests": 3
+  },
+  "reply": {
+    "id": "local-probe",
+    "object": "response",
+    "status": "completed",
+    "model": "model-b",
+    "output": [
+      {
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "OK",
+            "annotations": []
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "usage": {
+      "input_tokens": 7,
+      "output_tokens": 1,
+      "total_tokens": 8,
+      "input_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  },
+  "assertions": "passed",
+  "independent_log_db": true
+}

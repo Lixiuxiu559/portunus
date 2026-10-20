@@ -19,6 +19,9 @@ type Deps struct {
 	Auth func(key string) (apiKeyID int64, ok bool)
 	// LogWrite 写一条调用日志。生产实现写 shared.LogDB；测试收集到内存断言。
 	LogWrite func(*shared.Log)
+	// AttemptWrite 独立保存每次显式 Client.Do 尝试；写入失败不重试上游。
+	// nil 用于不需要记录尝试的测试/嵌入调用方；生产由 main 显式装配。
+	AttemptWrite func(*shared.UpstreamAttempt) error
 }
 
 // relayServer 持有依赖，承载 /v1 转发的全部编排（鉴权 / 路由 / 重试 / 熔断 / 归因）。

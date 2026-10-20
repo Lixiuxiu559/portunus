@@ -27,12 +27,13 @@ func NewHTTPClient(pc shared.ProxyConfig) *http.Client {
 
 // doRequest 发送上游 POST 请求，返回响应（body 由调用方负责关闭与读取）。
 // 端点与鉴权头由 protocol.Upstream 提供；HTTP 执行走注入的 Deps.Client。
-func (s *relayServer) doRequest(ctx context.Context, url string, headers http.Header, body []byte) (*http.Response, error) {
+func (s *relayServer) doRequest(ctx context.Context, url string, headers http.Header, body []byte, trace *relayAttemptTrace, reason string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	req.Header = headers
+	trace.begin(body, reason)
 	resp, err := s.deps.Client.Do(req)
 	if err != nil {
 		var ne net.Error
@@ -49,11 +50,11 @@ type chatBudgetRetry struct{ body []byte }
 
 // doRequestWithChatBudgetFallback 在响应尚未交付时处理一次预算字段不兼容。
 // 未匹配的错误恢复 body 交给常规失败处理；200/流内错误不参与此兼容重试。
-func (s *relayServer) doRequestWithChatBudgetFallback(ctx context.Context, url string, headers http.Header, body []byte, allow bool, state *chatBudgetRetry) (*http.Response, error) {
+func (s *relayServer) doRequestWithChatBudgetFallback(ctx context.Context, url string, headers http.Header, body []byte, allow bool, state *chatBudgetRetry, trace *relayAttemptTrace) (*http.Response, error) {
 	if state.body != nil {
 		body = state.body
 	}
-	resp, err := s.doRequest(ctx, url, headers, body)
+	resp, err := s.doRequest(ctx, url, headers, body, trace, "")
 	if err != nil || !allow || state.body != nil || (resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusUnprocessableEntity) {
 		return resp, err
 	}
@@ -67,7 +68,8 @@ func (s *relayServer) doRequestWithChatBudgetFallback(ctx context.Context, url s
 	if !ok {
 		return resp, nil
 	}
+	s.finishAttempt(trace, resp.StatusCode, false, &upstreamStatusError{status: resp.StatusCode, body: errorBody})
 	state.body = retryBody
 	log.Printf("relay 预算字段兼容重试: request_id=%s status=%d max_tokens→max_completion_tokens", headers.Get("X-Request-Id"), resp.StatusCode)
-	return s.doRequest(ctx, url, headers, retryBody)
+	return s.doRequest(ctx, url, headers, retryBody, trace, "budget_compat")
 }
