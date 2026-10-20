@@ -10,7 +10,14 @@ on:
   workflow_dispatch:
 
 jobs:
+  checks:
+    name: Quality checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: checks
     strategy:
       fail-fast: false
       matrix:

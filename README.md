@@ -202,7 +202,11 @@ pnpm run build:mac   # macOS DMG / ZIP（arm64）
 pnpm run build:win   # Windows EXE / ZIP（x64）
 ```
 
-产物位于 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions，构建 macOS、Windows、Linux 安装包并创建草稿 Release，确认后手动发布。
+每次分支提交和 PR 会触发 [CI](.github/workflows/ci.yml)：运行 Go 全量测试、`go vet`、Go 构建、前端测试与 renderer 构建。依赖使用 `pnpm install --frozen-lockfile` 安装，CI 不需要上游密钥或真实模型调用。
+
+产物位于 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions，先通过同一套 CI 检查，再构建 macOS、Windows、Linux 安装包并创建草稿 Release，确认后手动发布。手动触发 Release 同样先检查，再打包。
+
+如需阻止检查失败的 PR 合并，在 GitHub 分支保护或 ruleset 中将 `Go checks` 和 `Web checks` 设为必需状态检查；工作流文件本身不改变远端分支保护规则。桌面启动检查仍按[开发隔离说明](docs/product/DEVELOPMENT.md)单独执行。
 
 </details>
 
