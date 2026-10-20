@@ -44,8 +44,8 @@ backend/
   protocol  协议转换：OpenAI Chat/Responses ↔ Anthropic ↔ Gemini
   api       管理 API（/api/*，供前端调用）
   gateway   对外 /v1 LLM 接口（Chat / Responses / Messages，供客户端和应用调用）
-  cron      定时任务：定时同步模型、日志落库
-  shared    跨模块公共：配置、数据库、APIKey / 日志实体
+  cron      定时任务：同步模型、清理过期日志与尝试记录
+  shared    跨模块公共：配置、数据库、APIKey、日志/尝试实体与查询
 ```
 
 依赖方向：`api` / `gateway` / `cron` → `channel` / `model` / `group` / `protocol` → `shared`。模块间用外键 ID 关联，避免包级循环依赖。
@@ -54,7 +54,7 @@ backend/
 
 ```
 客户端(Chat / Responses / Messages) → /v1 → APIKey 鉴权 → 命中分组 → 按策略选模型项
-  → 需要则转协议 → 上游调用 → 转回 → 返回 → 异步记调用记录/token与缓存用量
+  → 需要则转协议 → 上游调用 → 转回 → 返回 → 经注入 writer 同步记录 relay 日志与独立 HTTP 尝试，汇总 token 与缓存用量
 ```
 
 桌面局域网模式保留 `/v1` 令牌鉴权服务；管理 `/api` 始终限制真实回环对端，并检查 Host / Origin。不得通过公开反向代理暴露管理接口。模型同步只新增发现的模型；日志记录数与客户端请求数需区分。产品不提供价格配置、默认价格套用或调用费用计算；保留 token、缓存用量和调用诊断。历史数据库 price/currency/cost 列及旧值保留，不删除或清零，也不再进入活跃管理接口与统计聚合。真实调用仍可能由上游收费。
@@ -62,3 +62,11 @@ backend/
 ## 桌面开发隔离
 
 桌面本地开发与预览统一使用 Portunus Dev（端口 13061、Bundle ID `com.portunus.app.dev`）。macOS 独立数据目录为 `~/Library/Application Support/Portunus Dev`；不迁移或复制正式配置。`cd web && pnpm dev` 自动编译并管理后端；`pnpm build:dev && pnpm preview:dev` 构建独立预览。不覆盖 `/Applications/Portunus.app`，不停止正式版，不使用 `killall`/`pkill Portunus`。正式发布仍用原有 `build:mac` / `build:win`。详细边界见 `docs/product/DEVELOPMENT.md`。
+
+## 调用观测与统计口径
+
+- `shared.Log` 保持旧 relay 日志与 token 聚合；`shared.UpstreamAttempt` 单独保存显式 `http.Client.Do` 尝试，不重复记 token，也不混入旧记录数。写入走 `Deps.LogWrite` / `Deps.AttemptWrite`，生产默认同步落库。
+- `/api/logs/requests` 是日志关联归并，非空请求 ID 合并，缺 ID 的历史行独立。筛选先命中关联项，摘要再取该请求全部日志；后端分组分页，不在前端合并当前页。
+- latest_log 按写入 ID 选取，最近时间、渠道与结果必须来自同一行；不能据此推断请求最终结果。连续序号不能证明采集完整，空尝试不能证明调用数为 0。
+- 未引入请求终态/完整性凭证前，不将关联项数、旧日志数或显式 Do 数标为准确客户端请求数、最终成功率或物理上游发送数。
+- 当前界面与排障口径见[调用记录说明](docs/call-records.md)，历史验证结论仅在其原基线和范围内有效。

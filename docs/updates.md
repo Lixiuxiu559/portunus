@@ -20,7 +20,7 @@ Portunus 默认从腾讯云 COS 获取更新，检查更新或下载安装包失
 
 ## 从本地同步正式版本
 
-GitHub Actions 继续负责构建安装包并生成草稿 Release；人工确认并发布后，在本地运行同步脚本。项目不再自动从 GitHub Runner 上传 COS。
+GitHub Actions 先复用 [CI 质量检查](../.github/workflows/ci.yml)，全部通过后才构建安装包；标签触发生成草稿 Release，手动触发只构建产物。人工确认并发布后，在本地运行同步脚本。项目不再自动从 GitHub Runner 上传 COS。
 
 环境要求：Python 3.11+、GitHub CLI（`gh`）。脚本将 Python 依赖安装到系统临时目录中的独立虚拟环境。
 

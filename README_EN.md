@@ -69,6 +69,8 @@ Call records capture the selected model, channel, group, protocol, latency, requ
 
 Record counts refer to log rows; retries or target switches can produce several records for one client request. Portunus does not configure model prices or calculate call costs. Refer to your upstream provider's invoice for actual charges.
 
+Filter by channel, group, or exact request ID; open a record to copy its request ID or error summary. The request association view groups persisted logs by request ID and shows ordinary retries, token-budget compatibility retries, and target switches. Historical logs without an ID stay separate. The latest persisted result is not proof of a final client outcome, and a continuous attempt sequence does not prove completeness. See the [call-record guide (Chinese)](docs/call-records.md).
+
 ### Keep everyday maintenance on your desktop
 
 Fetch model lists when saving a channel, on a schedule, or across all channels on demand. Sync adds newly discovered models while preserving existing models; it does not delete missing upstream models or run paid generation checks. Automatically clean up logs by retention period, switch themes, and update inside the app.
@@ -168,17 +170,18 @@ go run .
 
 The backend defaults to `0.0.0.0:3060`, with SQLite data files under `data/`. Configure it through `config.json` or `PORTUNUS_*` environment variables, including `PORTUNUS_SERVER_HOST`, `PORTUNUS_SERVER_PORT`, and `PORTUNUS_DATABASE_PATH`.
 
-Keep the backend running and start the management UI in a second terminal:
+Desktop development uses an isolated **Portunus Dev** instance; do not also start `go run .` for this path:
 
 ```bash
 cd web
 pnpm install
-pnpm run dev:web    # Browser: http://localhost:5173
-# Or use the desktop development window:
-pnpm run dev
+pnpm run dev        # Builds and manages the Dev backend; Vite: http://127.0.0.1:5173
+# Or build and launch a separate desktop preview:
+pnpm run build:dev
+pnpm run preview:dev
 ```
 
-The development server proxies `/api` and `/v1` to `localhost:3060`. Service Access also works in the browser and points examples at the development backend. The management UI and development proxy are local-only; do not proxy `/api` for remote users.
+The Dev backend uses port `13061`; the installed production app keeps `13060`. Configuration, databases, caches, and updates are isolated. Dev starts with fresh configuration and does not copy production credentials. Running `dev:web` alone requires an already running Dev backend; its `/api` and `/v1` proxy targets `127.0.0.1:13061`, independently of the standalone backend's default port 3060. The management UI and proxy remain local-only. See the [development guide](docs/product/DEVELOPMENT.md).
 
 </details>
 
@@ -201,7 +204,9 @@ pnpm run build:mac   # macOS DMG / ZIP (arm64)
 pnpm run build:win   # Windows EXE / ZIP (x64)
 ```
 
-Artifacts are written to `web/dist-electron/`. Pushing a `v*` tag triggers GitHub Actions to build macOS, Windows, and Linux packages and create a draft release for manual review and publication.
+Branch pushes, pull requests, and manual CI runs execute Go tests, vet, build, frontend tests, and the renderer build. Dependencies are installed with `pnpm install --frozen-lockfile`; no upstream credentials or paid generation calls are required.
+
+Artifacts are written to `web/dist-electron/`. Tag and manual release workflows reuse these checks before packaging. Pushing a `v*` tag builds macOS, Windows, and Linux packages and creates a draft release for manual review and publication; a manual release run only builds artifacts. Local validation has passed, but the first remote CI run and required status checks remain unverified/unconfigured. See the [CI and development guide](docs/product/DEVELOPMENT.md#持续集成与发布检查).
 
 </details>
 

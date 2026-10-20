@@ -42,7 +42,6 @@ macOS 预览路径：`web/dist-dev/mac-arm64/Portunus Dev.app`（Intel 为 `mac/
 - 不通过 `HOME`、任意数据目录覆盖参数或正式数据库副本实现隔离。
 - 端到端脚本使用 Dev 数据目录（正常启动检查不写业务配置）；不会重写 HOME，也不会停止正式版。
 
-
 ## 持续集成与发布检查
 
 配置提交：`337e216`。工作流见 [CI](../../.github/workflows/ci.yml) 和 [Release](../../.github/workflows/release.yml)。
@@ -53,6 +52,31 @@ macOS 预览路径：`web/dist-dev/mac-arm64/Portunus Dev.app`（Intel 为 `mac/
 - `v*` 标签及手动 Release 均先复用上述 CI，全部通过才进入三平台安装包构建。标签创建草稿 Release；手动 Release 只构建产物。草稿仍需人工确认发布。
 - CI 不加载用户配置、正式/Dev 数据或上游密钥，不执行真实生成调用。桌面启动检查 `pnpm test:e2e`、跨设备 LAN 和真实上游验证单独进行，不能以 CI 通过代替。
 
-本地已通过工作流 actionlint 检查、Go 全量测试/静态检查/构建，以及临时干净目录锁文件安装后的 94 项前端测试和 renderer 构建。尚未验证 GitHub 线上首次运行，未修改远端分支保护或 ruleset。构建大 chunk 和 Node module type 提示仍为现有非阻断项。
+CI 配置交付时，本地已通过工作流 actionlint 检查、Go 全量测试/静态检查/构建，以及临时干净目录锁文件安装后的 94 项前端测试和 renderer 构建。后续请求关联改动的验证为 101 项前端测试、全量 Go 测试、shared/api race、vet 与构建，见[请求关联验证报告](../research/2026-10-21-request-associations/README.md)。这些是各自提交时的验证结果。尚未验证 GitHub 线上首次运行，未修改远端分支保护或 ruleset。构建大 chunk 和 Node module type 提示仍为现有非阻断项。
 
 若需要禁止失败的 PR 合并，待远端产生实际检查结果后，将 `Go checks`、`Web checks` 设为必需状态检查。新增工作流本身不会启用合并限制。
+
+## 调用记录诊断接口
+
+管理 `/api` 仅接受真实回环连接，并检查 Host / Origin；服务 API 令牌不授予管理权限。操作说明见[调用记录与排障](../call-records.md)。
+
+| GET 路径 | 用途与口径 |
+| --- | --- |
+| `/api/logs` | 符合条件的日志行，返回 `{total,data}` |
+| `/api/logs/stat` | 同一筛选条件的日志行统计与 token/缓存用量，不按请求归并 |
+| `/api/logs/requests` | 服务端归并分页；任一行命中即选中关联项，摘要取该关联项全部日志 |
+| `/api/logs/attempts` | `request_id` 必填且精确匹配，按 sequence、id 升序返回独立尝试 |
+
+前三个接口共用筛选：`api_key_id`、`channel_id`、`group_name`、`model_name`、`request_id`（精确）、`client_protocol`、`success`、`start_time` / `end_time`（RFC3339）。分页接口接受 `page` / `page_size`，默认 1 / 20，每页最多 100；stat 不受分页影响。归并返回 `{total,data:[{key,request_id,log_count,latest_log,first_at,last_at}]}`，latest_log 按最大写入 ID 选取，first_at/last_at 是时间范围。
+
+`shared.Log` 保存一轮 relay 日志，`shared.UpstreamAttempt` 单独保存每次显式 `http.Client.Do` 尝试，包含预算兼容重试；不重复计 token。主进程注入的 `Deps.LogWrite` / `Deps.AttemptWrite` 当前同步写入 LogDB，支持独立日志库；cron 负责同步模型与过期清理，不负责日志落库。尝试记录写入失败会告警，不因此额外调用上游。
+
+自动保留期由 `log_retention_days` 控制（0 禁用），每小时清理。`DELETE /api/logs?target_timestamp=<Unix秒>` 使用相同截止时间清理旧日志（created_at）和尝试（started_at），返回的 `deleted` 仅计旧日志行，不包含尝试行数。
+
+当前没有请求终态或完整性凭证，不把关联项数、日志行数和已采集 Do 数称为准确客户端请求数，也不据此推断最终成功率。
+
+## 隔离复现与验证边界
+
+日志详情、上游尝试与归并的历史验证分别见[详情报告](../research/2026-10-21-log-details/README.md)、[尝试报告](../research/2026-10-21-upstream-attempts/README.md)和[归并报告](../research/2026-10-21-request-associations/README.md)。本地合成上游、真实浏览器、实际 main 进程、外部真实上游与打包桌面应用是不同验证范围，不能相互替代。
+
+复现报告中的 fixture 时，先确认其独立回环端口未被占用；使用临时合成数据，不读取或复制正式/Dev 数据，不覆盖 HOME，不接管已有端口进程。验证结束只关闭自己启动的服务。桌面 `pnpm test:e2e` 则按上文先退出已有 Dev，不停止正式版。历史报告记录的测试数量和结果保留在原提交基线上。
