@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -39,4 +42,32 @@ func (s *relayServer) doRequest(ctx context.Context, url string, headers http.He
 		return nil, err
 	}
 	return resp, nil
+}
+
+// chatBudgetRetry 生命周期为一次客户端请求的一个目标，避免外层普通重试反复切换字段。
+type chatBudgetRetry struct{ body []byte }
+
+// doRequestWithChatBudgetFallback 在响应尚未交付时处理一次预算字段不兼容。
+// 未匹配的错误恢复 body 交给常规失败处理；200/流内错误不参与此兼容重试。
+func (s *relayServer) doRequestWithChatBudgetFallback(ctx context.Context, url string, headers http.Header, body []byte, allow bool, state *chatBudgetRetry) (*http.Response, error) {
+	if state.body != nil {
+		body = state.body
+	}
+	resp, err := s.doRequest(ctx, url, headers, body)
+	if err != nil || !allow || state.body != nil || (resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusUnprocessableEntity) {
+		return resp, err
+	}
+	errorBody, readErr := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewReader(errorBody))
+	if readErr != nil {
+		return resp, nil
+	}
+	retryBody, ok := protocol.ChatTokenBudgetFallback(body, resp.StatusCode, errorBody)
+	if !ok {
+		return resp, nil
+	}
+	state.body = retryBody
+	log.Printf("relay 预算字段兼容重试: request_id=%s status=%d max_tokens→max_completion_tokens", headers.Get("X-Request-Id"), resp.StatusCode)
+	return s.doRequest(ctx, url, headers, retryBody)
 }

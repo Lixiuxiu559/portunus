@@ -125,7 +125,9 @@ func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte
 	// thinking 意图仅 openai 兼容上游消费：非 openai 目标不写入 canonical——
 	// 死存储会让「装配意图」看似各协议自行取舍，一旦任一 renderer 将来读取
 	// 该字段，-thinking 意图即静默漏进非 openai 上游（9a8e785 的 400 回归）。
-	if up.Thinking != nil && to == ProviderOpenAI {
+	if up.Thinking != nil && to == ProviderOpenAI && req.Thinking == nil &&
+		(req.reasoning == nil || (req.reasoning.mode != "disabled" &&
+			(req.reasoning.effort == nil || *req.reasoning.effort != "none"))) {
 		req.Thinking = up.Thinking
 	}
 	// 托管工具声明发往 openai 上游前剥离：openai 兼容上游没有 hosted 工具语义，
@@ -165,7 +167,7 @@ func rewriteSameProtocol(p Provider, body []byte, up UpstreamRequest) ([]byte, e
 	if up.Model != "" {
 		m["model"] = up.Model
 	}
-	if up.Thinking != nil && p == ProviderOpenAI {
+	if up.Thinking != nil && p == ProviderOpenAI && !hasExplicitThinking(m) {
 		thinking := map[string]any{"type": up.Thinking.Type}
 		if up.Thinking.BudgetTokens > 0 {
 			thinking["budget_tokens"] = up.Thinking.BudgetTokens
@@ -181,7 +183,16 @@ func parseRequestToOpenAI(from Provider, body []byte) (*ChatCompletionRequest, e
 	if !ok {
 		return nil, fmt.Errorf("暂不支持解析 %s 请求", from)
 	}
-	return impl.parseRequest(body)
+	reasoning, err := parseReasoning(from, body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := impl.parseRequest(body)
+	if err != nil {
+		return nil, err
+	}
+	req.reasoning = reasoning
+	return req, nil
 }
 
 // renderRequestFromOpenAI 将 OpenAI 规范请求渲染为 to 协议请求体。
@@ -190,7 +201,11 @@ func renderRequestFromOpenAI(to Provider, req *ChatCompletionRequest) ([]byte, e
 	if !ok {
 		return nil, fmt.Errorf("暂不支持渲染 %s 请求", to)
 	}
-	return impl.renderRequest(req)
+	body, err := impl.renderRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	return renderReasoning(to, body, req.reasoning, req.Thinking)
 }
 
 // parseResponseToOpenAI 按 from 协议解析响应体为 OpenAI 规范响应。

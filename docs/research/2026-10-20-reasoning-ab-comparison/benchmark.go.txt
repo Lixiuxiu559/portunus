@@ -1,0 +1,253 @@
+//go:build ignore
+
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/Lixiuxiu559/portunus/backend/gateway"
+	p "github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+type Case struct {
+	ID     string     `json:"id"`
+	Source p.Provider `json:"source_protocol"`
+	Prompt string     `json:"prompt"`
+}
+type Route struct {
+	ID      int64
+	Name    string
+	Type    p.Provider
+	BaseURL string
+	Key     string
+	Model   string
+}
+type Job struct {
+	Case   Case
+	Effort string
+}
+
+func check(err error) {
+	if err != nil {
+		panic("benchmark preparation failed; details suppressed")
+	}
+}
+func digest(s string) string { v := sha256.Sum256([]byte(s)); return hex.EncodeToString(v[:]) }
+func run(route Route, j Job) map[string]any {
+	start := time.Now()
+	id := fmt.Sprintf("portunus-ab-%d-%s", time.Now().UnixNano(), j.Effort)
+	out := map[string]any{"task": j.Case.ID, "source_protocol": j.Case.Source, "route": route.Name, "channel_id": route.ID, "base_url": route.BaseURL, "requested_model": route.Model, "effort": j.Effort, "prompt_sha256": digest(j.Case.Prompt), "request_id": id, "started_utc": start.UTC().Format(time.RFC3339Nano), "max_output_tokens_requested": 8192}
+	defer func() { out["duration_ms"] = time.Since(start).Milliseconds() }()
+	var clientBody map[string]any
+	if j.Case.Source == p.ProviderAnthropic {
+		clientBody = map[string]any{"model": "benchmark-group", "stream": true, "max_tokens": 8192, "thinking": map[string]any{"type": "adaptive"}, "output_config": map[string]any{"effort": j.Effort}, "messages": []any{map[string]any{"role": "user", "content": j.Case.Prompt}}}
+	} else {
+		clientBody = map[string]any{"model": "benchmark-group", "stream": true, "max_output_tokens": 8192, "reasoning": map[string]any{"effort": j.Effort}, "input": j.Case.Prompt}
+	}
+	raw, _ := json.Marshal(clientBody)
+	body, _, err := p.ComposeUpstreamRequest(j.Case.Source, route.Type, raw, p.UpstreamRequest{Model: route.Model})
+	if err != nil {
+		out["error"] = "conversion failed: " + err.Error()
+		return out
+	}
+	var sent map[string]any
+	check(json.Unmarshal(body, &sent))
+	out["sent_effort"] = sent["reasoning_effort"]
+	out["sent_thinking"] = sent["thinking"]
+	out["sent_max_tokens"] = sent["max_tokens"]
+	out["sent_max_completion_tokens"] = sent["max_completion_tokens"]
+	if sent["reasoning_effort"] != j.Effort {
+		out["error"] = "effort mismatch; no request sent"
+		return out
+	}
+	upstream, err := p.NewUpstream(route.Type, route.BaseURL, route.Key)
+	if err != nil {
+		out["error"] = "invalid upstream"
+		return out
+	}
+	req, err := http.NewRequest(http.MethodPost, upstream.ChatURL(route.Model, true), bytes.NewReader(body))
+	check(err)
+	req.Header = upstream.ChatHeaders()
+	req.Header.Set("X-Request-Id", id)
+	client := gateway.NewHTTPClient(shared.DefaultProxyConfig())
+	client.Timeout = 180 * time.Second
+	defer client.CloseIdleConnections()
+	resp, err := client.Do(req)
+	if err != nil {
+		out["error"] = strings.ReplaceAll(err.Error(), route.Key, "[REDACTED]")
+		return out
+	}
+	defer resp.Body.Close()
+	out["status"] = resp.StatusCode
+	out["headers_ms"] = time.Since(start).Milliseconds()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		out["error"] = strings.ReplaceAll(string(b), route.Key, "[REDACTED]")
+		return out
+	}
+	sc := bufio.NewScanner(resp.Body)
+	sc.Buffer(make([]byte, 65536), 4*1024*1024)
+	var answer strings.Builder
+	reasoningChars := 0
+	first := true
+	events := 0
+	done := false
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			done = true
+			break
+		}
+		var ev struct {
+			ID      string         `json:"id"`
+			Model   string         `json:"model"`
+			Error   any            `json:"error"`
+			Usage   map[string]any `json:"usage"`
+			Choices []struct {
+				Finish *string `json:"finish_reason"`
+				Delta  struct {
+					Content   string `json:"content"`
+					Reasoning string `json:"reasoning_content"`
+				} `json:"delta"`
+			} `json:"choices"`
+		}
+		if json.Unmarshal([]byte(data), &ev) != nil {
+			out["malformed_sse"] = true
+			continue
+		}
+		events++
+		if ev.ID != "" {
+			out["response_id"] = ev.ID
+		}
+		if ev.Model != "" {
+			out["response_model"] = ev.Model
+		}
+		if ev.Usage != nil {
+			out["usage"] = ev.Usage
+		}
+		if ev.Error != nil {
+			out["stream_error"] = ev.Error
+		}
+		for _, c := range ev.Choices {
+			if c.Finish != nil && *c.Finish != "" {
+				out["finish_reason"] = *c.Finish
+			}
+			if first && (c.Delta.Content != "" || c.Delta.Reasoning != "") {
+				out["first_content_ms"] = time.Since(start).Milliseconds()
+				first = false
+			}
+			answer.WriteString(c.Delta.Content)
+			reasoningChars += utf8.RuneCountInString(c.Delta.Reasoning)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		out["error"] = strings.ReplaceAll(err.Error(), route.Key, "[REDACTED]")
+	}
+	out["answer"] = answer.String()
+	out["answer_sha256"] = digest(answer.String())
+	out["answer_chars"] = utf8.RuneCountInString(answer.String())
+	out["reasoning_chars"] = reasoningChars
+	out["sse_events"] = events
+	out["done"] = done
+	return out
+}
+func main() {
+	root := os.Args[1]
+	raw, err := os.ReadFile(filepath.Join(root, "cases.json"))
+	check(err)
+	var cases []Case
+	check(json.Unmarshal(raw, &cases))
+	results, err := os.OpenFile(filepath.Join(root, "results.jsonl"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	check(err)
+	defer results.Close()
+	home, err := os.UserHomeDir()
+	check(err)
+	db, err := gorm.Open(sqlite.Open("file:"+filepath.Join(home, "Library/Application Support/@portunus/web/data/portunus.db")+"?mode=ro"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	check(err)
+	var routes []Route
+	check(db.Table("channels c").Select("c.id,c.name,c.type,c.base_url,c.key,m.name as model").Joins("join models m on m.channel_id=c.id").Where("(c.id=1 and m.name=?) or (c.id=3 and m.name=?)", "deepseek/deepseek-v4.1-flash", "deepseek-flash").Order("c.id").Scan(&routes).Error)
+	if len(routes) != 2 {
+		panic("expected two configured routes")
+	}
+	sqlDB, err := db.DB()
+	check(err)
+	check(sqlDB.Close())
+	meta := []map[string]any{}
+	for _, r := range routes {
+		row := map[string]any{"route": r.Name, "base_url": r.BaseURL, "configured_model": r.Model}
+		u, err := p.NewUpstream(r.Type, r.BaseURL, r.Key)
+		check(err)
+		models, err := u.FetchModels()
+		if err != nil {
+			row["metadata_error"] = strings.ReplaceAll(err.Error(), r.Key, "[REDACTED]")
+		} else {
+			ids := []string{}
+			for _, name := range models {
+				if strings.Contains(strings.ToLower(name), "deepseek") {
+					ids = append(ids, name)
+				}
+			}
+			row["deepseek_model_ids"] = ids
+		}
+		meta = append(meta, row)
+	}
+	data, _ := json.MarshalIndent(meta, "", "  ")
+	check(os.WriteFile(filepath.Join(root, "route_metadata.json"), data, 0600))
+	fmt.Println("metadata collected; configured model aliases may represent different versions")
+	jobs := []Job{}
+	for _, c := range cases {
+		for _, e := range []string{"low", "high", "max"} {
+			jobs = append(jobs, Job{c, e})
+		}
+	}
+	rand.New(rand.NewSource(20261020)).Shuffle(len(jobs), func(i, j int) { jobs[i], jobs[j] = jobs[j], jobs[i] })
+	order := []map[string]string{}
+	for _, j := range jobs {
+		order = append(order, map[string]string{"task": j.Case.ID, "effort": j.Effort})
+	}
+	data, _ = json.MarshalIndent(order, "", "  ")
+	check(os.WriteFile(filepath.Join(root, "pair_order.json"), data, 0600))
+	for batch, j := range jobs {
+		ch := make(chan map[string]any, 2)
+		for _, r := range routes {
+			go func(r Route) { ch <- run(r, j) }(r)
+		}
+		for i := 0; i < len(routes); i++ {
+			row := <-ch
+			row["pair_index"] = batch
+			data, _ := json.Marshal(row)
+			_, err := results.Write(append(data, '\n'))
+			check(err)
+			check(results.Sync())
+			summary := map[string]any{}
+			for _, k := range []string{"task", "route", "effort", "status", "duration_ms", "reasoning_chars", "finish_reason", "done", "error"} {
+				if v, ok := row[k]; ok {
+					summary[k] = v
+				}
+			}
+			b, _ := json.Marshal(summary)
+			fmt.Println(string(b))
+		}
+	}
+}

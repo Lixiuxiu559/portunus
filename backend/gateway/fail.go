@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -187,6 +188,11 @@ func failSpec(err error) failDecision {
 			RelayKind:  relayErrorKindByStatus(se.status),
 			RetryAfter: se.retryAfter,
 		}
+	}
+	// 无对应字段的显式思考设置是参数错误，不是上游故障。
+	var reasoningErr *protocol.ReasoningConversionError
+	if errors.As(err, &reasoningErr) {
+		return failDecision{ErrKind: shared.ErrKindConvert, Status: http.StatusBadRequest, RelayKind: relayErrInvalidRequest}
 	}
 	// 协议转换 / 请求改写失败：客户端请求体或渠道配置问题，重试无意义。
 	var convErr *convertError

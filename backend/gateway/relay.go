@@ -74,7 +74,7 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 		// -thinking 后缀：剥掉后解析分组（后缀判定、分组名解析是分组 / 模型名知识，
 		// 留在 gateway）；「thinking 落在哪个形状」是协议知识，交 protocol——
 		// ThinkingEnabledIntent 复用 anthropic 客户端自带的 budget_tokens
-		//（Claude Code 的 effort 就映射在这里）打包成意图，是否写入上游请求体由
+		//（旧式预算，与 output_config.effort 档位独立）打包成意图，是否写入上游请求体由
 		// protocol 按上游协议决定。
 		groupName := meta.Model
 		var upThinking *protocol.ThinkingConfig
@@ -105,9 +105,10 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 				skipped = append(skipped, fmt.Sprintf("%s(id=%d) %s", t.Model.Name, t.Model.ID, reason))
 				continue // 熔断开路，跳过该模型
 			}
+			budgetRetry := &chatBudgetRetry{} // 当前目标内记住字段切换，普通重试不重新触发兼容重试
 			for attempt := 0; attempt <= s.deps.Cfg.RetryCount; attempt++ {
 				anyAttempted = true
-				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking)
+				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking, budgetRetry)
 				if err == nil {
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
@@ -177,6 +178,10 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 				message = m
 			}
 		}
+		var reasoningErr *protocol.ReasoningConversionError
+		if errors.As(lastErr, &reasoningErr) {
+			message = reasoningErr.Error()
+		}
 		writeRelayError(c, clientProto, d.Status, d.RelayKind, message)
 	}
 }
@@ -184,7 +189,7 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 // relayToTarget 对单个 target 完成一次 relay。
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
-func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig) (out []byte, status int, err error) {
+func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig, budgetRetry *chatBudgetRetry) (out []byte, status int, err error) {
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -252,7 +257,8 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	headers := upstream.ChatHeaders()
 	headers.Set("X-Request-Id", requestID)
-	resp, err := s.doRequest(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody)
+	allowBudgetRetry := clientProto != protocol.ProviderOpenAI && t.Channel.Type == protocol.ProviderOpenAI
+	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry)
 	if err != nil {
 		return nil, 0, err
 	}

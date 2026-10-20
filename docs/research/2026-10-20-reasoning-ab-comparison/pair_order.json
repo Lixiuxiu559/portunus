@@ -1,0 +1,26 @@
+[
+  {
+    "effort": "high",
+    "task": "pipeline_schedule"
+  },
+  {
+    "effort": "max",
+    "task": "ttl_lru_debug"
+  },
+  {
+    "effort": "low",
+    "task": "ttl_lru_debug"
+  },
+  {
+    "effort": "low",
+    "task": "pipeline_schedule"
+  },
+  {
+    "effort": "high",
+    "task": "ttl_lru_debug"
+  },
+  {
+    "effort": "max",
+    "task": "pipeline_schedule"
+  }
+]

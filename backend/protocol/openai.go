@@ -24,6 +24,9 @@ type ChatCompletionRequest struct {
 	// 默认开启——无条件转发曾导致部分上游 400（见 9a8e785）。
 	Thinking *ThinkingConfig `json:"thinking,omitempty"`
 
+	// reasoning 是跨协议思考设置，不直接序列化给 Chat 上游。
+	reasoning *reasoningIntent
+
 	// bridgeDecoded 是本次解析中从 thinking / redacted_thinking 块签名里成功还原
 	// 原始 reasoning_content 的次数。这是**解析遥测**，不是请求数据：非导出字段
 	// 不参与序列化，只由 ComposeUpstreamRequest 读出交给调用日志，用于判断
@@ -47,7 +50,7 @@ type ThinkingConfig struct {
 // ThinkingEnabledIntent 返回「开思考」意图：由上游模型名的 -thinking 后缀驱动，
 // gateway 判后缀、这里管协议形状。type 恒为 "enabled"（anthropic 词汇，canonical
 // 层与 Anthropic 同形状复用）；budget 从客户端原始 thinking 形状宽容提取——仅
-// anthropic 客户端自带该字段（Claude Code 的 effort 映射在 budget_tokens），
+// anthropic 客户端自带该字段（旧式显式预算，与 effort 档位独立），
 // 形状怪异（字符串 / 布尔）或缺失时忽略，不让元数据形状影响请求放行。
 // raw 是原样保留的顶层 thinking 字段（见 relayMeta.Thinking）。
 func ThinkingEnabledIntent(clientProto Provider, raw json.RawMessage) *ThinkingConfig {

@@ -1,0 +1,57 @@
+{
+  "pipeline_schedule": {
+    "makespan": 17,
+    "starts": {
+      "A": 0,
+      "B": 4,
+      "D": 4,
+      "C": 6,
+      "E": 7,
+      "F": 11,
+      "G": 11,
+      "H": 14
+    },
+    "orders_checked": 71
+  },
+  "ttl_lru_debug": {
+    "actual_reads": [
+      "A1",
+      null,
+      "A2",
+      null,
+      "C1",
+      null,
+      "D2",
+      null,
+      null,
+      "E1",
+      null,
+      "X2",
+      null,
+      "Y1",
+      null
+    ],
+    "correct_reads": [
+      "A1",
+      "B1",
+      "A2",
+      "A2",
+      null,
+      null,
+      "D2",
+      "D2",
+      null,
+      null,
+      null,
+      "X2",
+      "X2",
+      null,
+      null
+    ],
+    "bugs": [
+      "expiry_boundary",
+      "stale_heap_record",
+      "eviction_on_update"
+    ]
+  }
+}

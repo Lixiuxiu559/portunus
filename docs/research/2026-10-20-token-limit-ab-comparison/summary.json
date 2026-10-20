@@ -1,0 +1,46 @@
+[
+  {
+    "route": "个人-deepseek",
+    "field": "max_completion_tokens",
+    "value": 256,
+    "completion_tokens": 6404,
+    "reasoning_tokens": 6362,
+    "finish_reason": "stop",
+    "limited": false,
+    "seconds": 32.195,
+    "request_id": "portunus-limit-ab-1792466308353247000-high"
+  },
+  {
+    "route": "个人-deepseek",
+    "field": "max_tokens",
+    "value": 256,
+    "completion_tokens": 256,
+    "reasoning_tokens": 256,
+    "finish_reason": "length",
+    "limited": true,
+    "seconds": 2.408,
+    "request_id": "portunus-limit-ab-1792466340554237000-high"
+  },
+  {
+    "route": "乐聚-newapi",
+    "field": "max_completion_tokens",
+    "value": 256,
+    "completion_tokens": 5089,
+    "reasoning_tokens": 5047,
+    "finish_reason": "stop",
+    "limited": false,
+    "seconds": 25.289,
+    "request_id": "portunus-limit-ab-1792466340554235000-high"
+  },
+  {
+    "route": "乐聚-newapi",
+    "field": "max_tokens",
+    "value": 256,
+    "completion_tokens": 256,
+    "reasoning_tokens": 256,
+    "finish_reason": "length",
+    "limited": true,
+    "seconds": 1.467,
+    "request_id": "portunus-limit-ab-1792466308353247000-high"
+  }
+]

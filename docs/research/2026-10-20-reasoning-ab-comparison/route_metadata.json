@@ -1,0 +1,26 @@
+[
+  {
+    "base_url": "https://aiapi.lejurobot.com/v1",
+    "configured_model": "deepseek/deepseek-v4.1-flash",
+    "deepseek_model_ids": [
+      "saver/deepseek-v4.1-flash",
+      "deepseek/deepseek-v4-flash",
+      "deepseek/deepseek-v4-pro",
+      "deepseek-v4.1-flash",
+      "deepseek-v4-pro",
+      "deepseek-v4-flash-vision-exp",
+      "deepseek/deepseek-v4.1-flash",
+      "deepseek-v4-flash"
+    ],
+    "route": "乐聚-newapi"
+  },
+  {
+    "base_url": "https://api.deepseek.com",
+    "configured_model": "deepseek-flash",
+    "deepseek_model_ids": [
+      "deepseek-flash",
+      "deepseek-v4-pro"
+    ],
+    "route": "个人-deepseek"
+  }
+]

@@ -1,0 +1,71 @@
+{
+  "actual_upstream_calls": 4,
+  "total_observed_output_tokens": 1024,
+  "strict_probe_limitation": "Upstream tail metadata parsed after forwarding; gateway completion can race report serialization. Original strict assertions failed. Summary independently checks captured outgoing budget and client usage/terminal events without extra real calls.",
+  "results": [
+    {
+      "channel_id": 1,
+      "route": "乐聚-newapi",
+      "client": "codex",
+      "effort": "high",
+      "upstream_budget_field": "max_tokens",
+      "budget": 256,
+      "observed_output_tokens": 256,
+      "client_http_status": 200,
+      "upstream_http_status": 200,
+      "calls": 1,
+      "duration_ms": 2060,
+      "budget_effective_from_client_evidence": true,
+      "client_stop_reason": "completed (existing conversion drops length reason)",
+      "strict_probe_passed": false
+    },
+    {
+      "channel_id": 1,
+      "route": "乐聚-newapi",
+      "client": "claude_code",
+      "effort": "max",
+      "upstream_budget_field": "max_tokens",
+      "budget": 256,
+      "observed_output_tokens": 256,
+      "client_http_status": 200,
+      "upstream_http_status": 200,
+      "calls": 1,
+      "duration_ms": 2046,
+      "budget_effective_from_client_evidence": true,
+      "client_stop_reason": "max_tokens",
+      "strict_probe_passed": false
+    },
+    {
+      "channel_id": 3,
+      "route": "个人-deepseek",
+      "client": "codex",
+      "effort": "high",
+      "upstream_budget_field": "max_tokens",
+      "budget": 256,
+      "observed_output_tokens": 256,
+      "client_http_status": 200,
+      "upstream_http_status": 200,
+      "calls": 1,
+      "duration_ms": 1753,
+      "budget_effective_from_client_evidence": true,
+      "client_stop_reason": "completed (existing conversion drops length reason)",
+      "strict_probe_passed": false
+    },
+    {
+      "channel_id": 3,
+      "route": "个人-deepseek",
+      "client": "claude_code",
+      "effort": "max",
+      "upstream_budget_field": "max_tokens",
+      "budget": 256,
+      "observed_output_tokens": 256,
+      "client_http_status": 200,
+      "upstream_http_status": 200,
+      "calls": 1,
+      "duration_ms": 1870,
+      "budget_effective_from_client_evidence": true,
+      "client_stop_reason": "max_tokens",
+      "strict_probe_passed": false
+    }
+  ]
+}

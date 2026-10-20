@@ -25,6 +25,14 @@ type providerImpl struct {
 // 跨协议转成 OpenAI 的流式请求默认带上 include_usage,否则 OpenAI 兼容上游默认不返回
 // usage chunk,客户端看不到上下文占用。直通(from==to)不经过这里,客户端自己的 stream_options 原样保留。
 func renderOpenAIRequest(req *ChatCompletionRequest) ([]byte, error) {
+	// 跨协议转 Chat 默认使用兼容范围更广的旧预算字段；同协议绕过此渲染器。
+	// 只改副本，保留 canonical 的原始预算供其他目标协议使用。
+	chat := *req
+	if chat.MaxCompletionTokens != nil {
+		chat.MaxTokens = chat.MaxCompletionTokens
+		chat.MaxCompletionTokens = nil
+	}
+	req = &chat
 	if req.Stream && req.StreamOptions == nil {
 		req.StreamOptions = &StreamOptions{IncludeUsage: true}
 	}
