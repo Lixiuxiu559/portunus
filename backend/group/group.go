@@ -38,4 +38,7 @@ type GroupItem struct {
 	GroupID  int64 `gorm:"not null;uniqueIndex:idx_group_model" json:"group_id"`
 	ModelID  int64 `gorm:"not null;uniqueIndex:idx_group_model" json:"model_id"` // 指向 model.Model
 	Priority int   `json:"priority"`                                             // failover 按升序尝试；round_robin 无意义
+	// 元数据由关联查询读取，不写入分组项，也不参与数据库迁移。
+	ModelName string `gorm:"->;-:migration" json:"-"`
+	ChannelID int64  `gorm:"->;-:migration" json:"-"`
 }

@@ -40,7 +40,7 @@ function MemberRow({ provided, dragging, name, channelName, active, manual, sort
 export default function Groups() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
-  const [models, setModels] = useState([]);
+  const [modelCount, setModelCount] = useState(0);
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,9 +60,9 @@ export default function Groups() {
     const setRefreshState = isRefresh || groups.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
-      const [g, m, c] = await Promise.all([listGroups(), listModels({ page: 1, page_size: 1000 }), listChannels()]);
+      const [g, m, c] = await Promise.all([listGroups(), listModels({ page: 1, page_size: 1 }), listChannels()]);
       setGroups(Array.isArray(g) ? g : []);
-      setModels(Array.isArray(m?.data) ? m.data : []);
+      setModelCount(Number(m?.total) || 0);
       setChannels(Array.isArray(c) ? c : []);
       setLoadError(false);
     } catch {
@@ -75,7 +75,6 @@ export default function Groups() {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const modelMap = Object.fromEntries(models.map((m) => [m.id, m.name]));
   const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
 
   const handleSetActive = async (groupId, itemId) => {
@@ -143,7 +142,7 @@ export default function Groups() {
           >
             <RotateCw className="size-4" />
           </Button>
-          <Button variant="primary" size="md" isDisabled={loading || !models.length} onPress={() => setShowCreate(true)}>
+          <Button variant="primary" size="md" isDisabled={loading || !modelCount} onPress={() => setShowCreate(true)}>
             <Plus className="size-4" />
             新增分组
           </Button>
@@ -167,10 +166,10 @@ export default function Groups() {
           <p>添加上游渠道 → 获取模型 → 创建分组 → 服务接入 → 查看调用记录</p>
           {channels.length === 0 ? (
             <Button variant="primary" size="sm" onPress={() => navigate('/channels')}>添加上游渠道</Button>
-          ) : models.length === 0 ? (
+          ) : modelCount === 0 ? (
             <Button variant="primary" size="sm" onPress={() => navigate('/models')}>获取或添加上游模型</Button>
           ) : null}
-          <Button variant="secondary" size="sm" isDisabled={!models.length} onPress={() => setShowCreate(true)}>
+          <Button variant="secondary" size="sm" isDisabled={!modelCount} onPress={() => setShowCreate(true)}>
             <Plus className="size-4" />
             新增分组
           </Button>
@@ -210,12 +209,11 @@ export default function Groups() {
                   {g.items?.length ? <Droppable droppableId={String(g.id)}>
                     {(droppableProvided) => <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
                       {g.items.map((item, index) => {
-                        const model = models.find((m) => m.id === item.model_id);
-                        const name = modelMap[item.model_id] || `#${item.model_id}`;
+                        const name = item.model_name || `#${item.model_id}`;
                         const isActive = g.strategy === 'manual' && g.active_item_id === item.id;
                         return <Draggable key={item.id} draggableId={String(item.id)} index={index} disableInteractiveElementBlocking isDragDisabled={g.strategy !== 'failover'}>
                           {(provided, snapshot) => <MemberRow provided={provided} dragging={snapshot.isDragging} name={name}
-                            channelName={model ? channelMap[model.channel_id] : null} index={index} active={isActive}
+                            channelName={channelMap[item.channel_id]} index={index} active={isActive}
                             manual={g.strategy === 'manual'} sortable={g.strategy === 'failover'}
                             onActivate={() => handleSetActive(g.id, item.id)}
                             onRemove={() => setRemoveTarget({ groupId: g.id, groupName: g.name, itemId: item.id, name,
@@ -247,7 +245,6 @@ export default function Groups() {
         onOpenChange={setShowCreate}
         onCreated={() => fetchAll(true)}
         channels={channels}
-        models={models}
       />
       {editTarget && (
         <ExpandEditor
@@ -281,7 +278,6 @@ export default function Groups() {
       />
       <AddGroupItemModal
         group={addItemTarget}
-        models={models}
         channels={channels}
         isOpen={addItemTarget !== null}
         onOpenChange={(open) => { if (!open) setAddItemTarget(null); }}

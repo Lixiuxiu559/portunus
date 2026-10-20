@@ -17,9 +17,10 @@ var ErrModelNotFound = &shared.StatusError{Status: 400, Message: "模型不存�
 
 // CreateRequest 创建分组请求。
 type CreateRequest struct {
-	Name     string           `json:"name" binding:"required"`
-	Strategy Strategy         `json:"strategy" binding:"required"`
-	Items    []ItemAddRequest `json:"items"` // 可选，初始模型
+	Name          string           `json:"name" binding:"required"`
+	ActiveModelID int64            `json:"active_model_id"` // manual 可选的初始激活模型，0 保持未激活
+	Strategy      Strategy         `json:"strategy" binding:"required"`
+	Items         []ItemAddRequest `json:"items"` // 可选，初始模型
 }
 
 // UpdateRequest 更新分组请求，仅包含需要变更的字段。
@@ -42,10 +43,12 @@ type ItemUpdateRequest struct {
 
 // ItemResponse 是分组项的对外响应。
 type ItemResponse struct {
-	ID       int64 `json:"id"`
-	GroupID  int64 `json:"group_id"`
-	ModelID  int64 `json:"model_id"`
-	Priority int   `json:"priority"`
+	ModelName string `json:"model_name"`
+	ChannelID int64  `json:"channel_id"`
+	ID        int64  `json:"id"`
+	GroupID   int64  `json:"group_id"`
+	ModelID   int64  `json:"model_id"`
+	Priority  int    `json:"priority"`
 }
 
 // Response 是分组的对外响应。
@@ -64,10 +67,12 @@ func (g *Group) ToResponse() Response {
 	items := make([]ItemResponse, 0, len(g.Items))
 	for _, it := range g.Items {
 		items = append(items, ItemResponse{
-			ID:       it.ID,
-			GroupID:  it.GroupID,
-			ModelID:  it.ModelID,
-			Priority: it.Priority,
+			ModelName: it.ModelName,
+			ChannelID: it.ChannelID,
+			ID:        it.ID,
+			GroupID:   it.GroupID,
+			ModelID:   it.ModelID,
+			Priority:  it.Priority,
 		})
 	}
 	return Response{
@@ -84,14 +89,14 @@ func (g *Group) ToResponse() Response {
 // List 返回所有分组（含分组项，按 priority 排序）。
 func List() ([]Group, error) {
 	var gs []Group
-	err := shared.DB.Preload("Items", orderByPriority).Order("id").Find(&gs).Error
+	err := shared.DB.Preload("Items", itemsWithMetadata).Order("id").Find(&gs).Error
 	return gs, err
 }
 
 // Get 返回单个分组（含分组项）。
 func Get(id int64) (*Group, error) {
 	var g Group
-	if err := shared.DB.Preload("Items", orderByPriority).First(&g, id).Error; err != nil {
+	if err := shared.DB.Preload("Items", itemsWithMetadata).First(&g, id).Error; err != nil {
 		return nil, err
 	}
 	return &g, nil
@@ -100,7 +105,7 @@ func Get(id int64) (*Group, error) {
 // GetByName 按分组名返回分组（含分组项，按 priority 排序）。
 func GetByName(name string) (*Group, error) {
 	var g Group
-	if err := shared.DB.Preload("Items", orderByPriority).Where("name = ?", name).First(&g).Error; err != nil {
+	if err := shared.DB.Preload("Items", itemsWithMetadata).Where("name = ?", name).First(&g).Error; err != nil {
 		return nil, err
 	}
 	return &g, nil
@@ -110,6 +115,21 @@ func GetByName(name string) (*Group, error) {
 func Create(req CreateRequest) (*Group, error) {
 	if req.Name == "" || !req.Strategy.Valid() {
 		return nil, ErrInvalid
+	}
+	if req.ActiveModelID != 0 {
+		if req.Strategy != StrategyManual {
+			return nil, ErrInvalid
+		}
+		found := false
+		for _, it := range req.Items {
+			if it.ModelID == req.ActiveModelID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, ErrInvalid
+		}
 	}
 	// 预校验所有模型存在（只读，无需进事务）
 	for _, it := range req.Items {
@@ -131,6 +151,12 @@ func Create(req CreateRequest) (*Group, error) {
 			if err := tx.Create(&item).Error; err != nil {
 				return err
 			}
+			if req.ActiveModelID != 0 && item.ModelID == req.ActiveModelID {
+				g.ActiveItemID = item.ID
+			}
+		}
+		if g.ActiveItemID != 0 {
+			return tx.Model(&g).Update("active_item_id", g.ActiveItemID).Error
 		}
 		return nil
 	})
@@ -239,9 +265,11 @@ func DeleteItemsByModelIDsTx(tx *gorm.DB, modelIDs []int64) error {
 	return tx.Where("id IN ?", itemIDs).Delete(&GroupItem{}).Error
 }
 
-// orderByPriority 让分组项按 priority 升序加载。
-func orderByPriority(db *gorm.DB) *gorm.DB {
-	return db.Order("priority")
+// itemsWithMetadata 一次查询加载本页所有分组的成员及模型元数据，避免逐项查询。
+func itemsWithMetadata(db *gorm.DB) *gorm.DB {
+	return db.Select("group_items.*, models.name AS model_name, models.channel_id AS channel_id").
+		Joins("LEFT JOIN models ON models.id = group_items.model_id").
+		Order("group_items.priority")
 }
 
 // itemInGroup 判断分组项是否属于指定分组。

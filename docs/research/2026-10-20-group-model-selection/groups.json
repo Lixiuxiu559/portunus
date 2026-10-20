@@ -1,0 +1,114 @@
+[
+  {
+    "id": 1,
+    "name": "目录外成员",
+    "strategy": "manual",
+    "active_item_id": 1,
+    "items": [
+      {
+        "model_name": "catalog-1099",
+        "channel_id": 1,
+        "id": 1,
+        "group_id": 1,
+        "model_id": 1100,
+        "priority": 0
+      },
+      {
+        "model_name": "zz-shared",
+        "channel_id": 2,
+        "id": 8,
+        "group_id": 1,
+        "model_id": 1102,
+        "priority": 0
+      }
+    ],
+    "created_at": "2026-10-20T22:56:40.317949+08:00",
+    "updated_at": "2026-10-20T22:56:40.318011+08:00"
+  },
+  {
+    "id": 2,
+    "name": "分页故障转移",
+    "strategy": "failover",
+    "active_item_id": 0,
+    "items": [
+      {
+        "model_name": "catalog-0000",
+        "channel_id": 1,
+        "id": 2,
+        "group_id": 2,
+        "model_id": 1,
+        "priority": 0
+      },
+      {
+        "model_name": "catalog-0020",
+        "channel_id": 1,
+        "id": 3,
+        "group_id": 2,
+        "model_id": 21,
+        "priority": 1
+      },
+      {
+        "model_name": "zz-shared",
+        "channel_id": 2,
+        "id": 4,
+        "group_id": 2,
+        "model_id": 1102,
+        "priority": 2
+      },
+      {
+        "model_name": "zz-shared",
+        "channel_id": 1,
+        "id": 5,
+        "group_id": 2,
+        "model_id": 1101,
+        "priority": 3
+      }
+    ],
+    "created_at": "2026-10-20T22:58:10.692238+08:00",
+    "updated_at": "2026-10-20T22:58:10.692238+08:00"
+  },
+  {
+    "id": 3,
+    "name": "手动多渠道",
+    "strategy": "manual",
+    "active_item_id": 7,
+    "items": [
+      {
+        "model_name": "zz-shared",
+        "channel_id": 1,
+        "id": 6,
+        "group_id": 3,
+        "model_id": 1101,
+        "priority": 0
+      },
+      {
+        "model_name": "zz-shared",
+        "channel_id": 2,
+        "id": 7,
+        "group_id": 3,
+        "model_id": 1102,
+        "priority": 1
+      }
+    ],
+    "created_at": "2026-10-20T22:58:57.348844+08:00",
+    "updated_at": "2026-10-20T22:58:57.349064+08:00"
+  },
+  {
+    "id": 4,
+    "name": "轮询配置验证",
+    "strategy": "round_robin",
+    "active_item_id": 0,
+    "items": [
+      {
+        "model_name": "catalog-0000",
+        "channel_id": 1,
+        "id": 9,
+        "group_id": 4,
+        "model_id": 1,
+        "priority": 0
+      }
+    ],
+    "created_at": "2026-10-20T23:01:49.985709+08:00",
+    "updated_at": "2026-10-20T23:01:49.985709+08:00"
+  }
+]

@@ -1,0 +1,237 @@
+[p1 "Portunus" | space "portunus-group-selection-20261020"(10): 1 managed, 0 untracked — p1* "Portunus"]
+root
+  container
+    container
+      container
+        image
+        text "Portunus"
+      tablist "导航"
+        tab [ref=230]
+          text "模型分组"
+        tab [ref=231]
+          text "上游渠道"
+        tab [ref=232]
+          text "上游模型"
+        tab [ref=233]
+          text "服务接入"
+        tab [ref=234]
+          text "调用记录"
+        tab [ref=235]
+          text "设置"
+      checkbox "深色模式" [ref=135, loc=css:input[aria-label="深色模式"]]
+    container
+      container
+        container
+          heading
+            text "模型分组"
+          paragraph
+            text "按用途组织上游模型，让每个分组成为稳定的调用入口。"
+        container
+          button "刷新分组" [ref=136, loc=css:button[aria-label="刷新分组"]]
+            svg_root
+          button [ref=137]
+            svg_root
+            text "新增分组"
+      container
+        container
+          container "模型分组 目录外成员"
+            container
+              svg_root
+              heading
+                text "目录外成员"
+              button "编辑分组 目录外成员" [ref=138, loc=css:button[aria-label="编辑分组 目录外成员"]]
+                svg_root
+              button "删除分组 目录外成员" [ref=139, loc=css:button[aria-label="删除分组 目录外成员"]]
+                svg_root
+            container
+              container
+                text "手动选择"
+                svg_root
+                text "·"
+                container
+                  text "2"
+                  text "个成员"
+              text "已配置"
+            container
+              container
+                text "01"
+                button "设为当前模型 catalog-1099" [ref=140, loc=css:button[aria-label="设为当前模型 catalog-1099"]]
+                  text "catalog-1099"
+                  text "验证渠道 A"
+                container
+                  svg_root
+                  text "当前"
+                button "移除模型 catalog-1099" [ref=141, loc=css:button[aria-label="移除模型 catalog-1099"]]
+                  svg_root
+              container
+                text "02"
+                button "设为当前模型 zz-shared" [ref=142]
+                  text "zz-shared"
+                  text "验证渠道 B"
+                button "移除模型 zz-shared" [ref=143]
+                  svg_root
+            container
+              button [ref=144]
+                svg_root
+                text "添加成员"
+              container
+                anchor "查看 目录外成员 的调用记录" [ref=145, loc=css:a[aria-label="查看 目录外成员 的调用记录"], url=http://127.0.0.1:13471/#/logs?group=%E7%9B%AE%E5%BD%95%E5%A4%96%E6%88%90%E5%91%98]
+                  svg_root
+                  text "调用记录"
+                anchor [ref=146, loc=href:/#/clients?group=%E7%9B%AE%E5%BD%95%E5%A4%96%E6%88%90%E5%91%98, url=http://127.0.0.1:13471/#/clients?group=%E7%9B%AE%E5%BD%95%E5%A4%96%E6%88%90%E5%91%98]
+                  text "接入"
+                  svg_root
+          container "模型分组 分页故障转移"
+            container
+              svg_root
+              heading
+                text "分页故障转移"
+              button "编辑分组 分页故障转移" [ref=147, loc=css:button[aria-label="编辑分组 分页故障转移"]]
+                svg_root
+              button "删除分组 分页故障转移" [ref=148, loc=css:button[aria-label="删除分组 分页故障转移"]]
+                svg_root
+            container
+              container
+                text "故障转移"
+                svg_root
+                text "·"
+                container
+                  text "4"
+                  text "个成员"
+              text "已配置"
+            container
+              container
+                button "拖拽调整 catalog-0000 的备用顺序" [ref=149, loc=css:button[aria-label="拖拽调整 catalog-0000 的备用顺序"]]
+                  svg_root
+                container
+                  text "catalog-0000"
+                  text "验证渠道 A"
+                button "移除模型 catalog-0000" [ref=150]
+                  svg_root
+              container
+                button "拖拽调整 catalog-0020 的备用顺序" [ref=151, loc=css:button[aria-label="拖拽调整 catalog-0020 的备用顺序"]]
+                  svg_root
+                container
+                  text "catalog-0020"
+                  text "验证渠道 A"
+                button "移除模型 catalog-0020" [ref=152, loc=css:button[aria-label="移除模型 catalog-0020"]]
+                  svg_root
+              container
+                button "拖拽调整 zz-shared 的备用顺序" [ref=153]
+                  svg_root
+                container
+                  text "zz-shared"
+                  text "验证渠道 B"
+                button "移除模型 zz-shared" [ref=154]
+                  svg_root
+              container
+                button "拖拽调整 zz-shared 的备用顺序" [ref=155]
+                  svg_root
+                container
+                  text "zz-shared"
+                  text "验证渠道 A"
+                button "移除模型 zz-shared" [ref=156]
+                  svg_root
+            container
+              button [ref=173]
+                svg_root
+                text "添加成员"
+              container
+                anchor "查看 分页故障转移 的调用记录" [ref=174, loc=css:a[aria-label="查看 分页故障转移 的调用记录"], url=http://127.0.0.1:13471/#/logs?group=%E5%88%86%E9%A1%B5%E6%95%85%E9%9A%9C%E8%BD%AC%E7%A7%BB]
+                  svg_root
+                  text "调用记录"
+                anchor [ref=175, loc=href:/#/clients?group=%E5%88%86%E9%A1%B5%E6%95%85%E9%9A%9C%E8%BD%AC%E7%A7%BB, url=http://127.0.0.1:13471/#/clients?group=%E5%88%86%E9%A1%B5%E6%95%85%E9%9A%9C%E8%BD%AC%E7%A7%BB]
+                  text "接入"
+                  svg_root
+          container "模型分组 手动多渠道"
+            container
+              svg_root
+              heading
+                text "手动多渠道"
+              button "编辑分组 手动多渠道" [ref=176, loc=css:button[aria-label="编辑分组 手动多渠道"]]
+                svg_root
+              button "删除分组 手动多渠道" [ref=177, loc=css:button[aria-label="删除分组 手动多渠道"]]
+                svg_root
+            container
+              container
+                text "手动选择"
+                svg_root
+                text "·"
+                container
+                  text "2"
+                  text "个成员"
+              text "已配置"
+            container
+              container
+                text "01"
+                button "设为当前模型 zz-shared" [ref=178]
+                  text "zz-shared"
+                  text "验证渠道 A"
+                button "移除模型 zz-shared" [ref=179]
+                  svg_root
+              container
+                text "02"
+                button "设为当前模型 zz-shared" [ref=180]
+                  text "zz-shared"
+                  text "验证渠道 B"
+                container
+                  svg_root
+                  text "当前"
+                button "移除模型 zz-shared" [ref=181]
+                  svg_root
+            container
+              button [ref=182]
+                svg_root
+                text "添加成员"
+              container
+                anchor "查看 手动多渠道 的调用记录" [ref=183, loc=css:a[aria-label="查看 手动多渠道 的调用记录"], url=http://127.0.0.1:13471/#/logs?group=%E6%89%8B%E5%8A%A8%E5%A4%9A%E6%B8%A0%E9%81%93]
+                  svg_root
+                  text "调用记录"
+                anchor [ref=184, loc=href:/#/clients?group=%E6%89%8B%E5%8A%A8%E5%A4%9A%E6%B8%A0%E9%81%93, url=http://127.0.0.1:13471/#/clients?group=%E6%89%8B%E5%8A%A8%E5%A4%9A%E6%B8%A0%E9%81%93]
+                  text "接入"
+                  svg_root
+          container "模型分组 轮询配置验证"
+            container
+              svg_root
+              heading
+                text "轮询配置验证"
+              button "编辑分组 轮询配置验证" [ref=236, loc=css:button[aria-label="编辑分组 轮询配置验证"]]
+                svg_root
+              button "删除分组 轮询配置验证" [ref=237, loc=css:button[aria-label="删除分组 轮询配置验证"]]
+                svg_root
+            container
+              container
+                text "轮询"
+                svg_root
+                text "·"
+                container
+                  text "1"
+                  text "个成员"
+              text "已配置"
+            container
+              text "01"
+              container
+                text "catalog-0000"
+                text "验证渠道 A"
+              button "移除模型 catalog-0000" [ref=238]
+                svg_root
+            container
+              button [ref=239]
+                svg_root
+                text "添加成员"
+              container
+                anchor "查看 轮询配置验证 的调用记录" [ref=240, loc=css:a[aria-label="查看 轮询配置验证 的调用记录"], url=http://127.0.0.1:13471/#/logs?group=%E8%BD%AE%E8%AF%A2%E9%85%8D%E7%BD%AE%E9%AA%8C%E8%AF%81]
+                  svg_root
+                  text "调用记录"
+                anchor [ref=241, loc=href:/#/clients?group=%E8%BD%AE%E8%AF%A2%E9%85%8D%E7%BD%AE%E9%AA%8C%E8%AF%81, url=http://127.0.0.1:13471/#/clients?group=%E8%BD%AE%E8%AF%A2%E9%85%8D%E7%BD%AE%E9%AA%8C%E8%AF%81]
+                  text "接入"
+                  svg_root
+        paragraph
+          text "分组名称即客户端的 model。配置状态仅反映成员设置，上游可用性以实际调用为准。"
+  region "1 个通知。"
+    alertdialog "分组创建成功" [ref=242, loc=role:alertdialog[name="分组创建成功"]]
+      svg_root
+      alert
+        text "分组创建成功"
+      button "Close" [ref=243, loc=css:button[aria-label="Close"]]
+        svg_root

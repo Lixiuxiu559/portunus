@@ -81,7 +81,7 @@
 3. 界面“记录数”按日志行计数；普通重试和目标切换可产生多条同 request_id 记录，预算字段兼容切换又未单独形成日志行。当前日志数既不是准确客户端请求数，也不是完整物理上游调用数。
 4. 产品不提供模型价格配置、默认价格套用、调用费用计算或费用统计。保留上游报告的 token 和缓存 usage；缺少 usage 不能被解释为没有消耗。实际收费以供应商账单为准，手动执行真实调用仍可能产生费用。
 5. 上游支持思考强度、上下文、工具等能力与否，不由模型名称推断；同协议透传、跨协议映射，不让用户在分组再配置一遍客户端参数。
-6. 此前真实预算验证发现的 Responses 固定 completed 问题已修复：跨协议流式、非流式转换将 `length` 映射为 `incomplete`，原因 `max_output_tokens`；流式发送 `response.incomplete`。内容过滤对应原因 `content_filter`，反向转换保留上述原因；正常完成与工具调用继续返回 completed。截断时保留部分输出和总用量，收尾时尚未完成的工具项标记 incomplete。同协议直通保留原事件，并提取截断事件中的 usage。已完成本地回归及两条上游、实际 Codex CLI 的[修复后实机验证](../research/2026-10-20-responses-lifecycle-fix/README.md)：预算截断原因已被客户端识别，正文 message / reasoning 生命周期与终态 output 已补齐，两条上游的 CLI 均实际显示 OK，真实缓存命中明细与上游、日志和 CLI 一致；不能用 HTTP 200 或 CLI 退出码 0 代替语义与正文检查。内容过滤真实触发、真实工具执行与图形客户端尚未验证。
+6. 此前真实预算验证发现的 Responses 固定 completed 问题已修复：跨协议流式、非流式转换将 `length` 映射为 `incomplete`，原因 `max_output_tokens`；流式发送 `response.incomplete`。内容过滤对应原因 `content_filter`，反向转换保留上述原因；正常完成与工具调用继续返回 completed。截断时保留部分输出和总用量，收尾时尚未完成的工具项标记 incomplete。同协议直通保留原事件，并提取截断事件中的 usage。已完成本地回归及两条上游、实际 Codex CLI 的[修复后实机验证](../research/2026-10-20-responses-lifecycle-fix/README.md)：预算截断原因已被客户端识别，正文 message / reasoning 生命周期与终态 output 已补齐，两条上游的 CLI 均实际显示 OK，真实缓存命中明细与上游、日志和 CLI 一致；不能用 HTTP 200 或 CLI 退出码 0 代替语义与正文检查。后续两条上游与本机 Codex App Server 的[只读动态函数工具及同会话双轮验证](../research/2026-10-20-responses-tools-multiturn/README.md)也已通过；内容过滤真实触发、内置 shell / 命名空间工具、工具与思考同时开启及图形客户端尚未验证。
 
 ## 5. 页面信息架构与目标方案
 
@@ -93,7 +93,7 @@ P0 采用六个主导航，调整职责与顺序，不新增仪表盘：
 
 ### 5.1 模型分组：产品主入口
 
-当前：分组卡片主要用于增删改、添加成员、切换手动项和排序；创建默认手动策略，名称示例“GPT-4 负载均衡”，接入动作位于另一个页面。
+当前：分组卡片支持增删改、添加成员、切换手动项、故障转移排序、接入与调用记录跳转；创建默认手动策略，允许跨页、跨渠道一次选择多个成员，并配置当前手动成员或故障转移顺序。已完成 [1102 条模型的隔离实机浏览器验证](../research/2026-10-20-group-model-selection/README.md)。
 
 建议：
 
@@ -128,7 +128,7 @@ P0 采用六个主导航，调整职责与顺序，不新增仪表盘：
 - 标题改为“上游模型”，说明“这是分组可使用的资源，不是直接交给客户端的 model”。
 - 主要信息为模型 ID、所属渠道、分组引用和加入分组入口，不配置模型价格。
 - 手动新增继续保留，覆盖上游无法列出模型但已有可调用 ID 的场景。
-- 选成员改为按渠道服务端搜索/分页，避免当前分组页仅取前 1000 条造成部分资源不可选。
+- 选成员已改为按渠道、名称服务端搜索，每页 20 条；跨页保留选择，分组成员名称与渠道直接来自分组响应，不再受前 1000 条目录限制。
 - 模型删除、渠道删除、同步发现模型消失时，应说明引用影响；同步发现消失项不能直接自动删除仍被分组引用的配置。
 
 ### 5.4 服务接入：统一对外入口
@@ -215,7 +215,7 @@ P0 已同步页面、文档和管理接口访问边界；本轮进一步撤出�
 | 当前六导航及默认渠道页 | `web/src/renderer/components/Layout.jsx:8`；`web/src/renderer/App.jsx:20` |
 | 分组是客户端 model，成员与策略 | `backend/group/group.go:24`；`backend/router/router.go:25` |
 | 对外端点与非空分组列表 | `backend/gateway/gateway.go:15`、`:70` |
-| 分组创建、当前前1000条资源加载 | `web/src/renderer/pages/Groups/CreateGroupModal.jsx:11`；`web/src/renderer/pages/Groups/index.jsx:44` |
+| 分组多成员创建、分页选择与成员元数据 | `web/src/renderer/pages/Groups/CreateGroupModal.jsx`；`web/src/renderer/pages/Groups/GroupModelPicker.jsx`；`backend/group/service.go` |
 | 渠道预览与保存时全量获取的差异 | `web/src/renderer/pages/Channels/CreateChannelModal.jsx:50`、`:73` |
 | 模型同步只新增 | `backend/model/sync.go:11` |
 | 指南、共享连接信息与客户端配置 | `web/src/renderer/pages/Clients.jsx:95`；`web/src/renderer/utils/connectionGuide.js:5` |
