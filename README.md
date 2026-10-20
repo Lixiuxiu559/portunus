@@ -5,121 +5,113 @@
 <h1 align="center">Portunus</h1>
 
 <p align="center">
-  <strong>Your models. Your tools. One place to connect them.</strong>
+  <strong>本地聚合上游 API，以模型分组统一提供服务。</strong>
 </p>
 
 <p align="center">
-  A desktop LLM gateway for individual developers.<br />
-  Bring your API providers together, connect Claude Code and Codex, and track usage and costs for every call.
+  本地运行的多上游 API 聚合网关。<br />
+  接入官方 API 与中转站，将模型组织为分组，为客户端和应用提供稳定入口。
 </p>
 
 <p align="center">
-  <a href="https://github.com/Lixiuxiu559/portunus/releases/latest"><strong>Download Portunus</strong></a> ·
-  <a href="#get-started-in-three-steps">Get started</a> ·
-  <a href="https://github.com/Lixiuxiu559/portunus/issues">Report an issue</a>
+  <a href="https://github.com/Lixiuxiu559/portunus/releases/latest"><strong>下载 Portunus</strong></a> ·
+  <a href="#三步开始使用">开始使用</a> ·
+  <a href="https://github.com/Lixiuxiu559/portunus/issues">反馈问题</a>
 </p>
 
 <p align="center">
   macOS · Windows · Linux<br />
-  <strong>English</strong> | <a href="./README_CN.md">简体中文</a>
+  <a href="./README_EN.md">English</a> | <strong>简体中文</strong>
 </p>
 
 ---
 
-## Give your models a home on your desktop
+## 让模型管理回到一个地方
 
-Working with multiple AI providers means juggling endpoints, API keys, and client configuration files. When a provider fails, you find a replacement by hand. When you want to understand your usage, you check several dashboards.
+当你同时使用多个模型渠道，切换工具往往也意味着切换地址、密钥和配置文件。渠道出问题时，要手动寻找替代；想看用量时，又得翻不同的后台。
 
-Portunus brings that work into one desktop app. Connect your providers, organize models into groups, and connect your favorite clients to those groups. Change providers or routing later while your clients keep using the same endpoint.
+Portunus 把这些操作集中到桌面上。接入上游渠道、将模型编成分组，再把分组交给你常用的客户端。之后调整渠道或路由时，客户端继续使用同一个入口。
 
-**Install one app and get started.** The backend ships with the installer. There is no separate server, Docker setup, or database to deploy.
+**装一个应用，就能开始。** 后端随安装包提供，无需另外部署服务器、Docker 或数据库。
 
 <p align="center">
-  <img src="docs/images/groups-light.png" alt="Portunus in light mode: model groups and failover priorities" width="1200" />
+  <img src="docs/images/groups-light.png" alt="Portunus 浅色主题：分组管理与故障转移模型优先级" width="1200" />
 </p>
-<p align="center"><sub>Organize models around your workflow and give them a fallback plan.</sub></p>
+<p align="center"><sub>按用途组织模型，为常用工作流配置故障转移。</sub></p>
 
-> Screenshots show the running product with a separate copy of local data. Channel names and service addresses have been anonymized. Prices and usage reflect local configuration and records, not service pricing.
+> 以下截图均来自实际运行的产品界面，使用独立的本地数据副本；渠道名称与服务地址已脱敏。截图展示模型分组与路由配置。
 
-## Built around your development workflow
+## 围绕模型分组提供服务
 
-### Connect once. Switch when you need to.
+### 接好一次，随时切换
 
-Configure Claude Code and Codex endpoints, tokens, and model mappings inside the app. Map Claude Code model slots, including 1M context markers. Configuration files are backed up before changes, with one-click rollback when needed.
+在「服务接入」中选择分组，复制网关地址、Portunus 令牌与通用 API 示例，或使用 Claude Code / Codex 等客户端配置指南。应用不读取或修改客户端配置文件；之后切换上游渠道和路由时，客户端继续使用同一个入口。
 
-### Multiple protocols. One entry point.
+### 多种协议，一个入口
 
-Connect OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Gemini providers. Portunus translates between client and upstream protocols, with support for SSE streaming and tool calls, giving you more flexibility in choosing providers.
+上游支持 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 和 Gemini；对调用方提供 Chat Completions、Responses、Messages 三类生成入口及模型列表。客户端与上游协议不一致时按字段语义转换，支持 SSE 流式响应与工具调用；能力范围仍取决于目标协议和上游。Gemini 当前仅作为上游协议接入。
 
-### Give your daily models a backup plan
+### 给常用模型安排好后路
 
-Combine models from different providers into a group named for its purpose, such as `coding` or `daily`. The group name becomes the model name your client uses; Portunus handles the upstream selection.
+将不同渠道的模型放进同一个分组，按用途命名，例如 `coding` 或 `daily`。分组名称就是客户端使用的模型名，上游选择由 Portunus 管理。
 
-| Routing strategy | How it works | When to use it |
+| 路由策略 | 如何工作 | 适用场景 |
 | --- | --- | --- |
-| Manual | Uses the model you select | Keep a preferred model and switch on demand |
-| Round-robin | Distributes requests across group members in turn | Spread calls across multiple providers |
-| Failover | Tries models in priority order, moving on after failure | Add backup providers to a daily workflow |
+| 手动指定 | 使用你选定的模型 | 固定主力模型，按需切换 |
+| 轮询 | 在组内模型之间轮流分配请求 | 分摊多个渠道的调用 |
+| 故障转移 | 按优先级尝试，失败后切换后续模型 | 为常用工作流配置备用渠道 |
 
-Retries, timeout handling, and circuit breaking help reduce disruption from upstream failures. Drag to reorder priorities.
+配合失败重试、超时处理与熔断保护，减少上游故障对工作流的影响。优先级可拖拽调整。流式响应已开始发送后，中途断流不能无损切换或自动重放。分组改名会改变客户端使用的 model，调整组内成员则保留分组入口。
 
-### Understand the cost of each call
+### 查看用量与调用诊断
 
-Call logs capture the model, channel, group, protocol, latency, tokens, cost, and request ID. Input, output, cache-read, and cache-write tokens are priced separately. The same model can have different prices on different channels.
+调用记录包含实际模型、渠道、分组、协议、耗时、请求 ID，以及上游报告的输入、输出、缓存读取和缓存写入 token，帮助判断请求去了哪里、用了多少 token、为何失败。
 
-Model sync can apply built-in default prices, and you can override them. **Costs are local estimates calculated from configured prices and reported usage.**
+统计中的“记录数”按日志行计算；重试或切换可能为同一请求生成多条记录，不能等同于客户端请求数。Portunus 不配置模型价格或计算调用费用，实际费用请以供应商账单为准。
 
-<p align="center">
-  <img src="docs/images/models-dark.png" alt="Portunus in dark mode: per-channel model prices for input, output, and cache tokens" width="1200" />
-</p>
-<p align="center"><sub>Compare model prices across channels, including cache reads and writes.</sub></p>
+### 日常维护，也在桌面完成
 
-<p align="center">
-  <img src="docs/images/logs-dark.png" alt="Portunus in dark mode: call logs, cost totals, token usage, and time to first token" width="1200" />
-</p>
-<p align="center"><sub>Go from cost totals to individual calls, cache usage, and response timing.</sub></p>
+保存渠道后自动获取模型列表，支持定时同步和一键同步所有渠道。同步只新增发现的模型，保留已有模型，不自动删除上游消失的模型，也不执行付费生成验证。日志可按保留天数自动清理，应用提供明暗主题与应用内更新。
 
-### Keep everyday maintenance on your desktop
+在「服务接入」中管理现有单令牌与「仅本机 / 局域网」访问范围。开启局域网后，其他设备可凭令牌访问 `/v1` 服务；`/api` 管理接口只允许真实本机回环连接，不依据转发头放行。不要通过本机反向代理向远端公开 `/api`；本机进程仍属于管理信任边界。
 
-Sync model lists when saving a channel, on a schedule, or across all channels on demand. Automatically clean up logs by retention period. Switch between light and dark themes, update inside the app, and choose localhost or LAN access.
+## 三步开始使用
 
-## Get started in three steps
+### 1. 下载并打开
 
-### 1. Download and open
+前往 [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest)，选择对应系统的安装包：
 
-Choose the installer for your system from [GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest):
-
-| Platform | Architecture | Package |
+| 系统 | 架构 | 安装包 |
 | --- | --- | --- |
-| macOS | Apple Silicon (arm64) | DMG or ZIP |
-| Windows | x64 | EXE installer or portable ZIP |
+| macOS | Apple Silicon（arm64） | DMG 或 ZIP |
+| Windows | x64 | EXE 安装程序或便携 ZIP |
 | Linux | x64 | AppImage |
 
-If your system blocks the first launch, see [Installation help](#installation-help) below.
+首次启动遇到系统提示时，参见下方的[安装帮助](#安装帮助)。
 
-### 2. Add a channel and create a group
+### 2. 添加渠道，创建分组
 
-In Channels, enter your provider's endpoint, API key, and protocol type, then save to sync its model list. In Groups, select models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order.
+在「上游渠道」中填写上游服务地址、API Key 和协议类型，保存后获取模型列表。随后在默认首页「模型分组」中选择上游模型并设置路由策略；如需自动切换备用渠道，选择「故障转移」并排好优先级。
 
-### 3. Connect your development tools
+### 3. 向客户端和应用提供服务
 
-Open Clients, choose the groups for Claude Code or Codex, and apply the connection configuration. Restart your client to begin sending requests through Portunus, then open Logs to inspect usage and costs.
+从分组进入「服务接入」，选择通用 API 示例，或复制 Claude Code、Codex 等客户端配置指南并手动合并配置。使用分组名作为 model 发起调用后，在「调用记录」中查看实际渠道、模型、用量与调用结果。
 
-Other compatible clients can connect using the gateway address, a Portunus token, and a group name. The packaged desktop app defaults to `http://127.0.0.1:13060`; the OpenAI-compatible base URL is `http://127.0.0.1:13060/v1`.
+其他兼容客户端也可以使用网关地址、Portunus 令牌和分组名称接入。桌面安装版默认使用 `http://127.0.0.1:13060`，OpenAI 兼容 Base URL 为 `http://127.0.0.1:13060/v1`。
 
-## Installation help
+## 安装帮助
 
 <details>
-<summary><strong>macOS: installation and first launch</strong></summary>
+<summary><strong>macOS：安装与首次启动</strong></summary>
 
-Move the app to Applications. Alternatively, download and extract the latest ZIP from a terminal:
+将应用放入「应用程序」目录。也可以通过终端下载最新版 ZIP 并解压：
 
 ```bash
 curl -fL -o /tmp/portunus.zip https://github.com/Lixiuxiu559/portunus/releases/latest/download/Portunus-mac-arm64.zip
 unzip -o /tmp/portunus.zip -d /Applications
 ```
 
-Current builds are unsigned. If macOS blocks launch, check System Settings → Privacy & Security for an Open Anyway option. If it reports that the app “is damaged and can't be opened,” confirm the package came from this repository's release, then remove its quarantine attribute and reopen:
+当前构建未签名。如果系统拦截启动，可在「系统设置 → 隐私与安全性」中查看是否提供「仍要打开」。若提示「已损坏，无法打开」，确认安装包来自本仓库的 Release 后，可移除应用的隔离属性并重新打开：
 
 ```bash
 xattr -rd com.apple.quarantine /Applications/Portunus.app
@@ -128,16 +120,16 @@ xattr -rd com.apple.quarantine /Applications/Portunus.app
 </details>
 
 <details>
-<summary><strong>Windows: installer and portable edition</strong></summary>
+<summary><strong>Windows：安装版与便携版</strong></summary>
 
-Run the EXE installer and select an installation directory, or extract the ZIP and launch the app directly. If SmartScreen reports an unknown publisher, confirm the package source, then choose More info → Run anyway.
+运行 EXE 安装程序，按提示选择安装目录；或解压 ZIP 后直接运行。若 SmartScreen 提示未知发布者，确认安装包来源后，点击「更多信息 → 仍要运行」。
 
 </details>
 
 <details>
-<summary><strong>Linux: run the AppImage</strong></summary>
+<summary><strong>Linux：运行 AppImage</strong></summary>
 
-Download `Portunus-linux-x64.AppImage` from the release, make it executable, and launch it:
+下载 Release 中的 `Portunus-linux-x64.AppImage`，添加执行权限后运行：
 
 ```bash
 chmod +x Portunus-linux-x64.AppImage
@@ -146,26 +138,26 @@ chmod +x Portunus-linux-x64.AppImage
 
 </details>
 
-## Frequently asked questions
+## 常见问题
 
-**Does Portunus include models or API credits?**
+**Portunus 提供模型或 API 额度吗？**
 
-Portunus connects providers, routes requests, and records usage. Bring your own provider endpoints and API keys. Model availability, quotas, and actual billing are determined by your upstream providers.
+Portunus 负责连接、路由和记录调用。你需要自行准备上游渠道的服务地址和 API Key；模型可用性、额度和实际账单由上游提供方决定。
 
-**Where is my data stored?**
+**数据保存在哪里？**
 
-The app stores configuration and call logs locally in SQLite. Requests are forwarded to the upstream services you configure. The desktop app listens on localhost by default, with optional LAN access in settings.
+应用使用本地 SQLite 保存配置和调用日志，请求会转发到你配置的上游服务。桌面版默认仅监听本机，也可以在「服务接入」中切换为局域网服务；管理接口仍只接受本机回环连接。
 
-**Does protocol translation make every model capability interchangeable?**
+**协议转换意味着所有模型能力都能通用吗？**
 
-Translation supports interactions such as messages, streaming, and tool calls. Context limits, reasoning capabilities, and upstream-hosted tools still depend on the provider. Setting a 1M context marker does not extend a model's actual context limit.
+协议转换支持消息、流式响应与工具调用等交互；模型的上下文长度、推理能力和上游托管工具仍取决于实际提供方。配置 1M 上下文标记不会扩展模型本身的上下文限制。
 
-## Development and builds
+## 开发与构建
 
 <details>
-<summary><strong>Run from source</strong></summary>
+<summary><strong>从源码运行</strong></summary>
 
-Requirements: Go 1.26.6+, Node.js 24 (matching the release workflow), and pnpm 10.
+环境要求：Go 1.26.6+、Node.js 24（与发布流水线一致）、pnpm 10。
 
 ```bash
 git clone https://github.com/Lixiuxiu559/portunus.git
@@ -174,45 +166,45 @@ go mod download
 go run .
 ```
 
-The backend defaults to `0.0.0.0:3060`, with SQLite data files under `data/`. Configure it through `config.json` or `PORTUNUS_*` environment variables, including `PORTUNUS_SERVER_HOST`, `PORTUNUS_SERVER_PORT`, and `PORTUNUS_DATABASE_PATH`.
+后端默认监听 `0.0.0.0:3060`，SQLite 数据文件默认位于 `data/`。可通过 `config.json` 或 `PORTUNUS_*` 环境变量调整配置，例如 `PORTUNUS_SERVER_HOST`、`PORTUNUS_SERVER_PORT`、`PORTUNUS_DATABASE_PATH`。
 
-Keep the backend running and start the management UI in a second terminal:
+保持后端运行，在另一个终端启动管理界面：
 
 ```bash
 cd web
 pnpm install
-pnpm run dev:web    # Browser: http://localhost:5173
-# Or use the desktop development window:
+pnpm run dev:web    # 浏览器：http://localhost:5173
+# 或使用桌面开发窗口：
 pnpm run dev
 ```
 
-The development server proxies `/api` and `/v1` to `localhost:3060`. Reading and writing client configuration files requires the Electron desktop environment.
+开发服务器将 `/api` 和 `/v1` 代理到 `localhost:3060`。服务接入页也可在浏览器中使用，示例指向开发后端地址。管理界面和开发代理只供本机使用，代理不要向远端转发 `/api`。
 
 </details>
 
 <details>
-<summary><strong>Build installers and run tests</strong></summary>
+<summary><strong>构建安装包与运行测试</strong></summary>
 
-Run backend tests from the repository root:
+在仓库根目录运行后端测试：
 
 ```bash
 go test ./...
 ```
 
-Install dependencies, run frontend tests, or build installers from `web/`:
+在 `web/` 中安装依赖、运行前端测试或构建安装包：
 
 ```bash
 cd web
 pnpm install
 pnpm test
-pnpm run build:mac   # macOS DMG / ZIP (arm64)
-pnpm run build:win   # Windows EXE / ZIP (x64)
+pnpm run build:mac   # macOS DMG / ZIP（arm64）
+pnpm run build:win   # Windows EXE / ZIP（x64）
 ```
 
-Artifacts are written to `web/dist-electron/`. Pushing a `v*` tag triggers GitHub Actions to build macOS, Windows, and Linux packages and create a draft release for manual review and publication.
+产物位于 `web/dist-electron/`。推送 `v*` 标签会触发 GitHub Actions，构建 macOS、Windows、Linux 安装包并创建草稿 Release，确认后手动发布。
 
 </details>
 
 ---
 
-[Update distribution](./docs/updates.md) · [Architecture and design](./ARCHITECTURE.md) · [Technical research](./docs/research) · [Release notes](https://github.com/Lixiuxiu559/portunus/releases) · [Issues and suggestions](https://github.com/Lixiuxiu559/portunus/issues)
+[产品定义与阶段计划](./docs/product/PRODUCT.md) · [更新分发说明](./docs/updates.md) · [架构与设计](./ARCHITECTURE.md) · [技术研究](./docs/research) · [版本更新](https://github.com/Lixiuxiu559/portunus/releases) · [问题与建议](https://github.com/Lixiuxiu559/portunus/issues)

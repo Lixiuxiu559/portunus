@@ -2,17 +2,17 @@
 
 > 用途：各平台宣传的母版。先读「定位与口径」，再按平台取用对应文案。
 > 链接口径：仓库 https://github.com/Lixiuxiu559/portunus ｜ 下载 https://github.com/Lixiuxiu559/portunus/releases/latest
-> 口径注意：不说「开源」（仓库未附 LICENSE）、不承诺价格、不提内部端口（客户无感）。
+> 口径注意：不说「开源」（仓库未附 LICENSE）、不宣传模型计价或费用统计、不提内部端口（客户无感）。
 
 ---
 
 ## 一、定位与一句话
 
-**一句话**：把你手里散落的 LLM API Key，变成一个本地端点。
+**一句话**：本地聚合多个上游 API，以模型分组统一向客户端和应用提供服务。
 
-**定位**：给个人开发者的 LLM 网关桌面应用。装完即用，无需 Docker、无需服务器。
+**定位**：本地运行的多上游 API 聚合网关。桌面应用随包提供后端，无需另外部署 Docker 或数据库；官方 API、New API 实例与其他中转站统一作为上游接入。Claude Code、Codex 等是调用方，模型分组是稳定服务入口。产品依据见 [产品定义](../product/PRODUCT.md)。
 
-**对标差异**（克制版说法）：one-api / new-api 这类自建网关面向服务器和团队，要部署要运维；Portunus 是装在个人电脑上的桌面应用——双击安装，打开就能用。不是替代关系，是两种使用形态。
+**形态差异**：Portunus 把聚合网关带到本地桌面，重点是上游集中管理和跨渠道模型分组。已有 New API 实例也可以成为 Portunus 的上游；不将其他产品的能力范围简单归类为只能服务团队。
 
 ---
 
@@ -22,32 +22,32 @@
 
 - 手里一堆渠道的 Key：官方的、云厂商的、第三方代理的。Claude Code 用一个、Codex 用一个，换渠道要挨个改配置文件。
 - 某个渠道半夜挂了，第二天下午才发现，一下午的活全耽误。
-- 月底一看账单，完全不知道钱花在哪个模型、哪个渠道上。
+- 出了调用错误，只能翻多个后台，不容易看清请求命中了哪个渠道、用了多少 token。
 - 想让 Claude Code 用上国产模型 / 想让 Codex 走 Anthropic 协议——协议对不上，改不动。
 
 Portunus 的解法：
 
-1. **渠道统一接入**：OpenAI Chat / Responses、Anthropic、Gemini 三家协议全收，填个 Key 就录入，模型列表自动拉取。
-2. **协议互转**：客户端和上游协议不一致时自动转换，SSE 流式透传、流式工具调用全协议可用。模型名加 `-thinking` 后缀即可开关思考模式。
-3. **分组路由**：多个模型编成一个组对外暴露，手动指定 / 轮询 / 故障转移三种策略，上游假死快速切换，失败重试 + 熔断。
-4. **Claude Code / Codex 一键接入**（王牌）：在应用内选好分组，服务地址和令牌自动写进 `~/.claude/settings.json` / `~/.codex/config.toml`——改前自动备份，支持一键回滚。按槽位映射模型，连 1M 上下文槽位都有。
-5. **四维计费**：输入 / 输出 / 缓存读 / 缓存写 token 分开计价，内置主流模型默认价，调用日志记到每次请求（协议、模型、分组、耗时、费用、request_id）。
+1. **渠道统一接入**：支持 OpenAI Chat / Responses、Anthropic、Gemini 四类上游协议，填写地址、密钥与协议后获取模型列表；同步只新增模型、保留已有资源，不代表实际生成已验证。
+2. **协议互转**：对调用方提供 Chat Completions、Responses、Messages 三类生成入口及模型列表，Gemini 当前仅作上游。客户端和上游协议不一致时按字段语义转换，支持 SSE 与工具调用；不能表达或上游不支持的能力不承诺等价。思考强度和输出预算遵从客户端请求，同协议透传、跨协议转换，不靠模型名猜能力。
+3. **分组路由**：多个模型编成一个组对外暴露，手动指定 / 轮询 / 故障转移三种策略，在允许重试的失败阶段按策略选择后续目标，配合重试和熔断。流已发送后断流不支持无损切换或自动重放。
+4. **服务接入**：选好分组，复制网关地址、Portunus 令牌和通用 API 示例，或使用 Claude Code / Codex 等客户端指南。Portunus 不读取或修改客户端配置，上游切换与路由统一由本地网关处理。
+5. **用量与调用诊断**：保留上游报告的输入 / 输出 / 缓存读取 / 缓存写入 token，调用记录包含协议、实际模型、分组、耗时、错误与 request_id。记录数按日志行统计，重试或切换可能产生多行，不等同于客户端请求数。实际费用以供应商账单为准。
 
 ---
 
 ## 三、三步上手
 
-1. 下载安装：[GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest)（macOS Apple Silicon / Windows x64）
+1. 下载安装：[GitHub Releases](https://github.com/Lixiuxiu559/portunus/releases/latest)（macOS Apple Silicon / Windows x64 / Linux x64）
 2. 添加渠道：填 Key，保存即自动拉取模型列表
-3. 一键接入：客户端页选分组，Claude Code / Codex 配置自动写好
+3. 创建模型分组：从上游模型中添加成员和路由策略；在服务接入中复制 API 示例或客户端指南，再到调用记录查看实际结果
 
 ---
 
 ## 四、适合谁 / 不适合谁（诚实边界）
 
-**适合**：同时用多个 LLM 渠道、重度使用 Claude Code / Codex 等 CLI 工具的个人开发者；想搞清楚自己 AI 花费的人；想在国内稳定用上各家模型协议互转的人。
+**适合**：集中管理多个官方 API 或中转站的人；希望多个客户端、脚本和应用复用模型分组的人；需要本地查看用量与调用结果的人。
 
-**不适合**：需要给整个团队 / 多台服务器共用网关的运维场景——那是自建网关软件的主场（Portunus 也提供局域网监听模式，但产品定位是个人桌面）。
+**当前边界**：支持本机和局域网设备使用同一服务令牌调用 `/v1`，管理接口 `/api` 仅限真实本机回环连接；不能通过本机反向代理向远端公开管理接口。多租户、充值结算、按调用方配额和公网托管尚未提供。
 
 ---
 
@@ -55,21 +55,21 @@ Portunus 的解法：
 
 ### ① 即刻 / 朋友圈（短版）
 
-> 做了个小工具：Portunus —— 把你手里散落的 LLM API Key 变成一个本地端点。
+> 做了个小工具：Portunus —— 本地聚合多个上游 API，用模型分组统一提供服务。
 >
-> 起因很简单：Claude Code、Codex 各配各的渠道，换 Key 要挨个改配置，渠道挂了半天才发现。现在统一接进 Portunus：OpenAI / Anthropic / Gemini 协议自动互转，分组路由故障转移，Claude Code 和 Codex 一键接入（自动写配置、可回滚），每次调用的 token 和费用都记着。
+> 起因很简单：Claude Code、Codex 各配各的渠道，换 Key 要挨个改配置，渠道挂了半天才发现。现在统一接进 Portunus：把官方 API 和中转站的模型按用途分组，让客户端通过分组名调用，支持手动、轮询和故障转移路由。通用 API 示例和 Claude Code、Codex 等指南放在服务接入页，用量、耗时和调用结果可以本地查看。
 >
-> 最重要的是：它是个桌面应用。双击安装就能用，不用 Docker、不用服务器。竞品都在卷服务端，我想先把「个人开发者装完即用」这件事做好。
+> 最重要的是：它是个桌面应用。双击安装就能用，不用 Docker、不用服务器。重点先把「本地聚合上游、用分组稳定提供服务」这件事做好。
 >
-> macOS / Windows 都有，v0.1.0 刚发：
+> macOS / Windows / Linux 安装包：
 > https://github.com/Lixiuxiu559/portunus/releases/latest
 >
-> 求反馈，特别是 Claude Code 重度用户。
+> 求反馈，特别是多上游、多客户端使用者。
 
 ### ② V2EX（第一人称叙事开头）
 
 标题备选：
-- 「写了个桌面端 LLM 网关：多渠道聚合 + Claude Code/Codex 一键接入，v0.1.0 发布」
+- 「写了个桌面端 LLM 网关：本地多上游聚合 + 模型分组服务」
 - 「分享一个自己写的 LLM 聚合工具 Portunus：双击安装即用，不用 Docker」
 
 正文开头（接长文骨架第二节）：
@@ -80,30 +80,34 @@ Portunus 的解法：
 
 结尾：
 
-> v0.1.0 刚发，macOS（Apple Silicon）/ Windows 都有。应用内自动更新已经打通，后面小版本迭代直接在 app 里升级。技术栈：Go + Gin + GORM（SQLite）/ Electron + React。求拍砖，尤其欢迎 Claude Code 重度用户提需求。
+> 提供 macOS（Apple Silicon）/ Windows / Linux 安装包。应用内自动更新已经打通，后面小版本迭代直接在 app 里升级。技术栈：Go + Gin + GORM（SQLite）/ Electron + React。求拍砖，尤其欢迎有多个上游和客户端的用户提需求。
 
 ### ③ 掘金 / 公众号（长文大纲）
 
 标题备选：
-- 《我用 Go + Electron 写了个本地 LLM 网关：给 Claude Code 管理所有渠道》
-- 《别再手改 Claude Code 配置了：一个桌面应用管住你所有的 LLM Key》
+- 《我用 Go + Electron 写了个本地 API 聚合网关：用模型分组统一服务多个客户端》
+- 《接好一次，随时切换：一个桌面应用管理你的 LLM 渠道》
 
-大纲：痛点场景（第二节）→ 架构（Go sidecar + Electron，纯 Go SQLite 无 CGO，应用内自动更新链路）→ 核心功能逐个演示截图（渠道录入 / 分组路由 / 客户端一键接入 / 日志计费）→ 协议互转细节（流式透传、工具调用映射、-thinking）→ 三步上手 → roadmap。
+大纲：痛点场景（第二节）→ 架构（Go sidecar + Electron，纯 Go SQLite 无 CGO，应用内自动更新链路）→ 核心功能逐个演示截图（渠道录入 / 分组路由 / 服务接入 / 调用记录与 token 用量）→ 协议互转细节（同协议透传、跨协议字段映射与能力边界）→ 三步上手 → roadmap。
 
 ### ④ 小红书（风格要点）
 
-- 标题：「Claude Code 用户的 Key 管理神器」「再也不用手改 Codex 配置了」
-- 排版：短句 + emoji，每个功能一行，截图 3-4 张（渠道页 / 客户端页 / 日志页）
+- 标题：「把多个 API 渠道接进一个本地网关」「用模型分组统一接入 AI 客户端」
+- 排版：短句 + emoji，每个功能一行，截图 3-4 张（模型分组页 / 服务接入页 / 调用记录页）
 - 结尾引导：评论交流 + 主页/置顶放链接
 
 ### ⑤ 英文一句话（X / HN）
 
-> Portunus — a desktop LLM gateway for individual devs: aggregate all your API keys behind one local endpoint, one-click onboard Claude Code & Codex, per-model billing. No Docker, no server. Install and go.
+> Portunus — a local API aggregation gateway: connect upstream providers and relay services, serve clients through model groups, and inspect token usage and diagnose calls. Generic API examples and client guides included. No separate server deployment required.
 > https://github.com/Lixiuxiu559/portunus
 
 ---
 
 ## 六、发布检查单
+
+- [ ] 页面与文案统一为“模型分组、上游渠道、上游模型、服务接入、调用记录、设置”
+- [ ] 不承诺全协议全能力等价、流中途无损切换、计价统计或多租户权限
+- [ ] 新截图按当前 P0 界面重新采集；已有截图可能保留旧页名，不作为新界面证明
 
 - [ ] 每篇配 2-3 张应用截图（浅色 + 深色主题各一）
 - [ ] 链接统一用 releases/latest（不用带版本号的链接，老链接会过时）
