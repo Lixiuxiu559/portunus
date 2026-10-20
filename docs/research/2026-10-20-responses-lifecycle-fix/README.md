@@ -2,6 +2,8 @@
 
 日期：2026-10-20。承接[上一轮实机报告](../2026-10-20-responses-completion-live/README.md)。用户已授权修复，并明确要求真实上游和真机验证。
 
+后续：[真实工具调用及同会话双轮验证](../2026-10-20-responses-tools-multiturn/README.md)已通过。本报告仍保留本轮自身的覆盖范围与限制。
+
 ## 结论
 
 **本次修复及所列真实场景验证通过。** 本机 Codex CLI 0.157.0 经两条真实上游均实际显示 `OK`，不再出现 `OutputTextDelta without active item`；预算截断仍能被准确识别；真实缓存命中明细已传到 Responses 和 Codex。

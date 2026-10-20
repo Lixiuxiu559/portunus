@@ -1,0 +1,50 @@
+import json,pathlib,hashlib,subprocess
+root=pathlib.Path('docs/research/2026-10-20-responses-tools-multiturn')
+sessions=[json.loads(x) for x in (root/'results.jsonl').read_text().splitlines()]
+checks=[]
+for s in sessions:
+ client=s['client_summary'];requests=s['requests'];expected=client['expected_values'];tag=client['expected_tag']
+ assert s['driver_exit']==0 and client['passed'] and client['ephemeral'] is True
+ assert len(requests)==3 and s['blocked_extra_calls']==0 and s['http_calls']==3
+ assert len(client['tool_calls'])==2 and all(c['success'] for c in client['tool_calls'])
+ assert {c['key'] for c in client['tool_calls']}=={'alpha','beta'}
+ assert all(c['value']==expected[c['key']] for c in client['tool_calls'])
+ upstream_tools=requests[0]['tool_calls'];assert len(upstream_tools)==2 and requests[0]['finish_reason']=='tool_calls'
+ ids={c['ID']:json.loads(c['Arguments'])['key'] for c in upstream_tools}
+ assert {c['call_id'] for c in client['tool_calls']}==set(ids)
+ for c in client['tool_calls']:assert c['key']==ids[c['call_id']]
+ for req in requests:
+  assert req['status']==200 and req['pairing_valid'] and req['done'] and req['input_tool_names']==['read_probe_value']
+  if req['ordinal']>1:
+   tools=[m for m in req['history'] if m['role']=='tool']
+   assert len(tools)==2
+   for m in tools:
+    assert m['name']=='read_probe_value' and m['tool_call_id'] in ids
+    result=json.loads(m['content']);key=ids[m['tool_call_id']]
+    assert result=={'key':key,'value':expected[key]}
+  raw=(root/f"{s['id']}-request-{req['ordinal']}.response.sse").read_text()
+  events=[json.loads(x[6:].strip()) for x in raw.splitlines() if x.startswith('data: {')]
+  assert [e['sequence_number'] for e in events]==list(range(len(events)))
+  assert raw.endswith('data: [DONE]\n\n')
+  final=events[-1]['response'];assert final['status']=='completed'
+  assert final['output']==[e['item'] for e in events if e['type']=='response.output_item.done']
+  u=req['usage'];assert final['usage']['input_tokens']==u['prompt_tokens'] and final['usage']['output_tokens']==u['completion_tokens']
+  cached=u.get('prompt_tokens_details',{}).get('cached_tokens',0);assert final['usage']['input_tokens_details']['cached_tokens']==cached
+  log=[l for l in s['gateway_logs'] if l['request_id']==req['request_id']];assert len(log)==1
+  assert log[0]['output_token']==u['completion_tokens'] and log[0]['cache_read_token']==cached and log[0]['success']
+  if req['ordinal']==1:
+   output_tools=[i for i in final['output'] if i['type']=='function_call'];assert len(output_tools)==2
+   for i in output_tools:assert i['call_id'] in ids and json.loads(i['arguments'])['key']==ids[i['call_id']]
+  else:
+   assert req['finish_reason']=='stop'
+   text=''.join(c['text'] for i in final['output'] if i['type']=='message' for c in i['content'])
+   assert text==req['text']
+ assert all(t['status']=='completed' and t['passed'] for t in client['turns'])
+ assert client['turns'][0]['parsed']==expected
+ assert client['turns'][1]['parsed']==dict(expected,tag=tag) and client['turns'][1]['new_tool_calls']==0
+ stderr=(root/(s['id']+'.stderr.txt')).read_text()
+ assert 'OutputTextDelta without active item' not in stderr and 'Tool use interrupted' not in stderr
+ checks.append({'id':s['id'],'channel_id':s['channel_id'],'model':s['model'],'paid_requests':len(requests),'same_model_batch_tool_calls':len(upstream_tools),'actual_tool_executions':len(client['tool_calls']),'completed_user_turns':len(client['turns']),'call_id_and_history_pairing':True,'tool_values_and_next_turn_memory':True,'sse_and_usage_verified':True,'passed':True})
+summary={'all_checks_passed':True,'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'paid_requests':sum(len(s['requests']) for s in sessions),'actual_tool_executions':sum(len(s['client_summary']['tool_calls']) for s in sessions),'completed_user_turns':sum(len(s['client_summary']['turns']) for s in sessions),'input_tokens_including_cache':sum(q['usage']['prompt_tokens'] for s in sessions for q in s['requests']),'cache_read_tokens':sum(q['usage'].get('prompt_tokens_details',{}).get('cached_tokens',0) for s in sessions for q in s['requests']),'output_tokens':sum(q['usage']['completion_tokens'] for s in sessions for q in s['requests']),'cases':checks,'source_sha256':{p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in ['backend/protocol/responses.go','backend/protocol/usage.go']}}
+(root/'assessment.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
+print(json.dumps({k:v for k,v in summary.items() if k not in ['source_sha256','cases']},ensure_ascii=False))

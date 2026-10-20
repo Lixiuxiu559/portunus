@@ -1,0 +1,668 @@
+{
+  "created_utc": "2026-10-20T14:36:05Z",
+  "max_total_paid_calls": 8,
+  "sessions": [
+    {
+      "id": "probe1",
+      "channel_id": 1,
+      "model": "deepseek/deepseek-v4.1-flash",
+      "budget": 384,
+      "requests": [
+        {
+          "ordinal": 1,
+          "request_id": "1a233daf47678645",
+          "status": 200,
+          "finish_reason": "tool_calls",
+          "usage": {
+            "completion_tokens": 69,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 6474,
+            "prompt_tokens": 6474,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 6543
+          },
+          "done": true,
+          "text": "",
+          "reasoning": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "ID": "call_00_qqxc31o3FLexBYIfpQfH4820",
+              "Name": "read_probe_value",
+              "Arguments": "{\"key\": \"alpha\"}"
+            },
+            {
+              "index": 1,
+              "ID": "call_01_9tI2dkkFMvgsLtSoVdq36353",
+              "Name": "read_probe_value",
+              "Arguments": "{\"key\": \"beta\"}"
+            }
+          ],
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "request_id": "ad52e3f752cafdcc",
+          "status": 200,
+          "finish_reason": "stop",
+          "usage": {
+            "completion_tokens": 28,
+            "prompt_cache_hit_tokens": 6400,
+            "prompt_cache_miss_tokens": 206,
+            "prompt_tokens": 6606,
+            "prompt_tokens_details": {
+              "cached_tokens": 6400
+            },
+            "total_tokens": 6634
+          },
+          "done": true,
+          "text": "{\"alpha\":\"24656edcd1e4f6df\",\"beta\":\"d9c8f2ee4d249952\"}",
+          "reasoning": "",
+          "tool_calls": null,
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "arguments": "{\"key\": \"alpha\"}",
+                  "id": "call_00_qqxc31o3FLexBYIfpQfH4820",
+                  "name": "read_probe_value"
+                },
+                {
+                  "arguments": "{\"key\": \"beta\"}",
+                  "id": "call_01_9tI2dkkFMvgsLtSoVdq36353",
+                  "name": "read_probe_value"
+                }
+              ]
+            },
+            {
+              "content": "{\"key\": \"alpha\", \"value\": \"24656edcd1e4f6df\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_00_qqxc31o3FLexBYIfpQfH4820"
+            },
+            {
+              "content": "{\"key\": \"beta\", \"value\": \"d9c8f2ee4d249952\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_01_9tI2dkkFMvgsLtSoVdq36353"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "request_id": "f604cbe6155720c2",
+          "status": 200,
+          "finish_reason": "stop",
+          "usage": {
+            "completion_tokens": 37,
+            "prompt_cache_hit_tokens": 6528,
+            "prompt_cache_miss_tokens": 5765,
+            "prompt_tokens": 12293,
+            "prompt_tokens_details": {
+              "cached_tokens": 6528
+            },
+            "total_tokens": 12330
+          },
+          "done": true,
+          "text": "{\"alpha\":\"24656edcd1e4f6df\",\"beta\":\"d9c8f2ee4d249952\",\"tag\":\"93df091a8d\"}",
+          "reasoning": "",
+          "tool_calls": null,
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "arguments": "{\"key\": \"alpha\"}",
+                  "id": "call_00_qqxc31o3FLexBYIfpQfH4820",
+                  "name": "read_probe_value"
+                },
+                {
+                  "arguments": "{\"key\": \"beta\"}",
+                  "id": "call_01_9tI2dkkFMvgsLtSoVdq36353",
+                  "name": "read_probe_value"
+                }
+              ]
+            },
+            {
+              "content": "{\"key\": \"alpha\", \"value\": \"24656edcd1e4f6df\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_00_qqxc31o3FLexBYIfpQfH4820"
+            },
+            {
+              "content": "{\"key\": \"beta\", \"value\": \"d9c8f2ee4d249952\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_01_9tI2dkkFMvgsLtSoVdq36353"
+            },
+            {
+              "role": "assistant"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        }
+      ],
+      "gateway_logs": [
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe1",
+          "channel_id": 1,
+          "model_name": "deepseek/deepseek-v4.1-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "1a233daf47678645",
+          "input_token": 6474,
+          "output_token": 69,
+          "cache_read_token": 0,
+          "cache_write_token": 0,
+          "duration_ms": 996,
+          "first_token_ms": 873,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 0,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe1",
+          "channel_id": 1,
+          "model_name": "deepseek/deepseek-v4.1-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "ad52e3f752cafdcc",
+          "input_token": 206,
+          "output_token": 28,
+          "cache_read_token": 6400,
+          "cache_write_token": 0,
+          "duration_ms": 821,
+          "first_token_ms": 687,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 1,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe1",
+          "channel_id": 1,
+          "model_name": "deepseek/deepseek-v4.1-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "f604cbe6155720c2",
+          "input_token": 5765,
+          "output_token": 37,
+          "cache_read_token": 6528,
+          "cache_write_token": 0,
+          "duration_ms": 731,
+          "first_token_ms": 575,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 1,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "blocked_extra_calls": 0,
+      "http_calls": 3,
+      "client_summary": {
+        "ephemeral": true,
+        "expected_tag": "93df091a8d",
+        "expected_values": {
+          "alpha": "24656edcd1e4f6df",
+          "beta": "d9c8f2ee4d249952"
+        },
+        "model": "probe1",
+        "passed": true,
+        "thread_id": "01a159bd-8e74-7313-833f-63be3ee10049",
+        "tool_calls": [
+          {
+            "call_id": "call_00_qqxc31o3FLexBYIfpQfH4820",
+            "key": "alpha",
+            "success": true,
+            "thread_id": "01a159bd-8e74-7313-833f-63be3ee10049",
+            "tool": "read_probe_value",
+            "turn_id": "01a159bd-8ef0-7741-9d2f-bad0a8762cd6",
+            "value": "24656edcd1e4f6df"
+          },
+          {
+            "call_id": "call_01_9tI2dkkFMvgsLtSoVdq36353",
+            "key": "beta",
+            "success": true,
+            "thread_id": "01a159bd-8e74-7313-833f-63be3ee10049",
+            "tool": "read_probe_value",
+            "turn_id": "01a159bd-8ef0-7741-9d2f-bad0a8762cd6",
+            "value": "d9c8f2ee4d249952"
+          }
+        ],
+        "turns": [
+          {
+            "final_text": "{\"alpha\":\"24656edcd1e4f6df\",\"beta\":\"d9c8f2ee4d249952\"}",
+            "new_tool_calls": 2,
+            "parsed": {
+              "alpha": "24656edcd1e4f6df",
+              "beta": "d9c8f2ee4d249952"
+            },
+            "passed": true,
+            "status": "completed",
+            "turn_id": "01a159bd-8ef0-7741-9d2f-bad0a8762cd6"
+          },
+          {
+            "final_text": "{\"alpha\":\"24656edcd1e4f6df\",\"beta\":\"d9c8f2ee4d249952\",\"tag\":\"93df091a8d\"}",
+            "new_tool_calls": 0,
+            "parsed": {
+              "alpha": "24656edcd1e4f6df",
+              "beta": "d9c8f2ee4d249952",
+              "tag": "93df091a8d"
+            },
+            "passed": true,
+            "status": "completed",
+            "turn_id": "01a159bd-9d0a-7830-a32d-c08aaff40e57"
+          }
+        ],
+        "unexpected_server_requests": []
+      },
+      "driver_exit": 0,
+      "incoming_tool_counts": [
+        20,
+        20,
+        20
+      ]
+    },
+    {
+      "id": "probe3",
+      "channel_id": 3,
+      "model": "deepseek-flash",
+      "budget": 384,
+      "requests": [
+        {
+          "ordinal": 1,
+          "request_id": "1dfe72f6e1d233fd",
+          "status": 200,
+          "finish_reason": "tool_calls",
+          "usage": {
+            "completion_tokens": 69,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 6473,
+            "prompt_tokens": 6473,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 6542
+          },
+          "done": true,
+          "text": "",
+          "reasoning": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "ID": "call_00_CLS2Qpb6D1NyMuZzbhQ04106",
+              "Name": "read_probe_value",
+              "Arguments": "{\"key\": \"alpha\"}"
+            },
+            {
+              "index": 1,
+              "ID": "call_01_JQWli4pcSNqQflz4LsNk2018",
+              "Name": "read_probe_value",
+              "Arguments": "{\"key\": \"beta\"}"
+            }
+          ],
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "request_id": "7ecfa105c321586d",
+          "status": 200,
+          "finish_reason": "stop",
+          "usage": {
+            "completion_tokens": 29,
+            "prompt_cache_hit_tokens": 6400,
+            "prompt_cache_miss_tokens": 206,
+            "prompt_tokens": 6606,
+            "prompt_tokens_details": {
+              "cached_tokens": 6400
+            },
+            "total_tokens": 6635
+          },
+          "done": true,
+          "text": "{\"alpha\":\"0a420d0c78b76bf5\",\"beta\":\"b76c205fcdc85a8d\"}",
+          "reasoning": "",
+          "tool_calls": null,
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "arguments": "{\"key\": \"alpha\"}",
+                  "id": "call_00_CLS2Qpb6D1NyMuZzbhQ04106",
+                  "name": "read_probe_value"
+                },
+                {
+                  "arguments": "{\"key\": \"beta\"}",
+                  "id": "call_01_JQWli4pcSNqQflz4LsNk2018",
+                  "name": "read_probe_value"
+                }
+              ]
+            },
+            {
+              "content": "{\"key\": \"alpha\", \"value\": \"0a420d0c78b76bf5\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_00_CLS2Qpb6D1NyMuZzbhQ04106"
+            },
+            {
+              "content": "{\"key\": \"beta\", \"value\": \"b76c205fcdc85a8d\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_01_JQWli4pcSNqQflz4LsNk2018"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "request_id": "d52901c9503012eb",
+          "status": 200,
+          "finish_reason": "stop",
+          "usage": {
+            "completion_tokens": 37,
+            "prompt_cache_hit_tokens": 6528,
+            "prompt_cache_miss_tokens": 5766,
+            "prompt_tokens": 12294,
+            "prompt_tokens_details": {
+              "cached_tokens": 6528
+            },
+            "total_tokens": 12331
+          },
+          "done": true,
+          "text": "{\"alpha\":\"0a420d0c78b76bf5\",\"beta\":\"b76c205fcdc85a8d\",\"tag\":\"8e11907826\"}",
+          "reasoning": "",
+          "tool_calls": null,
+          "history": [
+            {
+              "role": "system"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "user"
+            },
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "arguments": "{\"key\": \"alpha\"}",
+                  "id": "call_00_CLS2Qpb6D1NyMuZzbhQ04106",
+                  "name": "read_probe_value"
+                },
+                {
+                  "arguments": "{\"key\": \"beta\"}",
+                  "id": "call_01_JQWli4pcSNqQflz4LsNk2018",
+                  "name": "read_probe_value"
+                }
+              ]
+            },
+            {
+              "content": "{\"key\": \"alpha\", \"value\": \"0a420d0c78b76bf5\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_00_CLS2Qpb6D1NyMuZzbhQ04106"
+            },
+            {
+              "content": "{\"key\": \"beta\", \"value\": \"b76c205fcdc85a8d\"}",
+              "name": "read_probe_value",
+              "role": "tool",
+              "tool_call_id": "call_01_JQWli4pcSNqQflz4LsNk2018"
+            },
+            {
+              "role": "assistant"
+            },
+            {
+              "role": "system"
+            },
+            {
+              "role": "user"
+            }
+          ],
+          "pairing_valid": true,
+          "input_tool_names": [
+            "read_probe_value"
+          ]
+        }
+      ],
+      "gateway_logs": [
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe3",
+          "channel_id": 3,
+          "model_name": "deepseek-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "1dfe72f6e1d233fd",
+          "input_token": 6473,
+          "output_token": 69,
+          "cache_read_token": 0,
+          "cache_write_token": 0,
+          "duration_ms": 784,
+          "first_token_ms": 208,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 0,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe3",
+          "channel_id": 3,
+          "model_name": "deepseek-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "7ecfa105c321586d",
+          "input_token": 206,
+          "output_token": 29,
+          "cache_read_token": 6400,
+          "cache_write_token": 0,
+          "duration_ms": 607,
+          "first_token_ms": 112,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 1,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 0,
+          "api_key_id": 1,
+          "group_name": "probe3",
+          "channel_id": 3,
+          "model_name": "deepseek-flash",
+          "status": 200,
+          "success": true,
+          "stream": true,
+          "request_id": "d52901c9503012eb",
+          "input_token": 5766,
+          "output_token": 37,
+          "cache_read_token": 6528,
+          "cache_write_token": 0,
+          "duration_ms": 482,
+          "first_token_ms": 112,
+          "client_protocol": "openai_responses",
+          "bridge_decoded": 0,
+          "shim_rewrites": 1,
+          "hosted_tools_stripped": 0,
+          "created_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "blocked_extra_calls": 0,
+      "http_calls": 3,
+      "client_summary": {
+        "ephemeral": true,
+        "expected_tag": "8e11907826",
+        "expected_values": {
+          "alpha": "0a420d0c78b76bf5",
+          "beta": "b76c205fcdc85a8d"
+        },
+        "model": "probe3",
+        "passed": true,
+        "thread_id": "01a159bd-a0b8-7640-b218-1cd75110ec1a",
+        "tool_calls": [
+          {
+            "call_id": "call_00_CLS2Qpb6D1NyMuZzbhQ04106",
+            "key": "alpha",
+            "success": true,
+            "thread_id": "01a159bd-a0b8-7640-b218-1cd75110ec1a",
+            "tool": "read_probe_value",
+            "turn_id": "01a159bd-a105-7880-af7a-0b1e36654ea5",
+            "value": "0a420d0c78b76bf5"
+          },
+          {
+            "call_id": "call_01_JQWli4pcSNqQflz4LsNk2018",
+            "key": "beta",
+            "success": true,
+            "thread_id": "01a159bd-a0b8-7640-b218-1cd75110ec1a",
+            "tool": "read_probe_value",
+            "turn_id": "01a159bd-a105-7880-af7a-0b1e36654ea5",
+            "value": "b76c205fcdc85a8d"
+          }
+        ],
+        "turns": [
+          {
+            "final_text": "{\"alpha\":\"0a420d0c78b76bf5\",\"beta\":\"b76c205fcdc85a8d\"}",
+            "new_tool_calls": 2,
+            "parsed": {
+              "alpha": "0a420d0c78b76bf5",
+              "beta": "b76c205fcdc85a8d"
+            },
+            "passed": true,
+            "status": "completed",
+            "turn_id": "01a159bd-a105-7880-af7a-0b1e36654ea5"
+          },
+          {
+            "final_text": "{\"alpha\":\"0a420d0c78b76bf5\",\"beta\":\"b76c205fcdc85a8d\",\"tag\":\"8e11907826\"}",
+            "new_tool_calls": 0,
+            "parsed": {
+              "alpha": "0a420d0c78b76bf5",
+              "beta": "b76c205fcdc85a8d",
+              "tag": "8e11907826"
+            },
+            "passed": true,
+            "status": "completed",
+            "turn_id": "01a159bd-ad13-7791-86fb-e26fd5474882"
+          }
+        ],
+        "unexpected_server_requests": []
+      },
+      "driver_exit": 0,
+      "incoming_tool_counts": [
+        20,
+        20,
+        20
+      ]
+    }
+  ]
+}

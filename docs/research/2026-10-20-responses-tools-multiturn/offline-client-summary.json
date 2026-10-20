@@ -1,0 +1,57 @@
+{
+  "model": "probe3",
+  "tool_calls": [
+    {
+      "tool": "read_probe_value",
+      "key": "alpha",
+      "call_id": "c_alpha",
+      "thread_id": "01a159bb-3dc0-71e0-a9ad-46464bf06d0b",
+      "turn_id": "01a159bb-3e3d-7703-af07-cb194c961391",
+      "success": true,
+      "value": "bcaf87cadcd0dcc6"
+    },
+    {
+      "tool": "read_probe_value",
+      "key": "beta",
+      "call_id": "c_beta",
+      "thread_id": "01a159bb-3dc0-71e0-a9ad-46464bf06d0b",
+      "turn_id": "01a159bb-3e3d-7703-af07-cb194c961391",
+      "success": true,
+      "value": "d2d928fec8f66677"
+    }
+  ],
+  "turns": [
+    {
+      "turn_id": "01a159bb-3e3d-7703-af07-cb194c961391",
+      "status": "completed",
+      "final_text": "{\"alpha\": \"bcaf87cadcd0dcc6\", \"beta\": \"d2d928fec8f66677\"}",
+      "parsed": {
+        "alpha": "bcaf87cadcd0dcc6",
+        "beta": "d2d928fec8f66677"
+      },
+      "new_tool_calls": 2,
+      "passed": true
+    },
+    {
+      "turn_id": "01a159bb-480c-7ae2-b174-ce788d7099cb",
+      "status": "completed",
+      "final_text": "{\"alpha\": \"bcaf87cadcd0dcc6\", \"beta\": \"d2d928fec8f66677\", \"tag\": \"77163b1706\"}",
+      "parsed": {
+        "alpha": "bcaf87cadcd0dcc6",
+        "beta": "d2d928fec8f66677",
+        "tag": "77163b1706"
+      },
+      "new_tool_calls": 0,
+      "passed": true
+    }
+  ],
+  "unexpected_server_requests": [],
+  "passed": true,
+  "expected_values": {
+    "alpha": "bcaf87cadcd0dcc6",
+    "beta": "d2d928fec8f66677"
+  },
+  "expected_tag": "77163b1706",
+  "thread_id": "01a159bb-3dc0-71e0-a9ad-46464bf06d0b",
+  "ephemeral": true
+}

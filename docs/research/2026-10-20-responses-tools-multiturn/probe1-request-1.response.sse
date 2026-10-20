@@ -1,0 +1,54 @@
+data: {"type":"response.created","response":{"id":"1e4a32a3-49a9-4699-96d4-360742842667","object":"response","status":"in_progress","model":"deepseek-flash","output":[]},"sequence_number":0}
+
+data: {"item":{"arguments":"","call_id":"call_00_qqxc31o3FLexBYIfpQfH4820","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","name":"read_probe_value","status":"in_progress","type":"function_call"},"output_index":0,"sequence_number":1,"type":"response.output_item.added"}
+
+data: {"delta":"{","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":2,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":3,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"key","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":4,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":5,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":": ","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":6,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":7,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"alpha","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":8,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":9,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"}","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":10,"type":"response.function_call_arguments.delta"}
+
+data: {"item":{"arguments":"","call_id":"call_01_9tI2dkkFMvgsLtSoVdq36353","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","name":"read_probe_value","status":"in_progress","type":"function_call"},"output_index":1,"sequence_number":11,"type":"response.output_item.added"}
+
+data: {"delta":"{","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":12,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":13,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"key","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":14,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":15,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":": ","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":16,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":17,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"beta","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":18,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"\"","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":19,"type":"response.function_call_arguments.delta"}
+
+data: {"delta":"}","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":20,"type":"response.function_call_arguments.delta"}
+
+data: {"arguments":"{\"key\": \"alpha\"}","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","output_index":0,"sequence_number":21,"type":"response.function_call_arguments.done"}
+
+data: {"item":{"arguments":"{\"key\": \"alpha\"}","call_id":"call_00_qqxc31o3FLexBYIfpQfH4820","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","name":"read_probe_value","status":"completed","type":"function_call"},"output_index":0,"sequence_number":22,"type":"response.output_item.done"}
+
+data: {"arguments":"{\"key\": \"beta\"}","item_id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","output_index":1,"sequence_number":23,"type":"response.function_call_arguments.done"}
+
+data: {"item":{"arguments":"{\"key\": \"beta\"}","call_id":"call_01_9tI2dkkFMvgsLtSoVdq36353","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","name":"read_probe_value","status":"completed","type":"function_call"},"output_index":1,"sequence_number":24,"type":"response.output_item.done"}
+
+data: {"type":"response.completed","response":{"id":"1e4a32a3-49a9-4699-96d4-360742842667","object":"response","status":"completed","model":"deepseek-flash","output":[{"type":"function_call","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_0","name":"read_probe_value","call_id":"call_00_qqxc31o3FLexBYIfpQfH4820","status":"completed","arguments":"{\"key\": \"alpha\"}"},{"type":"function_call","id":"fc_1e4a32a3-49a9-4699-96d4-360742842667_1","name":"read_probe_value","call_id":"call_01_9tI2dkkFMvgsLtSoVdq36353","status":"completed","arguments":"{\"key\": \"beta\"}"}],"usage":{"input_tokens":6474,"output_tokens":69,"total_tokens":6543,"input_tokens_details":{"cached_tokens":0}}},"sequence_number":25}
+
+data: [DONE]
+
