@@ -14,6 +14,7 @@ import (
 
 // Register 注册管理 API 路由，供前端调用。
 func Register(r *gin.RouterGroup) {
+	r.Use(localManagementOnly())
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
