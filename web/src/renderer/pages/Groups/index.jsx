@@ -126,7 +126,7 @@ export default function Groups() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="groups-page flex flex-col flex-1 min-h-0">
       <div className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold">模型分组</h1>
@@ -226,7 +226,7 @@ export default function Groups() {
                 </div>
                 <footer className="group-service-footer">
                   <button type="button" className="group-add-member" onClick={() => setAddItemTarget(g)}><Plus className="size-3.5" />添加成员</button>
-                  <div className="flex items-center gap-3">
+                  <div className="group-footer-links">
                     <Link className="group-record-link" to={groupServicePath('/logs', g.name)} aria-label={`查看 ${g.name} 的调用记录`}><List className="size-3.5" />调用记录</Link>
                     <Link className="group-connect-link" to={groupServicePath('/clients', g.name)}>接入<ArrowUpRight className="size-3.5" /></Link>
                   </div>

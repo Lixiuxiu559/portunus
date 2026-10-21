@@ -1,10 +1,13 @@
 package protocol
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -55,28 +58,66 @@ func newGeminiUpstream(cfg baseConfig) Upstream {
 }
 
 // upstreamClient 拉取模型列表专用，设超时避免拖垮调用方。
-var upstreamClient = &http.Client{Timeout: 15 * time.Second}
+var upstreamClient = &http.Client{
+	Timeout: 15 * time.Second,
+	// 凭据不能随模型发现请求重定向到其他目标。
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+const maxModelResponseBytes = 4 << 20
+
+// FetchUpstreamModels 复用协议接入器的发现逻辑，并传播管理请求取消。
+func FetchUpstreamModels(ctx context.Context, p Provider, baseURL, key string) ([]string, error) {
+	u, err := NewUpstream(p, baseURL, key)
+	if err != nil {
+		return nil, errors.New("模型发现配置错误：未知协议")
+	}
+	contextual, ok := u.(interface {
+		fetchModelsContext(context.Context) ([]string, error)
+	})
+	if !ok {
+		return nil, errors.New("该协议不支持模型发现")
+	}
+	return contextual.fetchModelsContext(ctx)
+}
 
 // fetchModels 拉取模型列表并把响应体交给 parse 解析。
-func fetchModels(url string, header http.Header, parse func([]byte) ([]string, error)) ([]string, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func fetchModels(ctx context.Context, endpoint string, header http.Header, parse func([]byte) ([]string, error)) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("模型发现请求地址无效")
 	}
 	req.Header = header
 	resp, err := upstreamClient.Do(req)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("模型发现已终止: %w", ctx.Err())
+		}
+		var timeout interface{ Timeout() bool }
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			return nil, errors.New("模型发现请求超时")
+		}
+		return nil, errors.New("模型发现网络请求失败")
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("拉取模型列表失败: %s", resp.Status)
+		return nil, fmt.Errorf("模型发现返回 HTTP %d", resp.StatusCode)
 	}
-	return parse(body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxModelResponseBytes+1))
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("模型发现已终止: %w", ctx.Err())
+		}
+		return nil, errors.New("模型发现响应读取失败")
+	}
+	if len(body) > maxModelResponseBytes {
+		return nil, errors.New("模型发现响应超过大小上限")
+	}
+	names, err := parse(body)
+	if err != nil {
+		return nil, errors.New("模型发现响应格式无效")
+	}
+	return names, nil
 }
 
 // bearerUpstream 覆盖 OpenAI Chat Completions / Responses：二者仅对话路径不同，
@@ -98,7 +139,11 @@ func (u *bearerUpstream) ChatHeaders() http.Header {
 }
 
 func (u *bearerUpstream) FetchModels() ([]string, error) {
-	return fetchModels(u.baseURL+"/models", u.ChatHeaders(), parseOpenAIModels)
+	return u.fetchModelsContext(context.Background())
+}
+
+func (u *bearerUpstream) fetchModelsContext(ctx context.Context) ([]string, error) {
+	return fetchModels(ctx, u.baseURL+"/models", u.ChatHeaders(), parseOpenAIModels)
 }
 
 // anthropicUpstream 覆盖 Anthropic Messages：x-api-key 鉴权 + anthropic-version。
@@ -119,7 +164,11 @@ func (u *anthropicUpstream) ChatHeaders() http.Header {
 }
 
 func (u *anthropicUpstream) FetchModels() ([]string, error) {
-	return fetchModels(u.baseURL+"/models", u.ChatHeaders(), parseOpenAIModels)
+	return u.fetchModelsContext(context.Background())
+}
+
+func (u *anthropicUpstream) fetchModelsContext(ctx context.Context) ([]string, error) {
+	return fetchModels(ctx, u.baseURL+"/models", u.ChatHeaders(), parseOpenAIModels)
 }
 
 // geminiUpstream 覆盖 Gemini：模型名进 URL，鉴权用 x-goog-api-key，
@@ -144,7 +193,11 @@ func (u *geminiUpstream) ChatHeaders() http.Header {
 }
 
 func (u *geminiUpstream) FetchModels() ([]string, error) {
-	return fetchModels(u.baseURL+"/models?key="+u.key, http.Header{}, parseGeminiModels)
+	return u.fetchModelsContext(context.Background())
+}
+
+func (u *geminiUpstream) fetchModelsContext(ctx context.Context) ([]string, error) {
+	return fetchModels(ctx, u.baseURL+"/models?key="+url.QueryEscape(u.key), http.Header{}, parseGeminiModels)
 }
 
 // parseOpenAIModels 解析 OpenAI / Anthropic 的模型列表（data 数组，元素含 id）。

@@ -20,6 +20,7 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/router"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
+	"github.com/Lixiuxiu559/portunus/backend/upstream"
 )
 
 // relayMeta 是三种客户端协议请求体的最小公共字段。thinking 为 anthropic 与
@@ -225,7 +226,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		s.finishAttempt(trace, status, success, logErr)
 		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
 		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, durationMs, firstTokenMs, requestID, logErr)
-		if !success {
+		if !success && !s.quiet {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
 			log.Printf("relay 尝试失败: group=%s model=%s channel=%s kind=%s err=%v",
@@ -252,7 +253,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		return nil, 0, &convertError{err}
 	}
 
-	upstream, err := protocol.NewUpstream(t.Channel.Type, t.Channel.BaseURL, t.Channel.Key)
+	connection, err := upstream.Open(t.Channel.ConnectionConfig())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -272,10 +273,10 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		defer wd.Stop()
 	}
 
-	headers := upstream.ChatHeaders()
+	headers := connection.ChatHeaders()
 	headers.Set("X-Request-Id", requestID)
 	allowBudgetRetry := clientProto != protocol.ProviderOpenAI && t.Channel.Type == protocol.ProviderOpenAI
-	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, upstream.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry, trace)
+	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, connection.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry, trace)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -284,7 +285,9 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		errBody, _ := io.ReadAll(resp.Body)
-		log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
+		if !s.quiet {
+			log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
+		}
 		return nil, status, &upstreamStatusError{status: status, body: errBody, retryAfter: resp.Header.Get("Retry-After")}
 	}
 

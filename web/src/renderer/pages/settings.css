@@ -2,28 +2,33 @@
 .settings-sections {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  max-width: 920px;
+  width: 100%;
+  padding-bottom: 8px;
 }
 .settings-card.card {
   flex-shrink: 0;
   min-width: 0;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 18px;
+  gap: 0;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: none;
 }
-.settings-section-title { font-size: 16px; line-height: 24px; font-weight: 500; }
+.settings-section-title { font-size: 13px; line-height: 20px; font-weight: 600; }
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px 24px;
   min-width: 0;
-  padding: 12px 0;
+  min-height: 62px;
+  padding: 14px 0;
 }
 .settings-row:first-child { padding-top: 0; }
 .settings-row:last-child { padding-bottom: 0; }
 .settings-row + .settings-row { border-top: 1px solid var(--separator); }
-.settings-row-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.settings-row-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .settings-label { font-size: 14px; line-height: 20px; font-weight: 500; }
 .settings-hint { font-size: 12px; line-height: 20px; color: var(--muted); }
 .settings-value { font-size: 12px; line-height: 20px; color: var(--muted); text-align: right; }
@@ -31,20 +36,24 @@
 .settings-control.button { min-height: 36px; }
 .settings-interval-field { width: 96px; }
 .settings-interval-field .input { min-height: 36px; }
-.settings-access { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px 24px; }
+.settings-access { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px 24px; padding-block: 17px; }
 .settings-access-link { flex-shrink: 0; }
-.settings-about { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; min-width: 0; }
-.settings-about-copy { min-width: 0; }
-.settings-version-details { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
+.settings-about { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; min-width: 0; padding-block: 14px 0; }
+.settings-about-copy { min-width: 0; flex: 1; }
+.settings-version-details { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
 .settings-repository { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
 .settings-repository-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-version { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .settings-version > *, .settings-latest-version { overflow-wrap: anywhere; }
 .settings-update-actions { flex-wrap: wrap; justify-content: flex-end; }
-.settings-update-status { min-width: 0; min-height: 48px; padding-top: 4px; }
+.settings-update-status { min-width: 0; min-height: 48px; padding-top: 4px; margin: 0 20px 18px; }
 .settings-update-message { margin-top: 4px; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
 @media (max-width: 767px) {
   .settings-row, .settings-access, .settings-about { flex-wrap: wrap; gap: 8px 16px; }
   .settings-row-copy { flex-basis: 100%; }
   .settings-update-actions { justify-content: flex-start; }
 }
+
+.settings-card.card > .card__header { padding: 15px 20px; border-bottom: 1px solid var(--separator); }
+.settings-card.card > .card__content { padding: 4px 20px 16px; }
+@media (max-width: 1050px) { .settings-about { flex-wrap: wrap; } .settings-row { gap: 10px 16px; } .settings-update-actions { justify-content: flex-start; } }

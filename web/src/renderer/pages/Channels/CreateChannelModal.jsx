@@ -1,254 +1,56 @@
-import { useState, useEffect, useRef } from 'react';
-import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListBox, Typography, Chip, toast, ScrollShadow } from '@heroui/react';
-import { Plus, X, RefreshCw } from 'lucide-react';
-import { createChannel, previewModels, syncChannel } from '../../api';
+import { useRef, useState } from 'react';
+import { Button, Form, Modal, toast } from '@heroui/react';
+import { createChannel } from '../../api';
+import ConnectionFields from './ConnectionFields';
+import ModelPicker from './ModelPicker';
+import CallTestPanel from './CallTestPanel';
+import useChannelDraft from './useChannelDraft';
+import { savePayload } from './channelDraft';
 
-// 协议类型与后端 protocol.Provider 保持一致
-const providerOptions = [
-  { id: 'openai', label: 'OpenAI Chat' },
-  { id: 'openai_responses', label: 'OpenAI Responses' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'gemini', label: 'Gemini' },
-];
-
-// 各协议的默认 Base URL，选中后自动填充
-const defaultBaseURLs = {
-  openai: 'https://api.openai.com',
-  openai_responses: 'https://api.openai.com',
-  anthropic: 'https://api.anthropic.com',
-  gemini: 'https://generativelanguage.googleapis.com',
-};
-
-const emptyForm = {
-  name: '',
-  type: 'openai',
-  base_url: '',
-  key: '',
-  auto_sync: true,
-};
-
-export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) {
+function CreateChannelForm({ onOpenChange, onCreated }) {
+  const state = useChannelDraft();
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [models, setModels] = useState([]);
-  const [syncing, setSyncing] = useState(false);
-  const [modelSearch, setModelSearch] = useState('');
   const formRef = useRef(null);
-
-  const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
-
-  // 每次打开弹窗重置表单
-  useEffect(() => {
-    if (isOpen) {
-      setForm(emptyForm);
-      setModels([]);
-      setSyncing(false);
-      setSaving(false);
-    }
-  }, [isOpen]);
-
-  // 预览上游模型：不创建渠道，只获取模型列表
-  const handleSyncModels = async () => {
-    setSyncing(true);
-    try {
-      const res = await previewModels({
-        type: form.type,
-        base_url: form.base_url.trim(),
-        key: form.key.trim(),
-      });
-      setModels(Array.isArray(res.models) ? res.models : []);
-      toast.success(`获取到 ${(res.models || []).length} 个模型`);
-    } catch (e) {
-      toast.danger(e.message || '获取模型失败');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleRemoveModel = (name) => {
-    setModels((prev) => prev.filter((m) => m !== name));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formRef.current?.checkValidity()) return;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (saving || !state.draft.type || !formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
-      const ch = await createChannel({
-        name: form.name.trim(),
-        type: form.type,
-        base_url: form.base_url.trim(),
-        key: form.key.trim(),
-        auto_sync: form.auto_sync,
-      });
-      // 创建成功即自动同步一次模型，省去手动点同步；同步失败不影响渠道已建的事实
-      try {
-        const res = await syncChannel(ch.id);
-        toast.success(`渠道已创建，同步到 ${res.added ?? 0} 个模型`);
-      } catch (syncErr) {
-        toast.warning(`渠道已创建，但模型同步失败：${syncErr.message || '未知原因'}，可点渠道卡片上的同步按钮重试`);
-      }
-      setForm(emptyForm);
+      await createChannel(savePayload(state.draft, state.selected));
+      toast.success(state.selected.length ? '渠道与所选模型已保存，请到模型分组中添加使用' : '渠道已保存，尚未导入模型');
       onOpenChange(false);
       onCreated?.();
-    } catch (e) {
-      toast.danger(e.message || '创建失败');
-    } finally {
-      setSaving(false);
-    }
+    } catch {
+      // 请求层统一显示错误；保持草稿便于修正。
+    } finally { setSaving(false); }
   };
+  return <>
+    <Modal.Body>
+      <Form id="create-channel-form" ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <fieldset disabled={saving} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
+          <ConnectionFields state={state} />
+          <ModelPicker state={state} />
+          <CallTestPanel state={state} />
+        </fieldset>
+      </Form>
+    </Modal.Body>
+    <Modal.Footer>
+      <Button slot="close" variant="secondary" isDisabled={saving}>取消</Button>
+      <Button variant="primary" isPending={saving} isDisabled={!state.draft.type} onPress={() => formRef.current?.requestSubmit()}>
+        {saving ? '保存中…' : '保存渠道与所选模型'}
+      </Button>
+    </Modal.Footer>
+  </>;
+}
 
+export default function CreateChannelModal({ isOpen, onOpenChange, onCreated }) {
   return (
     <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container size="xl">
-        <Modal.Dialog className="w-[700px]">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Heading>新增渠道</Modal.Heading>
-          </Modal.Header>
-
-          <Modal.Body>
-            <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="dialog-form-grid grid grid-cols-2 gap-3">
-                <TextField
-                  isRequired
-                  name="name"
-                  value={form.name}
-                  onChange={set('name')}
-                  autoFocus
-                  autoComplete="off"
-                  validate={(v) => (!v || !v.trim()) ? '请填写渠道名称' : null}
-                >
-                  <Label>渠道名称</Label>
-                  <Input placeholder="例如：OpenAI 官方" />
-                  <FieldError />
-                </TextField>
-
-                <Select
-                  isRequired
-                  name="type"
-                  selectedKey={form.type}
-                  onSelectionChange={set('type')}
-                >
-                  <Label>协议类型</Label>
-                  <Select.Trigger>
-                    <Select.Value />
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover className="dialog-options">
-                    <ListBox>
-                      {providerOptions.map((o) => (
-                        <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-                          {o.label}
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                      ))}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
-
-                <TextField
-                  isRequired
-                  name="base_url"
-                  value={form.base_url}
-                  onChange={set('base_url')}
-                  autoComplete="off"
-                  validate={(v) => (!v || !v.trim()) ? '请填写 Base URL' : null}
-                >
-                  <Label>Base URL</Label>
-                  <Input placeholder="https://api.openai.com" />
-                  <FieldError />
-                </TextField>
-
-                <TextField
-                  isRequired
-                  name="key"
-                  type="password"
-                  value={form.key}
-                  onChange={set('key')}
-                  autoComplete="new-password"
-                  validate={(v) => (!v || !v.trim()) ? '请填写 API Key' : null}
-                >
-                  <Label>API Key</Label>
-                  <Input placeholder="sk-..." />
-                  <FieldError />
-                </TextField>
-              </div>
-
-              {/* 模型列表 */}
-              <div className="border-t border-separator pt-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <Typography type="body-sm" className="text-muted">
-                    模型列表
-                  </Typography>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onPress={handleSyncModels}
-                    isPending={syncing}
-                    isDisabled={!form.base_url.trim() || !form.key.trim()}
-                    className="h-7 px-2 gap-1 text-xs"
-                  >
-                    <RefreshCw className={`size-3 ${syncing ? 'animate-spin' : ''}`} />
-                    同步模型
-                  </Button>
-                </div>
-                {models.length === 0 ? (
-                  <Typography type="body-sm" className="text-muted">
-                    暂无模型
-                  </Typography>
-                ) : (
-                  <>
-                    <Input
-                      type="text"
-                      size="xs"
-                      placeholder="搜索模型…"
-                      value={modelSearch}
-                      onChange={(e) => setModelSearch(e.target.value)}
-                      className="w-full mb-2"
-                    />
-                    <ScrollShadow
-                      className="dialog-models flex flex-wrap gap-2 max-h-[190px] p-1"
-                      orientation="vertical"
-                      hideScrollBar
-                    >
-                      {models
-                        .filter((name) => !modelSearch || name.toLowerCase().includes(modelSearch.toLowerCase()))
-                        .map((name) => (
-                        <Chip
-                          key={name}
-                          variant="soft"
-                          size="sm"
-                        >
-                          <span className="flex items-center gap-1">
-                            <span className="dialog-model-name" title={name}>{name}</span>
-                            <button
-                              onClick={() => handleRemoveModel(name)}
-                              className="ml-0.5 rounded-full p-0.5 hover:bg-danger/20 cursor-pointer"
-                              aria-label={`移除模型 ${name}`}
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </span>
-                        </Chip>
-                      ))}
-                    </ScrollShadow>
-                  </>
-                )}
-              </div>
-            </Form>
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button slot="close" variant="secondary">
-              取消
-            </Button>
-            <Button variant="primary" isPending={saving} onClick={() => formRef.current?.requestSubmit()}>
-              {saving ? '保存中…' : '保存'}
-            </Button>
-          </Modal.Footer>
-        </Modal.Dialog>
-      </Modal.Container>
+      <Modal.Container size="xl"><Modal.Dialog className="w-[700px]">
+        <Modal.CloseTrigger />
+        <Modal.Header><Modal.Heading>新增渠道</Modal.Heading></Modal.Header>
+        {isOpen && <CreateChannelForm onOpenChange={onOpenChange} onCreated={onCreated} />}
+      </Modal.Dialog></Modal.Container>
     </Modal.Backdrop>
   );
 }

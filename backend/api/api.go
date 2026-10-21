@@ -10,12 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"github.com/Lixiuxiu559/portunus/backend/quota"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // Register 注册管理 API 路由，供前端调用。
-func Register(r *gin.RouterGroup) {
+func Register(r *gin.RouterGroup, quotaServices ...*quota.Service) {
 	r.Use(localManagementOnly())
+	if len(quotaServices) > 0 && quotaServices[0] != nil {
+		service := quotaServices[0]
+		r.Use(func(c *gin.Context) { c.Set("quota_service", service) })
+		registerQuotaRoutes(r, service)
+	}
 	r.GET("/ping", func(c *gin.Context) {
 		if instance := os.Getenv("PORTUNUS_INSTANCE_ID"); instance != "" {
 			c.Header("X-Portunus-Instance", instance)

@@ -27,6 +27,8 @@ type Deps struct {
 // relayServer 持有依赖，承载 /v1 转发的全部编排（鉴权 / 路由 / 重试 / 熔断 / 归因）。
 type relayServer struct {
 	deps Deps
+	// 管理验证仅返回安全的分阶段诊断，不输出可能回显凭据的上游原文。
+	quiet bool
 }
 
 // NewRelayServer 用给定依赖构建 relayServer。

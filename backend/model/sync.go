@@ -1,39 +1,46 @@
 package model
 
 import (
+	"context"
+	"gorm.io/gorm"
 	"log"
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
-	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
+	"github.com/Lixiuxiu559/portunus/backend/upstream"
 )
 
 // SyncFromChannel 从渠道上游拉取模型列表，把本地缺失的模型同步到模型表。
 // 已存在（channel_id + name）的模型不覆盖，保留包括历史价格在内的既有数据。
 // 返回新增的模型数量。
 func SyncFromChannel(ch *channel.Channel) (int, error) {
-	upstream, err := protocol.NewUpstream(ch.Type, ch.BaseURL, ch.Key)
+	return SyncFromChannelContext(context.Background(), ch)
+}
+
+// SyncFromChannelContext 支持调用方取消模型发现，导入在事务中原子完成。
+func SyncFromChannelContext(ctx context.Context, ch *channel.Channel) (int, error) {
+	if ch == nil {
+		return 0, ErrChannelNotFound
+	}
+	if ch.ConnectionOptions.ModelDiscovery == "manual" {
+		return 0, ErrManualDiscovery
+	}
+	conn, err := upstream.Open(ch.ConnectionConfig())
 	if err != nil {
 		return 0, err
 	}
-	names, err := upstream.FetchModels()
+	names, err := conn.FetchModels(ctx)
 	if err != nil {
 		return 0, err
 	}
 	added := 0
-	for _, name := range names {
-		var count int64
-		if err := shared.DB.Model(&Model{}).Where("channel_id = ? AND name = ?", ch.ID, name).Count(&count).Error; err != nil {
-			return added, err
-		}
-		if count > 0 {
-			continue
-		}
-		m := Model{ChannelID: ch.ID, Name: name}
-		if err := shared.DB.Create(&m).Error; err != nil {
-			return added, err
-		}
-		added++
+	err = shared.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var importErr error
+		added, importErr = ImportNamesTx(tx, ch.ID, names)
+		return importErr
+	})
+	if err != nil {
+		return 0, err
 	}
 	return added, nil
 }
@@ -48,7 +55,7 @@ func SyncAutoChannels() (synced, added int) {
 	}
 	for i := range cs {
 		c := cs[i]
-		if !c.AutoSync {
+		if !c.AutoSync || c.ConnectionOptions.ModelDiscovery == "manual" {
 			continue
 		}
 		n, err := SyncFromChannel(&c)

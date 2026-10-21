@@ -5,6 +5,7 @@ import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
+import './models.css';
 
 export default function Models() {
   const [models, setModels] = useState([]);
@@ -116,7 +117,7 @@ export default function Models() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 min-w-0">
+    <div className="model-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold">上游模型</h1>
@@ -127,10 +128,11 @@ export default function Models() {
           <Button variant="primary" size="md" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
         </div>
       </div>
-      <div className="model-filters resource-model-filters">
-        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
+      <div className="resource-toolbar model-toolbar">
+        <div className="model-filters resource-model-filters">
+        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="搜索模型名称，回车查询" className="model-search resource-search" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
         {draftName && <IconButton size="sm" label="清除名称筛选" onClick={() => { setDraftName(''); performSearch(draftChannel, '', 1); }}><X className="size-3.5" /></IconButton>}
-        <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="w-52">
+        <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="model-channel-filter">
           <Select.Trigger aria-label="按上游渠道筛选" aria-labelledby={null}><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover className="resource-channel-popover"><ListBox aria-label="上游渠道">
             <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
@@ -138,6 +140,8 @@ export default function Models() {
           </ListBox></Select.Popover>
         </Select>
         <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}><Search className="size-4" />查询</Button>
+        </div>
+        <span className="resource-count model-count" role="status">{queryName || queryChannel !== 'all' ? '筛选结果 · ' : ''}{total} 个模型</span>
       </div>
       {loading ? <div className="flex justify-center py-12"><Spinner size="sm" /></div>
       : loadError && models.length === 0 ? <div className="flex flex-col items-center gap-3 py-16 text-muted">
@@ -146,32 +150,32 @@ export default function Models() {
         </div>
       : models.length === 0 ? <div className="flex flex-col items-center gap-3 py-16 text-muted">
           <span>{queryName || queryChannel !== 'all' ? '没有符合条件的模型' : '暂无模型'}</span>
-          <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
+          {queryName || queryChannel !== 'all' ? <Button variant="secondary" size="sm" onPress={() => { setDraftName(''); setDraftChannel('all'); performSearch('all', '', 1); }}>清除筛选</Button>
+            : <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>}
         </div>
       : <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           <div className="resource-grid">
             {models.map((m) => {
               const channelName = channelMap[m.channel_id] || m.channel_id;
               return <Card key={m.id} className="resource-card">
-                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
-                  <div className="resource-card-identity">
-                    <span className="resource-card-symbol" aria-hidden="true"><Box className="size-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <Typography className="resource-card-title resource-card-model" title={m.name}>{m.name}</Typography>
-                      <span className="resource-card-source" title={String(channelName)}>{channelName}</span>
-                    </div>
-                  </div>
-                  <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
+                <Card.Header className="flex-row items-start gap-3 shrink-0">
+                  <span className="resource-card-symbol" aria-hidden="true"><Box className="size-4" /></span>
+                  <Typography className="resource-card-title resource-card-model model-card-name" title={m.name}>{m.name}</Typography>
                 </Card.Header>
+                <Card.Footer className="model-card-footer">
+                  <div className="min-w-0"><span className="model-source-label">上游渠道</span><span className="resource-card-source" title={String(channelName)}>{channelName}</span></div>
+                  <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
+                </Card.Footer>
               </Card>;
             })}
           </div>
         </div>}
-      <div className="flex items-center justify-between mt-3 shrink-0">
-        <Typography type="body-sm" className="text-muted">共 {total} 条，第 {page}/{Math.max(1, Math.ceil(total / pageSize))} 页</Typography>
-        <div className="flex gap-1">
-          <Button size="sm" variant="secondary" isDisabled={page <= 1} onPress={() => handlePageChange(page - 1)}>上一页</Button>
-          <Button size="sm" variant="secondary" isDisabled={page >= Math.max(1, Math.ceil(total / pageSize))} onPress={() => handlePageChange(page + 1)}>下一页</Button>
+      <div className="model-pagination">
+        <Typography type="body-sm" className="text-muted">{total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)}，共 ${total} 个` : '0 个模型'}</Typography>
+        <div className="model-page-controls">
+          <span className="model-page-number">第 {page} / {Math.max(1, Math.ceil(total / pageSize))} 页</span>
+          <Button size="sm" variant="secondary" isDisabled={page <= 1 || loading || refreshing} onPress={() => handlePageChange(page - 1)}>上一页</Button>
+          <Button size="sm" variant="secondary" isDisabled={page >= Math.max(1, Math.ceil(total / pageSize)) || loading || refreshing} onPress={() => handlePageChange(page + 1)}>下一页</Button>
         </div>
       </div>
       <CreateModelModal

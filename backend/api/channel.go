@@ -9,7 +9,7 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/channel"
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
-	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/quota"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -20,6 +20,9 @@ func registerChannelRoutes(r *gin.RouterGroup) {
 	g.GET("/:id", getChannel)
 	g.POST("", createChannel)
 	g.POST("/preview-models", previewChannelModels)
+	g.POST("/resolve", resolveChannelConnection)
+	g.POST("/test", testChannelConnection)
+	r.GET("/upstream-presets", listUpstreamPresets)
 	g.PUT("/:id", updateChannel)
 	g.DELETE("/:id", deleteChannel)
 	g.POST("/:id/sync", syncChannelModels)
@@ -53,12 +56,24 @@ func getChannel(c *gin.Context) {
 }
 
 func createChannel(c *gin.Context) {
-	var req channel.CreateRequest
+	var req struct {
+		channel.CreateRequest
+		Models []string `json:"models"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
 		return
 	}
-	ch, err := channel.Create(req)
+	var ch *channel.Channel
+	err := shared.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		var err error
+		ch, err = channel.CreateTx(tx, &req.CreateRequest)
+		if err != nil {
+			return err
+		}
+		_, err = model.ImportNamesTx(tx, ch.ID, req.Models)
+		return err
+	})
 	if err != nil {
 		respondError(c, err)
 		return
@@ -72,15 +87,41 @@ func updateChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
 		return
 	}
-	var req channel.UpdateRequest
+	var req struct {
+		channel.UpdateRequest
+		Models []string `json:"models"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
 		return
 	}
-	ch, err := channel.Update(id, req)
+	var ch *channel.Channel
+	keyChanged := false
+	err := shared.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		var previous channel.Channel
+		if err := tx.Select("id", "key").First(&previous, id).Error; err != nil {
+			return err
+		}
+		var err error
+		ch, err = channel.UpdateTx(tx, id, req.UpdateRequest)
+		if err != nil {
+			return err
+		}
+		keyChanged = previous.Key != ch.Key
+		if _, configured := c.Get("quota_service"); configured && keyChanged {
+			if err := quota.InvalidateInheritedSourcesTx(tx, id); err != nil {
+				return err
+			}
+		}
+		_, err = model.ImportNamesTx(tx, ch.ID, req.Models)
+		return err
+	})
 	if err != nil {
 		respondError(c, err)
 		return
+	}
+	if keyChanged {
+		cancelChannelQuota(c, id)
 	}
 	c.JSON(http.StatusOK, ch.ToResponse())
 }
@@ -93,6 +134,11 @@ func deleteChannel(c *gin.Context) {
 	}
 	// 级联清理：先收集该渠道模型 ID，删引用它们的分组项，再删模型，最后删渠道。
 	err := shared.DB.Transaction(func(tx *gorm.DB) error {
+		if _, configured := c.Get("quota_service"); configured {
+			if err := quota.DeleteByChannelTx(tx, id); err != nil {
+				return err
+			}
+		}
 		var modelIDs []int64
 		if err := tx.Model(&model.Model{}).Where("channel_id = ?", id).Pluck("id", &modelIDs).Error; err != nil {
 			return err
@@ -109,32 +155,31 @@ func deleteChannel(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	cancelChannelQuota(c, id)
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+func cancelChannelQuota(c *gin.Context, channelID int64) {
+	if value, ok := c.Get("quota_service"); ok {
+		value.(*quota.Service).CancelChannel(channelID)
+	}
 }
 
 // previewChannelModels 只读预览某协议下的上游模型列表，不落库、不要求渠道已存在。
 func previewChannelModels(c *gin.Context) {
-	var req struct {
-		Type    protocol.Provider `json:"type" binding:"required"`
-		BaseURL string            `json:"base_url" binding:"required"`
-		Key     string            `json:"key" binding:"required"`
-	}
+	var req connectionDraft
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不合法: " + err.Error()})
 		return
 	}
-	if !req.Type.Valid() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的协议类型"})
-		return
-	}
-	upstream, err := protocol.NewUpstream(req.Type, req.BaseURL, req.Key)
+	connection, _, err := req.open(true)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	names, err := upstream.FetchModels()
+	names, err := connection.FetchModels(c.Request.Context())
 	if err != nil {
-		respondError(c, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error(), "stage": "model_discovery"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"models": names})
@@ -152,7 +197,7 @@ func syncChannelModels(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	added, err := model.SyncFromChannel(ch)
+	added, err := model.SyncFromChannelContext(c.Request.Context(), ch)
 	if err != nil {
 		respondError(c, err)
 		return

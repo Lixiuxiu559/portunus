@@ -50,7 +50,7 @@ function DocLink({ href, children }) {
 
 function GuideStep({ number, title, children }) {
   return (
-    <section id={`guide-step-${number}`} className="scroll-mt-5">
+    <section id={`guide-step-${number}`} className="service-guide-step scroll-mt-5">
       <h2 className="mb-4 flex items-center gap-3 text-base font-semibold">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm text-accent">{number}</span>
         {title}
@@ -196,7 +196,7 @@ export default function Clients() {
   const logsPath = selectedGroup ? `/logs?group=${encodeURIComponent(selectedGroup)}` : '/logs';
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col">
+    <div className="service-page flex flex-1 min-h-0 flex-col">
       <header className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">服务接入</h1>

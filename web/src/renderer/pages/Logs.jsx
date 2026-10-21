@@ -100,6 +100,7 @@ export default function Logs() {
   const channelIds = [...new Set([...channels.map((item) => String(item.id)), ...(logs.data || []).map((item) => (item.latest_log || item).channel_id).filter((id) => id > 0).map(String), ...(filters.channel_id !== 'all' ? [filters.channel_id] : [])])];
 
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
+  const advancedFilterCount = [filters.group_name, filters.model_name, filters.client_protocol !== 'all', filters.range].filter(Boolean).length;
 
   const defaultDate = (() => { const d = today(getLocalTimeZone()); return new CalendarDateTime(d.year, d.month, d.day, 0, 0, 0); })();
 
@@ -116,12 +117,36 @@ export default function Logs() {
       ),
     },
     {
+      title: '状态',
+      dataIndex: 'success',
+      key: 'success',
+      width: '110px',
+      render: (val, record) => (
+        <span className="flex flex-col items-center gap-0.5">
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
+            val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+          }`}>
+            {val ? '成功' : '失败'}
+          </span>
+          {!val && record?.err_kind && (
+            <span
+              className="max-w-[100px] truncate text-xs text-muted"
+              title={record?.err_msg || record.err_kind}
+            >
+              {errKindLabels[record.err_kind] || record.err_kind}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
       title: '实际渠道 / 模型',
       dataIndex: 'model_name',
       key: 'model_name',
       width: '200px',
       render: (val, record) => <span className="block text-center"><span className="block truncate" title={String(val || '')}>{val || '未记录模型'}</span><span className="block truncate text-xs text-muted" title={logChannelLabel(record.channel_id, channels)}>{logChannelLabel(record.channel_id, channels)}</span></span>,
     },
+    { title: '详情', dataIndex: 'id', key: 'detail', width: '90px', render: (id, record) => <Button size="sm" variant="secondary" aria-label={`查看日志 ${id} 详情`} onPress={() => setDetail({ record })}>详情</Button> },
     {
       title: '分组',
       dataIndex: 'group_name',
@@ -217,40 +242,18 @@ export default function Logs() {
         );
       },
     },
-    {
-      title: '状态',
-      dataIndex: 'success',
-      key: 'success',
-      width: '110px',
-      render: (val, record) => (
-        <span className="flex flex-col items-center gap-0.5">
-          <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-            val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-          }`}>
-            {val ? '成功' : '失败'}
-          </span>
-          {!val && record?.err_kind && (
-            <span
-              className="max-w-[100px] truncate text-xs text-muted"
-              title={record?.err_msg || record.err_kind}
-            >
-              {errKindLabels[record.err_kind] || record.err_kind}
-            </span>
-          )}
-        </span>
-      ),
-    },
-    { title: '详情', dataIndex: 'id', key: 'detail', width: '90px', render: (id, record) => <Button size="sm" variant="secondary" aria-label={`查看日志 ${id} 详情`} onPress={() => setDetail({ record })}>详情</Button> },
+
+
   ];
 
   const requestColumns = [
     { title: '最近日志时间', dataIndex: 'latest_log', key: 'time', width: '170px', render: (row) => row.created_at ? new Date(row.created_at).toLocaleString('zh-CN') : '未记录' },
+    { title: '最近日志结果', dataIndex: 'latest_log', key: 'result', width: '140px', render: (row) => <span className={row.success ? 'text-success' : 'text-danger'}>{row.success ? '成功' : '失败'} · {row.status || '无响应状态'}</span> },
+    { title: '最近渠道 / 模型', dataIndex: 'latest_log', key: 'target', width: '230px', render: (row) => <span className="block"><span className="block truncate">{row.model_name || '未记录模型'}</span><span className="block truncate text-xs text-muted">{logChannelLabel(row.channel_id, channels)}</span></span> },
+    { title: '尝试链', dataIndex: 'key', width: '110px', render: (_, item) => <Button size="sm" variant="secondary" aria-label={`查看关联 ${item.request_id || `历史日志 ${item.latest_log.id}`}`} onPress={() => setDetail({ record: item.latest_log, association: item })}>查看关联</Button> },
     { title: '请求关联 ID', dataIndex: 'request_id', width: '220px', render: (value, item) => <span className="block truncate font-mono text-xs" title={value || ''}>{value || `独立历史日志 #${item.latest_log.id}`}</span> },
     { title: '模型分组', dataIndex: 'latest_log', key: 'group', width: '160px', render: (row) => row.group_name || '未记录' },
-    { title: '最近渠道 / 模型', dataIndex: 'latest_log', key: 'target', width: '230px', render: (row) => <span className="block"><span className="block truncate">{row.model_name || '未记录模型'}</span><span className="block truncate text-xs text-muted">{logChannelLabel(row.channel_id, channels)}</span></span> },
     { title: '关联日志数', dataIndex: 'log_count', width: '110px' },
-    { title: '最近日志结果', dataIndex: 'latest_log', key: 'result', width: '140px', render: (row) => <span className={row.success ? 'text-success' : 'text-danger'}>{row.success ? '成功' : '失败'} · {row.status || '无响应状态'}</span> },
-    { title: '尝试链', dataIndex: 'key', width: '110px', render: (_, item) => <Button size="sm" variant="secondary" aria-label={`查看关联 ${item.request_id || `历史日志 ${item.latest_log.id}`}`} onPress={() => setDetail({ record: item.latest_log, association: item })}>查看关联</Button> },
   ];
   const changeView = (next) => {
     if (next === view) return;
@@ -263,8 +266,7 @@ export default function Logs() {
       <div className="resource-page-heading logs-heading">
         <div>
           <h1 className="text-xl font-semibold">调用记录</h1>
-          <p className="mt-1 text-sm text-muted">查看分组实际调用的模型、用量和结果。记录数按日志行统计，一次客户端请求可能产生多条记录。</p>
-          <p className="logs-heading-note">用量来自上游报告；输入明细保留缓存读取和写入 token。近期记录指近 60 秒。</p>
+          <p className="mt-1 text-sm text-muted">追踪模型调用，查看用量与排查结果。</p>
         </div>
         <div className="resource-page-actions">
         <Button
@@ -279,14 +281,21 @@ export default function Logs() {
         </Button>
         </div>
       </div>
+      <div className="logs-toolbar">
       <div className="logs-view-switch" role="group" aria-label="调用记录视图">
         <Button size="sm" variant={view === 'records' ? 'primary' : 'secondary'} aria-pressed={view === 'records'} onPress={() => changeView('records')}>日志记录</Button>
         <Button size="sm" variant={view === 'requests' ? 'primary' : 'secondary'} aria-pressed={view === 'requests'} onPress={() => changeView('requests')}>按请求归并</Button>
-        {view === 'requests' && <p className="text-xs text-muted">按请求 ID 关联；无 ID 的历史日志单独保留。筛选命中任一日志即可显示关联项，摘要为整个请求的最近日志。统计卡仍按匹配日志行汇总，关联项数不是准确客户端请求数。</p>}
+
+      </div>
+      <details className="logs-metric-help">
+        <summary>统计与归并口径</summary>
+        <p>记录数按日志行统计，一次客户端请求可能产生多条记录。用量来自上游报告，输入明细保留缓存读取和写入 token；近期记录指近 60 秒。</p>
+        <p>按请求 ID 关联，无 ID 的历史日志单独保留。筛选命中任一日志即可显示关联项，摘要为整个请求的最近日志。统计卡按匹配日志行汇总，关联项数不是准确客户端请求数。</p>
+      </details>
       </div>
       {/* 统计按当前查询范围汇总，不把日志行数当作独立客户端请求数。 */}
       {stats && (
-        <div className="logs-stats grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="logs-stats">
           <StatCard label="记录数" value={String(stats.total_requests || 0)} />
           <StatCard label="非缓存输入 Token" value={formatNum(stats.input_tokens)} detail={`缓存读 ${formatNum(stats.cache_read_tokens)} · 缓存写 ${formatNum(stats.cache_write_tokens)}`} />
           <StatCard label="输出 Token" value={formatNum(stats.output_tokens)} />
@@ -307,20 +316,6 @@ export default function Logs() {
           <Label>请求 ID</Label><Input className="logs-control" placeholder="精确匹配 request_id" />
         </TextField>
         {channelError && <Button size="sm" variant="secondary" onPress={fetchChannels}>重试渠道名称</Button>}
-
-        <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
-          <Label>模型分组</Label>
-          <Input className="logs-control" placeholder="按分组名称查询" />
-        </TextField>
-        <TextField
-          name="model_name"
-          value={filters.model_name}
-          onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
-          className="logs-filter-field"
-        >
-          <Label>模型名</Label>
-          <Input className="logs-control" placeholder="筛选模型" />
-        </TextField>
 
         <Select
           name="success"
@@ -345,91 +340,6 @@ export default function Logs() {
           </Select.Popover>
         </Select>
 
-        <Select
-          name="client_protocol"
-          selectedKey={filters.client_protocol}
-          onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
-          className="logs-filter-protocol"
-        >
-          <Label>客户端</Label>
-          <Select.Trigger className="logs-control">
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {clientProtocolOptions.map((o) => (
-                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-                  {o.label}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-
-        <DateRangePicker
-          granularity="minute"
-          startName="start"
-          endName="end"
-          value={filters.range}
-          onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
-          placeholderValue={defaultDate}
-          className="logs-filter-date"
-        >
-          <Label>时间范围</Label>
-          <DateField.Group fullWidth className="logs-control">
-            <DateField.Input slot="start">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateRangePicker.RangeSeparator />
-            <DateField.Input slot="end">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateField.Suffix>
-              <DateRangePicker.Trigger>
-                <DateRangePicker.TriggerIndicator />
-              </DateRangePicker.Trigger>
-            </DateField.Suffix>
-          </DateField.Group>
-          <DateRangePicker.Popover>
-            <RangeCalendar aria-label="时间范围">
-              <RangeCalendar.Header>
-                <RangeCalendar.YearPickerTrigger>
-                  <RangeCalendar.YearPickerTriggerHeading />
-                  <RangeCalendar.YearPickerTriggerIndicator />
-                </RangeCalendar.YearPickerTrigger>
-                <RangeCalendar.NavButton slot="previous" />
-                <RangeCalendar.NavButton slot="next" />
-              </RangeCalendar.Header>
-              <RangeCalendar.Grid>
-                <RangeCalendar.GridHeader>
-                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
-                </RangeCalendar.GridHeader>
-                <RangeCalendar.GridBody>
-                  {(date) => <RangeCalendar.Cell date={date} />}
-                </RangeCalendar.GridBody>
-              </RangeCalendar.Grid>
-              <RangeCalendar.YearPickerGrid>
-                <RangeCalendar.YearPickerGridBody>
-                  {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
-                </RangeCalendar.YearPickerGridBody>
-              </RangeCalendar.YearPickerGrid>
-            </RangeCalendar>
-          </DateRangePicker.Popover>
-        </DateRangePicker>
-
-        {filters.range && (
-          <Button
-            size="md"
-            variant="secondary"
-            onPress={() => setFilters((f) => ({ ...f, range: null }))}
-            className="logs-filter-action gap-1"
-          >
-            <X className="size-4" /> 清除时间
-          </Button>
-        )}
-
         {/* 查询：已在第 1 页直接带筛选刷新；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
         <Button
           size="md"
@@ -443,6 +353,127 @@ export default function Logs() {
           <Search className="size-4" /> 查询
         </Button>
 
+        <details className="logs-advanced">
+          <summary>更多筛选{advancedFilterCount > 0 && <span> · 已配置 {advancedFilterCount} 项</span>}</summary>
+          <div className="logs-advanced-fields">
+            <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
+              <Label>模型分组</Label>
+              <Input className="logs-control" placeholder="按分组名称查询" />
+            </TextField>
+            <TextField
+              name="model_name"
+              value={filters.model_name}
+              onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
+              className="logs-filter-field"
+            >
+              <Label>模型名</Label>
+              <Input className="logs-control" placeholder="筛选模型" />
+            </TextField>
+
+            <Select
+              name="client_protocol"
+              selectedKey={filters.client_protocol}
+              onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
+              className="logs-filter-protocol"
+            >
+              <Label>客户端</Label>
+              <Select.Trigger className="logs-control">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {clientProtocolOptions.map((o) => (
+                    <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+                      {o.label}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+
+            <DateRangePicker
+              granularity="minute"
+              startName="start"
+              endName="end"
+              value={filters.range}
+              onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
+              placeholderValue={defaultDate}
+              className="logs-filter-date"
+            >
+              <Label>时间范围</Label>
+              <DateField.Group fullWidth className="logs-control">
+                <DateField.Input slot="start">
+                  {(segment) => <DateField.Segment segment={segment} />}
+                </DateField.Input>
+                <DateRangePicker.RangeSeparator />
+                <DateField.Input slot="end">
+                  {(segment) => <DateField.Segment segment={segment} />}
+                </DateField.Input>
+                <DateField.Suffix>
+                  <DateRangePicker.Trigger>
+                    <DateRangePicker.TriggerIndicator />
+                  </DateRangePicker.Trigger>
+                </DateField.Suffix>
+              </DateField.Group>
+              <DateRangePicker.Popover>
+                <RangeCalendar aria-label="时间范围">
+                  <RangeCalendar.Header>
+                    <RangeCalendar.YearPickerTrigger>
+                      <RangeCalendar.YearPickerTriggerHeading />
+                      <RangeCalendar.YearPickerTriggerIndicator />
+                    </RangeCalendar.YearPickerTrigger>
+                    <RangeCalendar.NavButton slot="previous" />
+                    <RangeCalendar.NavButton slot="next" />
+                  </RangeCalendar.Header>
+                  <RangeCalendar.Grid>
+                    <RangeCalendar.GridHeader>
+                      {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
+                    </RangeCalendar.GridHeader>
+                    <RangeCalendar.GridBody>
+                      {(date) => <RangeCalendar.Cell date={date} />}
+                    </RangeCalendar.GridBody>
+                  </RangeCalendar.Grid>
+                  <RangeCalendar.YearPickerGrid>
+                    <RangeCalendar.YearPickerGridBody>
+                      {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
+                    </RangeCalendar.YearPickerGridBody>
+                  </RangeCalendar.YearPickerGrid>
+                </RangeCalendar>
+              </DateRangePicker.Popover>
+            </DateRangePicker>
+
+            {filters.range && (
+              <Button
+                size="md"
+                variant="secondary"
+                onPress={() => setFilters((f) => ({ ...f, range: null }))}
+                className="logs-filter-action gap-1"
+              >
+                <X className="size-4" /> 清除时间
+              </Button>
+            )}
+
+          </div>
+        </details>
+      </div>
+      <div className="logs-query-summary" aria-label="已生效筛选">
+        <span className="logs-query-caption">当前查询</span>
+        <div className="logs-query-tags">
+          {query.channel_id !== 'all' && <span>渠道：{logChannelLabel(query.channel_id, channels)}</span>}
+          {query.request_id.trim() && <span>请求 ID：{query.request_id.trim()}</span>}
+          {query.group_name && <span>分组：{query.group_name}</span>}
+          {query.model_name && <span>模型：{query.model_name}</span>}
+          {query.success !== 'all' && <span>状态：{query.success === 'true' ? '成功' : '失败'}</span>}
+          {query.client_protocol !== 'all' && <span>客户端：{clientProtocolOptions.find((option) => option.id === query.client_protocol)?.label || query.client_protocol}</span>}
+          {query.range && <span>时间：{query.range.start?.toString()} — {query.range.end?.toString()}</span>}
+          {query.channel_id === 'all' && !query.request_id.trim() && !query.group_name && !query.model_name && query.success === 'all' && query.client_protocol === 'all' && !query.range && <span className="logs-query-all">全部记录</span>}
+        </div>
+        <Button size="sm" variant="tertiary" onPress={() => {
+          const cleared = { group_name: '', model_name: '', channel_id: 'all', request_id: '', client_protocol: 'all', success: 'all', range: null };
+          setFilters(cleared); setQuery(cleared); setPage(1);
+        }}>清空筛选</Button>
       </div>
 
       {/* 日志表格 */}

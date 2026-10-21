@@ -1,19 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Typography, Card, Chip, Spinner, toast } from '@heroui/react';
-import { Plus, Trash2, RefreshCw, Pencil, RotateCw } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Pencil, RotateCw, Search, X } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
 import EditChannelEditor from './EditChannelEditor';
 import ProviderIcon from '../../components/ProviderIcon';
-import IconButton from '../../components/IconButton';
 import ExpandEditor from '../../components/ExpandEditor';
 import { captureCardRect } from '../../utils/expandRect';
 import { listChannels, syncChannel } from '../../api';
+import QuotaSummary from './quota/QuotaSummary';
+import QuotaPanel from './quota/QuotaPanel';
+import useQuotaSummaries from './quota/useQuotaSummaries';
+import { filterChannels } from './channelSearch.js';
+import './channels.css';
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState([]);
+  const [search, setSearch] = useState('');
+  const visibleChannels = useMemo(() => filterChannels(channels, search), [channels, search]);
   const [loading, setLoading] = useState(true);
+  const [quotaTarget, setQuotaTarget] = useState(null);
+  const quota = useQuotaSummaries(channels);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
@@ -55,7 +63,7 @@ export default function Channels() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="resource-page-heading">
         <div>
           <h1 className="text-xl font-semibold">上游渠道</h1>
@@ -78,6 +86,15 @@ export default function Channels() {
         </div>
       </div>
 
+      {!loading && !loadError && channels.length > 0 && <div className="resource-toolbar channel-toolbar">
+        <label className="channel-search resource-search">
+          <Search className="size-4 shrink-0" aria-hidden="true" />
+          <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
+          {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
+        </label>
+        <span className="resource-count channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
+      </div>}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <Spinner size="sm" />
@@ -97,39 +114,25 @@ export default function Channels() {
             新增渠道
           </Button>
         </div>
+      ) : visibleChannels.length === 0 ? (
+        <div className="channel-empty">
+          <Search className="size-7" aria-hidden="true" />
+          <strong>没有找到匹配的渠道</strong>
+          <span>试试其他名称、地址或厂商。</span>
+          <Button variant="secondary" size="sm" onPress={() => setSearch('')}>清空搜索</Button>
+        </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           <div className="resource-grid">
-            {channels.map((ch) => (
+            {visibleChannels.map((ch) => (
               <Card key={ch.id} data-expand-card className="resource-card">
-                {/* 操作按钮上移标题行右侧：消除"按钮孤行"，与分组卡同模式 */}
-                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                <Card.Header className="channel-card-heading">
                   <div className="resource-card-identity">
-                    <ProviderIcon type={ch.type} className="size-6 shrink-0" />
-                    <Typography className="resource-card-title" title={ch.name}>
-                      {ch.name}
-                    </Typography>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <IconButton
-                      label={`同步渠道 ${ch.name} 模型`}
-                      onClick={() => handleSync(ch)}
-                      disabled={syncingId === ch.id}
-                    >
-                      <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
-                    </IconButton>
-                    <IconButton
-                      label={`编辑渠道 ${ch.name}`}
-                      onClick={(e) => {
-                        setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
-                        setEditTarget(ch);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger>
-                      <Trash2 className="size-4" />
-                    </IconButton>
+                    <span className="channel-provider-icon"><ProviderIcon type={ch.type} className="size-6 shrink-0" /></span>
+                    <div className="min-w-0 flex-1">
+                      <Typography className="resource-card-title channel-card-name" title={ch.name}>{ch.name}</Typography>
+                      <span className="channel-provider-label">{ch.provider_id && ch.provider_id !== 'generic' ? ch.provider_id : '自定义渠道'}</span>
+                    </div>
                   </div>
                 </Card.Header>
 
@@ -144,13 +147,28 @@ export default function Channels() {
                       {ch.base_url}
                     </code>
                   </div>
+                  <QuotaSummary sources={quota.summaries[ch.id]} error={quota.error} loading={quota.loading}
+                    onConfigure={() => setQuotaTarget(ch)} onRefresh={quota.refresh} pending={quota.pending} refreshErrors={quota.refreshErrors} />
                 </Card.Content>
+                <Card.Footer className="channel-card-actions">
+                  <Button variant="secondary" size="sm" onPress={(e) => {
+                    setEditRect(captureCardRect(e.target.closest('[data-expand-card]')));
+                    setEditTarget(ch);
+                  }} aria-label={`编辑渠道 ${ch.name}`}><Pencil className="size-3.5" />编辑</Button>
+                  <Button variant="tertiary" size="sm" onPress={() => handleSync(ch)}
+                    isDisabled={syncingId === ch.id || ch.connection_options?.model_discovery === 'manual'}
+                    isPending={syncingId === ch.id} aria-label={`同步渠道 ${ch.name} 的全部模型`}>
+                    <RefreshCw className="size-3.5" />同步模型
+                  </Button>
+                  <button type="button" className="channel-delete" onClick={() => setDeleteTarget(ch)} aria-label={`删除渠道 ${ch.name}`} title={`删除渠道 ${ch.name}`}><Trash2 className="size-3.5" /></button>
+                </Card.Footer>
               </Card>
             ))}
           </div>
         </div>
       )}
 
+      {quotaTarget && <QuotaPanel channel={quotaTarget} onClose={() => setQuotaTarget(null)} onChanged={quota.invalidate} />}
       <CreateChannelModal
         isOpen={isOpen}
         onOpenChange={setIsOpen}
@@ -187,7 +205,7 @@ export default function Channels() {
             <EditChannelEditor
               channel={editTarget}
               onClose={requestClose}
-              onUpdated={() => fetchChannels(true)}
+              onUpdated={() => { quota.invalidate(); fetchChannels(true); }}
             />
           )}
         </ExpandEditor>

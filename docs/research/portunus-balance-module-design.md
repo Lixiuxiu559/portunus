@@ -1,5 +1,7 @@
 # Portunus 余额/额度查询模块设计（借鉴 cc-switch）
 
+> **已被替代，仅作历史参考。** 当前实施方案见 [2026-10-21 渠道余额与额度查询整体方案](./2026-10-21-channel-quota-design.md)。本旧稿的渠道 Key 假设、按域名识别、零值/无限语义及余额参与路由等不再采用。
+
 > 本文档是 portunus 余额模块的**设计稿**，回答「余额模块怎么做、如何从 cc-switch 借鉴落地」。
 > 借鉴对象研究见同目录 [`cc-switch-balance-query.md`](./cc-switch-balance-query.md)。
 > 结论均对照 portunus 现有代码（`backend/`）给出可落地的包结构、数据模型、API 与错误约定。

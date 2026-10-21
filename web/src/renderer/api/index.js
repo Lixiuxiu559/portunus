@@ -7,3 +7,4 @@ export * from './group';
 export * from './setting';
 export * from './apikey';
 export * from './log';
+export * from './quota';

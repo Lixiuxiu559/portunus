@@ -1,4 +1,5 @@
 import request from './request';
+import { RETRY_MAX_ATTEMPTS } from './retryPolicy';
 
 /**
  * 渠道：上游供应商连接配置
@@ -38,6 +39,21 @@ export function syncChannel(id) {
 }
 
 /** 预览上游模型列表（不创建渠道） */
-export function previewModels(data) {
-  return request.post('/channels/preview-models', data);
+export function previewModels(data, options) {
+  return request.post('/channels/preview-models', data, options);
+}
+
+/** 后端维护的厂商与协议配置档目录 */
+export function listUpstreamPresets(options) {
+  return request.get('/upstream-presets', options);
+}
+
+/** 纯本地解析：不调用上游 */
+export function resolveChannel(data, options) {
+  return request.post('/channels/resolve', data, options);
+}
+
+/** 单模型主动验证。禁止全局网络重发，避免重复消耗上游额度。 */
+export function testChannel(data, options) {
+  return request.post('/channels/test', data, { ...options, __retryCount: RETRY_MAX_ATTEMPTS });
 }

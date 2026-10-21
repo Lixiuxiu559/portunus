@@ -1,0 +1,560 @@
+{
+  "events": [
+    {
+      "method": "GET",
+      "path": "/api/channels",
+      "query": "",
+      "body": {},
+      "time": 1792569202684
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569202728
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569202868
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569202904
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569202904
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569202986
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569202986
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569202987
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569211403
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569211403
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569211404
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569211524
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569211525
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569211526
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569213596
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569213596
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569213597
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569225393
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569225395
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569225395
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569226931
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569226931
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569226931
+    },
+    {
+      "method": "POST",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {
+        "name": "自定义余额查询",
+        "adapter_id": "custom.balance",
+        "schema_version": 1,
+        "enabled": false,
+        "query_base_url": "https://fixture.example",
+        "credential_mode": "dedicated",
+        "options": {
+          "custom": {
+            "request": {
+              "method": "POST",
+              "path": "/user/balance",
+              "headers": {
+                "Authorization": "Bearer {{token}}"
+              },
+              "body": "{\"account\":9007199254740993,\"fraction\":0.123456789012345678}"
+            },
+            "items": [
+              {
+                "id": "balance_1",
+                "label": "余额",
+                "kind": "balance",
+                "scope": "account",
+                "unit": {
+                  "kind": "money",
+                  "code": "credits"
+                },
+                "remaining_path": "/data/balance"
+              }
+            ]
+          }
+        },
+        "auto_refresh_minutes": 0,
+        "credentials": {
+          "token": "fixture-only-token"
+        }
+      },
+      "time": 1792569226950
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569227004
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569227005
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569227005
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569247564
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569247568
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569247568
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569277582
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569277594
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569277595
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569279228
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569279228
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569279229
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569301181
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569301182
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569301182
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569302201
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569302201
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569302201
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569302210
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569303209
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569306300
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569306318
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569306318
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569307319
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569307319
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569307319
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569336259
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569336262
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569336263
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569356544
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569356546
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569356548
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569356675
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569356676
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569356678
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569356797
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569356797
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569356797
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569357550
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569357554
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569357555
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/adapters",
+      "query": "",
+      "body": {},
+      "time": 1792569358557
+    },
+    {
+      "method": "GET",
+      "path": "/api/channels/1/quota-sources",
+      "query": "",
+      "body": {},
+      "time": 1792569358557
+    },
+    {
+      "method": "GET",
+      "path": "/api/quota/summaries",
+      "query": "?channel_ids=1,2",
+      "body": {},
+      "time": 1792569358560
+    }
+  ],
+  "sources": [
+    {
+      "name": "自定义余额查询",
+      "adapter_id": "custom.balance",
+      "schema_version": 1,
+      "enabled": false,
+      "query_base_url": "https://fixture.example",
+      "credential_mode": "dedicated",
+      "options": {
+        "custom": {
+          "request": {
+            "method": "POST",
+            "path": "/user/balance",
+            "headers": {
+              "Authorization": "Bearer {{token}}"
+            },
+            "body": "{\"account\":9007199254740993,\"fraction\":0.123456789012345678}"
+          },
+          "items": [
+            {
+              "id": "balance_1",
+              "label": "余额",
+              "kind": "balance",
+              "scope": "account",
+              "unit": {
+                "kind": "money",
+                "code": "credits"
+              },
+              "remaining_path": "/data/balance"
+            }
+          ]
+        }
+      },
+      "auto_refresh_minutes": 0,
+      "id": 3,
+      "channel_id": 1,
+      "config_revision": 1,
+      "has_token": true,
+      "state": {
+        "status": "disabled",
+        "in_progress": false
+      }
+    }
+  ]
+}

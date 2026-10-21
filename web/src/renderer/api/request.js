@@ -39,6 +39,9 @@ request.interceptors.response.use(
     return response.data;
   },
   async (error) => {
+    // 草稿变更、关闭页面主动取消的请求不属于连接故障。
+    if (error.code === 'ERR_CANCELED') return Promise.reject(error);
+
     // 网络层失败的有限静默重试：兜底启动竞态与网络模式切换（后端重启）的短暂窗口。
     // 只重试「请求根本没到达后端」的连接类失败（重发无副作用）；超时 / 取消 /
     // HTTP 4xx/5xx 不重试；超限后走下方统一报错。重试期间不 toast 不 console.error。

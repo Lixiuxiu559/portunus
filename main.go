@@ -1,8 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,7 +20,9 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/gateway"
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
+	"github.com/Lixiuxiu559/portunus/backend/quota"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -32,6 +42,8 @@ func main() {
 		&group.GroupItem{},
 		&shared.APIKey{},
 		&shared.Setting{},
+		&quota.Source{},
+		&quota.State{},
 	); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
@@ -63,13 +75,35 @@ func main() {
 		LogWrite:     func(e *shared.Log) { shared.LogDB.Create(e) },
 		AttemptWrite: shared.WriteUpstreamAttempt,
 	})
-	api.Register(r.Group("/api")) // 管理 API
+	quotaService := quota.NewService(shared.DB, quota.NewHTTPClient(), func(tx *gorm.DB, id int64) (string, error) {
+		var ch channel.Channel
+		if err := tx.Select("id", "key").First(&ch, id).Error; err != nil {
+			return "", err
+		}
+		return ch.Key, nil
+	})
+	api.Register(r.Group("/api"), quotaService)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go quotaService.RunScheduler(ctx)
 
 	cron.Start() // 定时自动同步渠道模型
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("portunus 启动于 %s", addr)
-	if err := r.Run(addr); err != nil {
+	server := &http.Server{Addr: addr, Handler: r, BaseContext: func(net.Listener) context.Context { return ctx }}
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("关闭管理与网关服务失败: %v", err)
+		}
+	}()
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("启动失败: %v", err)
 	}
+	<-shutdownDone
 }
