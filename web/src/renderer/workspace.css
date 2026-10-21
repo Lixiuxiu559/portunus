@@ -1,44 +1,185 @@
-/* Desktop shell: materials use the existing warm accent and theme tokens. */
-.app-shell { position: relative; z-index: 10; display: grid; grid-template-columns: 212px minmax(0, 1fr); height: 100dvh; overflow: hidden; color: var(--foreground); }
-.app-sidebar { display: flex; flex-direction: column; min-height: 0; padding: 42px 14px 16px; -webkit-app-region: drag; }
-.app-sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px 28px; min-width: 0; }
-.app-sidebar-brand img { width: 35px; height: 35px; object-fit: contain; flex-shrink: 0; }
-.app-brand-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.app-brand-name { font-size: 18px; font-weight: 650; letter-spacing: -.6px; line-height: 23px; }
-.app-brand-caption { color: var(--muted); font-size: 10px; white-space: nowrap; letter-spacing: .2px; }
-.app-dev-badge { align-self: flex-start; margin-top: 2px; font-size: 8px; letter-spacing: .5px; font-weight: 700; color: var(--accent); }
-.app-navigation { flex: 1; min-height: 0; overflow-y: auto; -webkit-app-region: no-drag; }
-.app-nav-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 26px; }
-.app-nav-label { margin: 0 12px 7px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .5px; }
-.app-nav-link { display: flex; align-items: center; gap: 11px; padding: 11px 12px; min-width: 0; min-height: 42px; border: 1px solid transparent; border-radius: 11px; color: var(--muted); font-size: 13px; font-weight: 500; transition: background 160ms, color 160ms, box-shadow 160ms; }
-.app-nav-link svg { flex-shrink: 0; }
-.app-nav-link:hover { color: var(--foreground); background: color-mix(in oklch, var(--surface) 45%, transparent); }
-.app-nav-link--active { color: var(--accent); background: color-mix(in oklch, var(--surface) 72%, transparent); border-color: color-mix(in oklch, var(--surface) 80%, transparent); box-shadow: 0 2px 5px color-mix(in oklch, var(--foreground) 4%, transparent), inset 0 1px 0 color-mix(in oklch, white 25%, transparent); }
-.app-nav-link--active:hover { color: var(--accent); background: var(--surface); }
-.app-sidebar-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 10px 0; border-top: 1px solid var(--separator); -webkit-app-region: no-drag; }
-.app-appearance-label { color: var(--muted); font-size: 12px; }
-.app-sidebar-footer .theme-switch { font-size: 9px; }
-.app-workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; margin: 12px 12px 12px 0; border: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent); border-radius: 18px; background: color-mix(in oklch, var(--surface) 78%, transparent); box-shadow: 0 4px 24px color-mix(in oklch, var(--foreground) 3%, transparent); overflow: hidden; }
-.app-titlebar { height: 44px; min-height: 44px; display: flex; align-items: center; gap: 14px; padding: 0 21px; border-bottom: 1px solid color-mix(in oklch, var(--separator) 70%, transparent); -webkit-app-region: drag; }
-.app-sidebar-toggle { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; color: var(--muted); cursor: pointer; -webkit-app-region: no-drag; }
-.app-sidebar-toggle:hover { background: var(--default); color: var(--foreground); }
-.app-breadcrumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
-.app-breadcrumb > :last-child { color: var(--foreground); }
-.app-window-caption { margin-left: auto; color: var(--muted); font-size: 10px; letter-spacing: .2px; }
+/* 顶部工作区导航，复用现有主题与玻璃材质。 */
+.app-shell { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; color: var(--foreground); }
+.app-topbar { display: flex; align-items: center; gap: 24px; min-height: 64px; padding: 0 24px 0 88px; flex-shrink: 0; -webkit-app-region: drag; }
+.app-topbar-brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.app-topbar-brand img { width: 36px; height: 36px; object-fit: contain; }
+.app-top-navigation { margin-inline: auto; min-width: 0; -webkit-app-region: no-drag; }
+.app-topbar-actions { display: flex; align-items: center; flex-shrink: 0; -webkit-app-region: no-drag; }
+.app-workspace { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; margin: 0 16px 16px; border: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent); border-radius: 18px; background: color-mix(in oklch, var(--surface) 78%, transparent); box-shadow: 0 4px 24px color-mix(in oklch, var(--foreground) 3%, transparent); overflow: hidden; }
 .app-update-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 24px; font-size: 12px; background: color-mix(in oklch, var(--accent) 8%, var(--surface)); border-bottom: 1px solid var(--separator); }
 .app-main { display: flex; flex: 1; min-width: 0; min-height: 0; padding: 27px 28px 22px; outline: none; }
 .app-page { display: flex; flex-direction: column; min-width: 0; min-height: 0; width: 100%; height: 100%; max-width: 1440px; margin-inline: auto; }
-.app-skip-link { position: fixed; z-index: 100; top: 8px; left: 230px; padding: 8px 14px; border-radius: 8px; background: var(--surface); transform: translateY(-180%); }
+.app-skip-link { position: fixed; z-index: 100; top: 8px; left: 88px; padding: 8px 14px; border-radius: 8px; background: var(--surface); transform: translateY(-180%); }
 .app-skip-link:focus { transform: none; outline: 2px solid var(--accent); }
-.app-nav-link:focus-visible, .app-sidebar-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.app-shell--compact { grid-template-columns: 72px minmax(0, 1fr); }
-.app-shell--compact .app-sidebar { padding-inline: 10px; }
-.app-shell--compact .app-sidebar-brand { padding: 2px 8px 24px; }
-.app-shell--compact .app-sidebar-brand img { width: 30px; height: 30px; }
-.app-shell--compact .app-brand-copy, .app-shell--compact .app-dev-badge, .app-shell--compact .app-nav-label, .app-shell--compact .app-nav-link span, .app-shell--compact .app-appearance-label { display: none; }
-.app-shell--compact .app-nav-link { justify-content: center; padding-inline: 8px; }
-.app-shell--compact .app-sidebar-footer { justify-content: center; padding-inline: 0; }
-@media (max-width: 1100px) { .app-shell:not(.app-shell--compact) { grid-template-columns: 184px minmax(0, 1fr); } .app-sidebar { padding-inline: 10px; } .app-main { padding: 23px 22px 18px; } .app-dev-badge { display: none; } }
-@media (max-width: 760px) { .app-shell:not(.app-shell--compact) { grid-template-columns: 72px minmax(0, 1fr); } .app-sidebar { padding-inline: 10px; } .app-sidebar-brand { padding: 2px 8px 24px; } .app-sidebar-brand img { width: 30px; height: 30px; } .app-brand-copy, .app-dev-badge, .app-nav-label, .app-nav-link span, .app-appearance-label { display: none; } .app-nav-link { justify-content: center; padding-inline: 8px; } .app-sidebar-footer { justify-content: center; padding-inline: 0; } .app-main { padding: 18px 16px 14px; } .app-titlebar { padding-inline: 14px; } .app-window-caption, .app-sidebar-toggle { display: none; } .app-breadcrumb { gap: 4px; } .app-workspace { margin: 8px 8px 8px 0; border-radius: 14px; } }
-@media (prefers-reduced-motion: reduce) { .app-nav-link { transition: none; } }
-@media (max-height: 700px) { .app-sidebar-brand { padding-bottom: 20px; } .app-nav-group { margin-bottom: 16px; } .app-nav-label { margin-bottom: 4px; } .app-nav-link { min-height: 38px; padding-block: 8px; } }
+@media (max-width: 1100px) { .app-topbar { gap: 16px; padding-right: 20px; } .app-topbar-brand .brand-name { font-size: 17px; } .app-main { padding: 23px 22px 18px; } }
+@media (max-width: 850px) { .app-topbar { flex-wrap: wrap; gap: 8px 16px; padding-top: 12px; padding-bottom: 12px; } .app-topbar-actions { margin-left: auto; } .app-top-navigation { order: 3; flex-basis: 100%; display: flex; justify-content: center; } .app-top-navigation .nav-tabs { max-width: 100%; overflow-x: auto; } .app-workspace { margin: 0 10px 10px; border-radius: 14px; } .app-main { padding: 18px 16px 14px; } }
+
+/* 恢复原顶部胶囊的液态玻璃材质与动效，作用域不影响页面 Tabs。 */
+.nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 32%, transparent);
+  border: 1px solid color-mix(in oklch, white 45%, transparent);
+  border-radius: 99rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
+  overflow: hidden; /* 点击涟漪裁剪在胶囊圆角内 */
+}
+
+html.dark .nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 8%, transparent);
+  border-color: color-mix(in oklch, white 14%, transparent);
+}
+
+/*
+ * 液态玻璃选中胶囊：
+ * 流动机制——HeroUI 的 Tabs.Indicator 是 RAC SharedElement，切页时旧 indicator
+ * 快照 translate/width/height，新 indicator 从旧值过渡到本 tab 值，动画完全由
+ * 下面的 transition 定义。曲线用液态 spring（快启动、长减速、约 1.5% 微过冲，
+ * 粘性液体感而非弹簧振荡）；拉伸/回弹（scale）与点击涟漪由 useLiquidNav 播放。
+ */
+:root {
+  --nav-liquid-spring: linear(
+    0, 0.062 8.1%, 0.216 16.3%, 0.408 25.2%, 0.612 34.8%, 0.79 44.6%,
+    0.912 54%, 0.977 63.2%, 1.008 72.3%, 1.016 78.8%, 1.015 84.3%,
+    1.008 90.1%, 1 97.4%
+  );
+}
+
+.nav-tabs .tabs__indicator {
+  background-color: color-mix(in oklch, white 52%, transparent);
+  background-image: var(--glass-noise);
+  backdrop-filter: blur(6px) saturate(150%);
+  -webkit-backdrop-filter: blur(6px) saturate(150%);
+  /* 四边内高光（上强下弱 = 受光）+ 悬浮投影 + 半像素发丝描边 */
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 65%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 20%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 25%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 25%, transparent),
+    0 2px 10px rgb(0 0 0 / 12%),
+    0 0 0 0.5px color-mix(in oklch, white 38%, transparent);
+  transition:
+    translate 620ms var(--nav-liquid-spring),
+    width 620ms var(--nav-liquid-spring),
+    height 620ms var(--nav-liquid-spring);
+}
+
+/* 顶部 specular 光带：真实受光玻璃的镜面反射 */
+.nav-tabs .tabs__indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 32%),
+    rgb(255 255 255 / 5%) 46%,
+    transparent 62%
+  );
+  pointer-events: none;
+}
+
+html.dark .nav-tabs .tabs__indicator {
+  background-color: color-mix(in oklch, white 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 24%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 6%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 10%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 10%, transparent),
+    0 2px 10px rgb(0 0 0 / 30%),
+    0 0 0 0.5px color-mix(in oklch, white 12%, transparent);
+}
+
+html.dark .nav-tabs .tabs__indicator::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 12%),
+    rgb(255 255 255 / 2%) 46%,
+    transparent 62%
+  );
+}
+
+/* 首次出现（无前快照可循）从液滴凝出成胶囊 */
+.nav-tabs .tabs__indicator[data-entering='true'] {
+  animation: nav-liquid-condense 320ms var(--ease-out);
+}
+
+@keyframes nav-liquid-condense {
+  from {
+    opacity: 0;
+    scale: 0.72 0.64;
+  }
+}
+
+/*
+ * 点击液态扩散：从指针落点泛起一圈微光，挂在胶囊容器内被圆角裁剪，
+ * 由 useLiquidNav 生成，动画结束自删。
+ * 亮色用深色暗晕（液体按压的表面张力变形，白光在浅粉玻璃上不可见），
+ * 暗色用白色高光（暗玻璃上白光才是反光语义）。
+ */
+.nav-tabs .nav-liquid-ripple {
+  position: absolute;
+  z-index: 2;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgb(66 32 18 / 14%) 0%,
+    rgb(66 32 18 / 6%) 42%,
+    transparent 68%
+  );
+  animation: nav-liquid-ripple 480ms var(--ease-out) forwards;
+}
+
+html.dark .nav-tabs .nav-liquid-ripple {
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 22%) 0%,
+    rgb(255 255 255 / 8%) 42%,
+    transparent 68%
+  );
+}
+
+@keyframes nav-liquid-ripple {
+  from {
+    transform: scale(0.24);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* 减弱动态：流动/凝出/涟漪全部停用，切换退化为直接落位 */
+@media (prefers-reduced-motion: reduce) {
+  .nav-tabs .tabs__indicator,
+  .nav-tabs .tabs__indicator[data-entering='true'] {
+    transition: none;
+    animation: none;
+  }
+
+  .nav-tabs .nav-liquid-ripple {
+    display: none;
+  }
+}
+
+.nav-tabs .tabs__tab[data-selected="true"] {
+  color: color-mix(in oklch, var(--accent) 80%, black);
+}
+
+/*
+ * 暗色下未选中 tab 提亮：全局 --muted（76%L）在实色底上够用，
+ * 但玻璃顶栏叠了 accent 染色、色块飘过时背景亮度波动，对比被吃掉。
+ * hover 从"降透明度"（暗底上是负反馈）改为"提亮到前景色"（暗色模式的正确语义）。
+ */
+html.dark .nav-tabs .tabs__tab {
+  color: color-mix(in oklch, var(--foreground) 70%, transparent);
+}
+
+html.dark .nav-tabs .tabs__tab:not([data-selected="true"]):hover,
+html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) {
+  opacity: 1;
+  color: var(--foreground);
+}
