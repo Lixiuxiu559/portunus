@@ -105,24 +105,32 @@ export default function Clients() {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 已有数据时的刷新不进入加载态：保留当前配置展示，只在按钮上给反馈
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   // 桌面端取实际 sidecar 地址；浏览器开发环境直连开发后端，不把 Vite 端口交给客户端。
   const serverUrl = window.api?.getServerUrl?.() || 'http://127.0.0.1:3060';
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (isRefresh = false) => {
+    // 首次加载或没有可展示的数据时才遮蔽内容；刷新失败保留旧配置
+    const blocking = !isRefresh || (!groups.length && !apiKey);
+    if (blocking) setLoading(true); else setRefreshing(true);
     const [groupResult, keyResult] = await Promise.allSettled([listGroups(), getAPIKey()]);
-    setLoadError(groupResult.status === 'rejected' || keyResult.status === 'rejected');
+    const failed = groupResult.status === 'rejected' || keyResult.status === 'rejected';
+    // 刷新失败保留旧配置，只有首次加载失败才进入错误态
+    if (!failed || blocking) setLoadError(failed);
     if (groupResult.status === 'fulfilled') {
       const next = groupResult.value || [];
       setGroups(next);
       setSelectedGroup((old) => selectServiceGroup(next, requestedGroup, old));
-    } else {
+    } else if (blocking) {
       setGroups([]);
       setSelectedGroup('');
     }
-    setApiKey(keyResult.status === 'fulfilled' ? keyResult.value?.key || '' : '');
+    if (keyResult.status === 'fulfilled') setApiKey(keyResult.value?.key || '');
+    else if (blocking) setApiKey('');
     setLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -200,7 +208,7 @@ export default function Clients() {
       <h1 className="sr-only">服务接入</h1>
       <div className="service-toolbar">
         <p className="service-toolbar-hint">选择模型分组，为你的应用提供一个稳定入口。</p>
-        <Button size="md" variant="secondary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
+        <Button size="md" variant="secondary" onPress={() => load(true)} isPending={loading || refreshing} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="service-access-grid">
