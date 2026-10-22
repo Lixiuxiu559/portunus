@@ -5,12 +5,13 @@
 .logs-stat-card.card { gap: 2px; padding: 8px 14px; border-radius: 14px; }
 /* 卡片内容默认纵向排列；统计项的值与缓存明细并排，压缩卡片高度。 */
 .logs-stat-card .card__content { flex-direction: row; align-items: baseline; gap: 8px; }
-.logs-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; flex-shrink: 0; }
-.logs-filter-row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; min-width: 0; }
+.logs-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; margin-bottom: 16px; flex-shrink: 0; }
 .logs-filter-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.logs-filter-field { width: 160px; }
-.logs-filter-status { width: 112px; }
-.logs-filter-protocol { width: 128px; }
+/* 五个筛选控件等宽分配，查询与刷新靠右；宽度不足时整行自然换行。 */
+.logs-filter-channel,
+.logs-filter-status,
+.logs-filter-protocol,
+.logs-filter-field { flex: 1 1 150px; min-width: 128px; max-width: 220px; }
 .logs-table { flex: 1 0 180px; min-height: 180px; border-radius: 18px; font-variant-numeric: tabular-nums; container-type: inline-size; container-name: logs-table; }
 .logs-table [role="grid"] { table-layout: fixed; min-width: 1120px; }
 /* 只有表格真正横向溢出时，才把行操作固定在右侧；颜色沿用表格玻璃与表头底色，避免出现色带。 */
@@ -23,7 +24,6 @@
   .logs-stats { gap: 12px; }
   .logs-filter-field { flex: 1 1 144px; }
 }
-.logs-filter-channel { flex: 1 1 156px; min-width: 120px; max-width: 240px; }
 .log-detail-fields { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px 14px; font-size: 13px; }
 .log-detail-fields dt { color: var(--muted); }
 .log-detail-fields dd { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

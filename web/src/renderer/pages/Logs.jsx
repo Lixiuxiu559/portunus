@@ -271,101 +271,97 @@ export default function Logs() {
         </div>
       )}
 
-      {/* 筛选栏：第一行是主筛选和查询操作，第二行是分组与模型筛选 */}
+      {/* 筛选栏：五个条件等宽排布，查询与刷新固定在右侧 */}
       <div className="logs-filters">
-        <div className="logs-filter-row logs-filter-primary">
-          <Select aria-label="日志渠道" selectedKey={filters.channel_id} onSelectionChange={(value) => setFilters((current) => ({ ...current, channel_id: value || 'all' }))} className="logs-filter-channel">
-            <Label>渠道</Label><Select.Trigger className="logs-control"><Select.Value /><Select.Indicator /></Select.Trigger>
-            <Select.Popover className="dialog-options"><ListBox>
-              <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
-              {channelIds.map((id) => <ListBox.Item key={id} id={id} textValue={logChannelLabel(id, channels)}>{logChannelLabel(id, channels)}<ListBox.ItemIndicator /></ListBox.Item>)}
-            </ListBox></Select.Popover>
-          </Select>
-          {channelError && <Button size="sm" variant="secondary" onPress={fetchChannels}>重试渠道名称</Button>}
-          <Select
-            name="success"
-            selectedKey={filters.success}
-            onSelectionChange={(v) => setFilters((f) => ({ ...f, success: v }))}
-            className="logs-filter-status"
-          >
-            <Label>状态</Label>
-            <Select.Trigger className="logs-control">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {successOptions.map((o) => (
-                  <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-                    {o.label}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-          <Select
-            name="client_protocol"
-            selectedKey={filters.client_protocol}
-            onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
-            className="logs-filter-protocol"
-          >
-            <Label>客户端</Label>
-            <Select.Trigger className="logs-control">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {clientProtocolOptions.map((o) => (
-                  <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-                    {o.label}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-          <div className="logs-filter-actions">
-            <Button
-              size="md"
-              variant="secondary"
-              aria-label="刷新调用记录"
-              onPress={() => fetchLogs()}
-              isPending={showRefreshing}
-              className="logs-refresh-action"
-            >
-              <RotateCw className="size-4" />
-            </Button>
-            {/* 查询：已在第 1 页直接带筛选刷新；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
-            <Button
-              size="md"
-              variant="primary"
-              className="logs-filter-action"
-              onPress={() => {
-                setPage(1);
-                setQuery({ ...filters });
-              }}
-            >
-              <Search className="size-4" /> 查询
-            </Button>
-          </div>
-        </div>
+        <Select aria-label="日志渠道" selectedKey={filters.channel_id} onSelectionChange={(value) => setFilters((current) => ({ ...current, channel_id: value || 'all' }))} className="logs-filter-channel">
+          <Label>渠道</Label><Select.Trigger className="logs-control"><Select.Value /><Select.Indicator /></Select.Trigger>
+          <Select.Popover className="dialog-options"><ListBox>
+            <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
+            {channelIds.map((id) => <ListBox.Item key={id} id={id} textValue={logChannelLabel(id, channels)}>{logChannelLabel(id, channels)}<ListBox.ItemIndicator /></ListBox.Item>)}
+          </ListBox></Select.Popover>
+        </Select>
+        {channelError && <Button size="sm" variant="secondary" onPress={fetchChannels}>重试渠道名称</Button>}
+        <Select
+          name="success"
+          selectedKey={filters.success}
+          onSelectionChange={(v) => setFilters((f) => ({ ...f, success: v }))}
+          className="logs-filter-status"
+        >
+          <Label>状态</Label>
+          <Select.Trigger className="logs-control">
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {successOptions.map((o) => (
+                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+                  {o.label}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+        <Select
+          name="client_protocol"
+          selectedKey={filters.client_protocol}
+          onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
+          className="logs-filter-protocol"
+        >
+          <Label>客户端</Label>
+          <Select.Trigger className="logs-control">
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {clientProtocolOptions.map((o) => (
+                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+                  {o.label}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
 
-        <div className="logs-filter-row logs-filter-secondary">
-          <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
-            <Label>模型分组</Label>
-            <Input className="logs-control" placeholder="按分组名称查询" />
-          </TextField>
-          <TextField
-            name="model_name"
-            value={filters.model_name}
-            onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
-            className="logs-filter-field"
+        <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
+          <Label>模型分组</Label>
+          <Input className="logs-control" placeholder="按分组名称查询" />
+        </TextField>
+        <TextField
+          name="model_name"
+          value={filters.model_name}
+          onChange={(v) => setFilters((f) => ({ ...f, model_name: v }))}
+          className="logs-filter-field"
+        >
+          <Label>模型名</Label>
+          <Input className="logs-control" placeholder="筛选模型" />
+        </TextField>
+        <div className="logs-filter-actions">
+          <Button
+            size="md"
+            variant="secondary"
+            aria-label="刷新调用记录"
+            onPress={() => fetchLogs()}
+            isPending={showRefreshing}
+            className="logs-refresh-action"
           >
-            <Label>模型名</Label>
-            <Input className="logs-control" placeholder="筛选模型" />
-          </TextField>
+            <RotateCw className="size-4" />
+          </Button>
+          {/* 查询：已在第 1 页直接带筛选刷新；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
+          <Button
+            size="md"
+            variant="primary"
+            className="logs-filter-action"
+            onPress={() => {
+              setPage(1);
+              setQuery({ ...filters });
+            }}
+          >
+            <Search className="size-4" /> 查询
+          </Button>
         </div>
       </div>
       <div className="logs-query-summary" aria-label="已生效筛选">
