@@ -55,7 +55,6 @@ export default function Logs() {
     group_name: linkedGroup,
     model_name: '',
     channel_id: 'all',
-    request_id: '',
     client_protocol: 'all',
     success: 'all',
   });
@@ -117,12 +116,17 @@ export default function Logs() {
       dataIndex: 'created_at',
       key: 'created_at',
       isRowHeader: true,
-      width: '150px',
-      render: (val) => (
-        <span className="block whitespace-nowrap text-center font-mono text-xs text-muted">
-          {val ? new Date(val).toLocaleString('zh-CN') : '—'}
-        </span>
-      ),
+      width: '132px',
+      render: (val) => {
+        if (!val) return <span className="block text-center text-xs text-muted">—</span>;
+        const date = new Date(val);
+        return (
+          <span className="block whitespace-nowrap text-center font-mono text-xs">
+            <span className="block text-muted">{date.toLocaleDateString('zh-CN')}</span>
+            <span className="block">{date.toLocaleTimeString('zh-CN', { hour12: false })}</span>
+          </span>
+        );
+      },
     },
     {
       title: '状态',
@@ -148,7 +152,7 @@ export default function Logs() {
       ),
     },
     {
-      title: '实际渠道 / 模型',
+      title: '实际模型 / 渠道',
       dataIndex: 'model_name',
       key: 'model_name',
       width: '184px',
@@ -252,7 +256,7 @@ export default function Logs() {
     },
   ];
 
-  const hasActiveFilters = query.channel_id !== 'all' || Boolean(query.request_id.trim()) || Boolean(query.group_name) || Boolean(query.model_name) || query.success !== 'all' || query.client_protocol !== 'all';
+  const hasActiveFilters = query.channel_id !== 'all' || Boolean(query.group_name) || Boolean(query.model_name) || query.success !== 'all' || query.client_protocol !== 'all';
 
   return (
     <div className="logs-page flex flex-col flex-1 min-h-0">
@@ -277,9 +281,6 @@ export default function Logs() {
               {channelIds.map((id) => <ListBox.Item key={id} id={id} textValue={logChannelLabel(id, channels)}>{logChannelLabel(id, channels)}<ListBox.ItemIndicator /></ListBox.Item>)}
             </ListBox></Select.Popover>
           </Select>
-          <TextField name="request_id" value={filters.request_id} onChange={(value) => setFilters((current) => ({ ...current, request_id: value }))} className="logs-filter-request">
-            <Label>请求 ID</Label><Input className="logs-control" placeholder="精确匹配 request_id" />
-          </TextField>
           {channelError && <Button size="sm" variant="secondary" onPress={fetchChannels}>重试渠道名称</Button>}
           <Select
             name="success"
@@ -371,7 +372,6 @@ export default function Logs() {
         <span className="logs-query-caption">当前查询</span>
         <div className="logs-query-tags">
           {query.channel_id !== 'all' && <span>渠道：{logChannelLabel(query.channel_id, channels)}</span>}
-          {query.request_id.trim() && <span>请求 ID：{query.request_id.trim()}</span>}
           {query.group_name && <span>分组：{query.group_name}</span>}
           {query.model_name && <span>模型：{query.model_name}</span>}
           {query.success !== 'all' && <span>状态：{query.success === 'true' ? '成功' : '失败'}</span>}
@@ -379,7 +379,7 @@ export default function Logs() {
           {!hasActiveFilters && <span className="logs-query-all">全部记录</span>}
         </div>
         <Button size="sm" variant="tertiary" isDisabled={!hasActiveFilters} onPress={() => {
-          const cleared = { group_name: '', model_name: '', channel_id: 'all', request_id: '', client_protocol: 'all', success: 'all' };
+          const cleared = { group_name: '', model_name: '', channel_id: 'all', client_protocol: 'all', success: 'all' };
           setFilters(cleared); setQuery(cleared); setPage(1);
         }}>清空筛选</Button>
       </div>
