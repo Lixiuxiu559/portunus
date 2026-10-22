@@ -44,9 +44,13 @@
 .service-tree-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .service-tree-icon { display: inline-flex; flex-shrink: 0; color: currentColor; }
 .service-pane { min-width: 0; padding: 20px; }
-/* 接入示例：模型分组是示例生成参数，放在内容区顶部。 */
-.service-examples-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
-.service-group-field { width: min(100%, 340px); min-width: 0; }
+/* 接入示例：模型分组是示例生成参数，放在内容区顶部；左标签 + 紧凑下拉，右侧说明同一行对齐。 */
+.service-examples-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
+.service-group-field { max-width: min(100%, 470px); min-width: 0; }
+.service-group-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.service-group-label { flex-shrink: 0; font-size: 12px; line-height: 18px; color: var(--muted); }
+.service-group-select { width: 220px; flex-shrink: 0; }
+.service-group-meta { flex: 0 1 auto; max-width: 14rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 18px; color: var(--muted); }
 .service-examples-note { margin-left: auto; font-size: 11px; line-height: 18px; color: var(--muted); }
 /* 客户端配置：连接字段不需要拉满整行，编辑器与模型映射保留全宽。 */
 .service-client-fields { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
@@ -78,8 +82,9 @@
 }
 .service-network-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .service-network-option:disabled { cursor: default; opacity: .5; }
-.service-group-trigger { min-height: 4rem; height: auto; padding: .75rem; border-radius: 9px !important; }
-.service-group-popover { width: var(--trigger-width); max-width: calc(100vw - 3rem); }
+.service-group-trigger { min-height: 2.25rem; height: auto; padding: 0 .625rem; border-radius: 9px !important; font-size: 13px; }
+.service-group-trigger [data-slot="select-value"] { display: flex; align-items: center; }
+.service-group-popover { width: var(--trigger-width); min-width: 15rem; max-width: calc(100vw - 3rem); }
 .service-group-popover [role="option"] { min-width: 0; }
 .service-code {
   max-height: 27rem; tab-size: 2; font-family: var(--font-mono) !important; font-size: 12px; line-height: 1.8;

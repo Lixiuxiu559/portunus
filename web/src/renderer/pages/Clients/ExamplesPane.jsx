@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Select, ListBox, Label } from '@heroui/react';
+import { Button, Select, ListBox } from '@heroui/react';
 import { findClientGuide } from './tools';
 import { buildServiceExamples } from '../../utils/serviceAccess';
 import { CodeSample, CopyValue, DocLink, GuideStep, Note, Parameters } from './shared';
@@ -55,29 +55,32 @@ export default function ExamplesPane({
     <div className="service-examples">
       <div className="service-examples-head">
         <div className="service-group-field">
-          <Select
-            placeholder={loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}
-            selectedKey={selectedGroup || null}
-            onSelectionChange={(key) => { if (key !== null) onSelectGroup(String(key)); }}
-            isDisabled={loading || !groups.length}
-            className="w-full min-w-0"
-          >
-            <Label className="mb-1 text-xs text-muted">模型分组</Label>
-            <Select.Trigger aria-label={selected ? `模型分组：${selected.name}` : '选择模型分组'} aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
-              <Select.Value className="min-w-0 flex-1 text-left">
-                {() => selected ? <span className="block min-w-0"><span className="block truncate font-medium text-sm" title={selected.name}>{selected.name}</span><span className="mt-1 block truncate text-[11px] text-muted">{selectedDescription}</span></span> : <span className="text-sm text-muted">{loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}</span>}
-              </Select.Value>
-              <Select.Indicator className="size-4 shrink-0 text-muted" />
-            </Select.Trigger>
-            <Select.Popover className="service-group-popover">
-              <ListBox aria-label="可接入的模型分组">
-                {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
-                  <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{STRATEGY_LABELS[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>)}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          <div className="service-group-row">
+            <span className="service-group-label">模型分组</span>
+            <Select
+              placeholder={loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}
+              selectedKey={selectedGroup || null}
+              onSelectionChange={(key) => { if (key !== null) onSelectGroup(String(key)); }}
+              isDisabled={loading || !groups.length}
+              className="service-group-select min-w-0"
+            >
+              <Select.Trigger aria-label={selected ? `模型分组：${selected.name}` : '选择模型分组'} aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
+                <Select.Value className="min-w-0 flex-1 text-left">
+                  {() => selected ? <span className="block min-w-0 truncate text-[13px] font-medium" title={selected.name}>{selected.name}</span> : <span className="text-[13px] text-muted">{loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}</span>}
+                </Select.Value>
+                <Select.Indicator className="size-4 shrink-0 text-muted" />
+              </Select.Trigger>
+              <Select.Popover className="service-group-popover">
+                <ListBox aria-label="可接入的模型分组">
+                  {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
+                    <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{STRATEGY_LABELS[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>)}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+            {selected && <span className="service-group-meta" title={selectedDescription}>{selectedDescription}</span>}
+          </div>
           {!loading && missingRequestedGroup && <p role="alert" className="mt-3 text-xs leading-5 text-warning">链接中的分组「{missingRequestedGroup}」不存在，请重新选择。未替换为其他分组。</p>}
           {!loading && !groups.length && <p className="mt-3 text-xs leading-5 text-muted">添加<Link to="/channels" className="text-accent underline">上游渠道</Link>后，创建<Link to="/groups" className="text-accent underline">模型分组</Link>再接入。</p>}
           {selected && !selected.items?.length && <p className="mt-3 text-xs leading-5 text-warning">分组尚无成员，请先添加上游模型。</p>}
