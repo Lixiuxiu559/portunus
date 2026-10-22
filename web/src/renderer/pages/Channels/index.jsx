@@ -65,8 +65,16 @@ export default function Channels() {
 
   return (
     <div className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="flex items-center justify-end mb-4 shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="channel-toolbar">
+        {!loading && !loadError && channels.length > 0 && <>
+          <label className="channel-search">
+            <Search className="size-4 shrink-0" aria-hidden="true" />
+            <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
+            {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
+          </label>
+          <span className="channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
+        </>}
+        <div className="channel-actions">
           <Button
             variant="secondary"
             size="md"
@@ -82,15 +90,6 @@ export default function Channels() {
           </Button>
         </div>
       </div>
-
-      {!loading && !loadError && channels.length > 0 && <div className="channel-toolbar">
-        <label className="channel-search">
-          <Search className="size-4 shrink-0" aria-hidden="true" />
-          <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
-          {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
-        </label>
-        <span className="channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
-      </div>}
 
       {loading ? (
         <div className="flex justify-center py-12">
