@@ -1,4 +1,4 @@
-/* 服务接入：上下结构，上层连接配置、下层接入示例，卡片材质由页面类统一提供。 */
+/* 服务接入：上层连接配置，下层「左树 + 内容」工作区，卡片材质由页面类统一提供。 */
 .service-access-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -8,9 +8,7 @@
 .service-access-grid > section {
   min-width: 0;
 }
-/* 连接配置内部：左侧选分组，右侧连接参数，窄屏折成单列。
- * 参数区不画横向分隔线，只用列间竖线，避免和底部令牌区的分隔线叠在一起。 */
-.service-config-grid { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 12px 24px; align-items: start; }
+/* 连接参数：三列等宽，列间只用竖线；窄屏逐级折行。 */
 .service-config-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .service-config-values > div { padding-block: 0 6px; }
 .service-config-values > div + div { border-left: 1px solid var(--separator); padding-left: 20px; }
@@ -18,11 +16,33 @@
 .service-config-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; margin-top: 12px; border-top: 1px solid var(--separator); padding-top: 12px; }
 .service-config-footer > .service-disclosure { flex: 1 1 auto; min-width: 0; }
 .service-config-footer > .button { flex-shrink: 0; }
+/* 工作区：左树 + 右内容。不要加 overflow-hidden，否则左树的 sticky 失效。 */
+.service-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; }
+.service-tree { position: sticky; top: 0; align-self: start; max-height: calc(100dvh - 140px); overflow-y: auto; padding: 12px; border-right: 1px solid var(--separator); }
+.service-tree-list { display: flex; flex-direction: column; gap: 2px; }
+.service-tree-section { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; cursor: pointer; transition: color 140ms var(--ease-out), background-color 140ms var(--ease-out); }
+.service-tree-section:hover { color: var(--foreground); background: color-mix(in oklch, var(--surface-secondary) 55%, transparent); }
+.service-tree-section:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.service-tree-chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform 160ms var(--ease-out); }
+.service-tree-chevron.is-open { transform: rotate(90deg); }
+.service-tree-children { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px; }
+.service-tree-item { position: relative; display: flex; align-items: center; gap: 9px; padding: 7px 8px 7px 26px; border-radius: 8px; font-size: 13px; color: var(--muted); transition: color 140ms var(--ease-out), background-color 140ms var(--ease-out); }
+.service-tree-item:hover { color: var(--foreground); background: color-mix(in oklch, var(--surface-secondary) 55%, transparent); }
+.service-tree-item[aria-current="page"] { color: var(--foreground); font-weight: 550; background: color-mix(in oklch, var(--accent) 10%, transparent); }
+.service-tree-item[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--accent); }
+.service-tree-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.service-tree-icon { display: inline-flex; flex-shrink: 0; color: currentColor; }
+.service-pane { min-width: 0; padding: 20px; }
+/* 接入示例：模型分组是示例生成参数，放在内容区顶部。 */
+.service-examples-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
+.service-group-field { width: min(100%, 340px); min-width: 0; }
+.service-examples-note { margin-left: auto; font-size: 11px; line-height: 18px; color: var(--muted); }
+/* 客户端配置：连接字段不需要拉满整行，编辑器与模型映射保留全宽。 */
+.service-client-fields { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
 /* 顶部工具行与其他页面一致：左侧说明、右侧操作按钮。 */
 .service-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-shrink: 0; }
 .service-toolbar-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 20px; color: var(--muted); }
 .service-toolbar .button { margin-left: auto; flex-shrink: 0; }
-.service-connection-panel > .mb-5 { margin-bottom: 16px; }
 .service-network-segment {
   display: inline-flex;
   flex-shrink: 0;
@@ -43,7 +63,7 @@
 .service-network-option[aria-pressed="true"] {
   background: var(--surface);
   color: var(--foreground);
-  box-shadow: var(--elev-1), var(--sheen);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
 }
 .service-network-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .service-network-option:disabled { cursor: default; opacity: .5; }
@@ -67,7 +87,6 @@
   border-radius: .25rem;
 }
 .service-stream-check { accent-color: var(--accent); width: .9rem; height: .9rem; }
-.service-tool-nav { padding-bottom: .125rem; flex-wrap: wrap; gap: 4px; overflow-x: visible; }
 .service-manual .scroll-mt-5 { scroll-margin-top: 1rem; }
 .service-manual { line-height: 1.8; }
 .service-guide-step > div { padding-left: 0; }
@@ -79,12 +98,12 @@
   .service-config-values > div:nth-child(3) { grid-column: 1 / -1; border-left: 0; padding-left: 0; padding-top: 8px; border-top: 1px solid var(--separator); }
 }
 @media (max-width: 900px) {
-  .service-config-grid { grid-template-columns: minmax(0, 1fr); }
   .service-config-values { grid-template-columns: minmax(0, 1fr); }
   .service-config-values > div { padding-block: 8px; }
   .service-config-values > div + div { border-left: 0; padding-left: 0; border-top: 1px solid var(--separator); }
+  .service-workspace { grid-template-columns: minmax(0, 1fr); }
+  .service-tree { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--separator); }
   .service-code { max-height: 24rem; }
-  .service-tool-nav { flex-wrap: nowrap; overflow-x: auto; }
 }
 
 .service-page { min-width: 0; }

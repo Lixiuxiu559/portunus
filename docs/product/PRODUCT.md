@@ -90,7 +90,7 @@ CI 配置已提交到本地仓库；不能将本地检查通过写成远端 Acti
 | 协议转换 | 消息、流、工具调用、思考参数、预算字段兼容等 | 分清透传、转换、降级、不支持；不承诺任意能力完全等价 |
 | 失败处理 | 重试、超时、熔断、策略切换 | 解释生效边界；流式已提交后中断不能无损自动重放 |
 | 调用观测 | 日志、分组/模型/渠道标识、request_id、token、缓存用量、耗时、错误 | 分组/渠道/request_id 筛选、单条详情与独立尝试记录已实现；关联归并和尝试链界面已实现；后续补请求终态、采集完整性和准确请求统计 |
-| 服务接入 | 通用 API 和多客户端手动配置指南，可复制地址、令牌、分组 | 保留连接信息＋API 示例＋客户端指南，后续补手动实际调用验证 |
+| 服务接入 | 通用 API 和多客户端手动配置指南，可复制地址、令牌、分组；桌面端可编辑 Claude Code 配置 | 保留连接信息＋API 示例＋客户端指南，Claude Code 支持首写备份、原子保存与回滚；后续补手动实际调用验证 |
 | 本地运行 | 本地 SQLite、桌面启动后端、应用更新、本机/LAN 模式 | 后续完善运行状态与生命周期展示；LAN 管理面边界已由 P0 保护 |
 | 维护设置 | 同步间隔、触发所有渠道同步、应用更新；令牌与监听范围在服务接入页 | 设置聚焦同步与应用维护，后续补日志维护入口 |
 
@@ -153,7 +153,7 @@ P0 采用六个主导航，调整职责与顺序，不新增仪表盘：
 
 ### 5.4 服务接入：统一对外入口
 
-当前：服务接入页集中网关地址、分组、Portunus 令牌、监听范围、通用 API 示例与客户端指南；设置页提供跳转，不再重复编辑令牌与监听范围。
+当前：服务接入页集中网关地址、分组、Portunus 令牌、监听范围、通用 API 示例、客户端指南与 Claude Code 配置编辑；设置页提供跳转，不再重复编辑令牌与监听范围。
 
 页面按以下职责组织；其中应用内实际调用验证入口仍待补齐：
 
@@ -161,7 +161,7 @@ P0 采用六个主导航，调整职责与顺序，不新增仪表盘：
 2. **访问令牌**：查看、复制、生成/重置及影响说明。沿用现有单令牌，不在本轮增加多调用方权限体系。
 3. **分组选择与连接参数**：model、对应 Base URL、认证方式、模型列表入口。
 4. **通用 API 示例**：Chat Completions、Responses、Messages 分别展示最小请求及流式示例，明确地址是否包含 `/v1`。
-5. **客户端指南**：保留现有 Claude Code、Codex、OpenCode、OpenClaw 等内容，复用上面的地址、令牌和分组；不读取或改写客户端文件。
+5. **客户端指南与配置**：接入示例保留 Claude Code、Codex、OpenCode、OpenClaw 等内容，复用上面的地址、令牌和分组，只生成可复制内容，不写入文件；桌面端另提供「客户端配置 → Claude Code」，可读取、编辑并原子保存 `~/.claude/settings.json`，首次写入前备份为 `.portunus.bak`，支持回滚。仅操作用户主动打开的配置文件，不在后台读取；其他客户端仍按示例手动配置。
 6. **验证与排障**：本机连通性、模型列表属于基础检查；真正调用明确提示上游可能收费并展示输出预算。一次成功只证明当前请求路径。
 
 令牌与访问范围只有一个主要编辑入口；设置页保留跳转链接，避免两处重复维护。思考强度和输出预算遵从客户端请求，不增加分组能力开关让用户重复填写。
@@ -251,7 +251,7 @@ P0 已同步页面、文档和管理接口访问边界；本轮进一步撤出�
 | 分组多成员创建、分页选择与成员元数据 | `web/src/renderer/pages/Groups/CreateGroupModal.jsx`；`web/src/renderer/pages/Groups/GroupModelPicker.jsx`；`backend/group/service.go` |
 | 渠道预览与保存时全量获取的差异 | `web/src/renderer/pages/Channels/CreateChannelModal.jsx:50`、`:73` |
 | 模型同步只新增 | `backend/model/sync.go:11` |
-| 指南、共享连接信息与客户端配置 | `web/src/renderer/pages/Clients.jsx:95`；`web/src/renderer/utils/connectionGuide.js:5` |
+| 指南、共享连接信息与客户端配置 | `web/src/renderer/pages/Clients/index.jsx`；`web/src/renderer/pages/Clients/ClaudeConfigPanel.jsx`；`web/src/main/client-config.js`；`web/src/renderer/utils/connectionGuide.js:5` |
 | 服务接入集中令牌与网络范围；设置负责同步和应用维护 | `web/src/renderer/pages/Clients.jsx`；`web/src/renderer/pages/Settings.jsx` |
 | 日志实体、统计计数和筛选能力 | `backend/shared/log.go`；`backend/shared/log_query.go`；`backend/api/log.go` |
 | 独立尝试记录、关联摘要与界面 | `backend/shared/upstream_attempt.go`；`backend/shared/log_requests.go`；`web/src/renderer/pages/RequestAttemptTimeline.jsx` |

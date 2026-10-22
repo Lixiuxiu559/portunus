@@ -1,9 +1,11 @@
-import { Button, Tabs } from '@heroui/react';
+import { useState } from 'react';
+import { Button, Modal, Tabs, Typography } from '@heroui/react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import logo from '../assets/logo.png';
 import { useUpdater } from '../hooks/useUpdater';
 import useLiquidNav from '../hooks/useLiquidNav';
+import { getNavBlock } from '../utils/navGuard';
 import '../workspace.css';
 
 export const tabs = [
@@ -23,6 +25,23 @@ export default function Layout() {
   const liquid = useLiquidNav(current.id);
   const isDev = window.api?.isDevelopment;
   const appName = window.api?.appName || 'Portunus';
+  // 导航守卫：页面注册了未保存数据时，切页先存下目标，确认后再走
+  const [pendingNav, setPendingNav] = useState(null);
+
+  const handleTabChange = (key) => {
+    const tab = tabs.find((item) => item.id === key);
+    if (!tab || tab.path === location.pathname) return;
+    if (getNavBlock()) {
+      setPendingNav(tab);
+      return;
+    }
+    navigate(tab.path);
+  };
+
+  const confirmLeave = () => {
+    if (pendingNav) navigate(pendingNav.path);
+    setPendingNav(null);
+  };
 
   return (
     <div className="app-shell">
@@ -33,10 +52,7 @@ export default function Layout() {
           <span className={`brand-name${isDev ? ' brand-name--dev' : ''}`} title={isDev ? '开发环境 · 13061' : undefined}>{appName}</span>
         </div>
         <nav className="app-top-navigation" aria-label="主导航">
-          <Tabs className="nav-tabs w-fit whitespace-nowrap" selectedKey={current.id} onSelectionChange={(key) => {
-            const tab = tabs.find((item) => item.id === key);
-            if (tab && tab.path !== location.pathname) navigate(tab.path);
-          }}>
+          <Tabs className="nav-tabs w-fit whitespace-nowrap" selectedKey={current.id} onSelectionChange={handleTabChange}>
             <Tabs.ListContainer>
               <Tabs.List aria-label="导航" className="flex-nowrap" ref={liquid.listRef}>
                 {tabs.map((tab) => <Tabs.Tab id={tab.id} key={tab.id}>{tab.label}<Tabs.Indicator /></Tabs.Tab>)}
@@ -55,6 +71,25 @@ export default function Layout() {
           <div key={location.pathname} className="page-in app-page"><Outlet /></div>
         </main>
       </section>
+
+      {/* 导航守卫确认：页面注册了未保存数据（navGuard）时，切页前拦截 */}
+      <Modal.Backdrop isOpen={!!pendingNav} onOpenChange={(open) => !open && setPendingNav(null)}>
+        <Modal.Container size="sm">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>离开当前页面？</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <Typography color="muted">{getNavBlock()}，离开将丢弃未保存的内容。</Typography>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">留在此页</Button>
+              <Button variant="danger" onPress={confirmLeave}>丢弃并离开</Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// 只生成可复制的接入示例，不读取或修改客户端文件。
+// 只生成可复制的接入示例；客户端文件读写由 main/client-config 与「客户端配置」面板单独负责。
 export const KEY_PLACEHOLDER = '<PORTUNUS_API_KEY>';
 export const MODEL_PLACEHOLDER = '<分组名称>';
 

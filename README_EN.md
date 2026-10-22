@@ -45,7 +45,7 @@ Portunus brings that work into one desktop app. Connect your providers, organize
 
 ### Connect once. Switch when you need to.
 
-Choose a group in Service Access and copy the gateway address, Portunus token, and generic API example, or follow a guide for Claude Code, Codex, or another client. Portunus does not read or modify client configuration files; upstream channels and routing stay in the gateway.
+Choose a group in Service Access and copy the gateway address, Portunus token, and generic API example, or follow a guide for Claude Code, Codex, or another client. On desktop, Client Config can also read and edit Claude Code's `settings.json`: the first write backs up the existing file to `.portunus.bak`, saves are atomic, and you can roll back at any time; other clients are still configured manually. Upstream channels and routing stay in the gateway.
 
 ### Multiple protocols. One entry point.
 

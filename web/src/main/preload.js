@@ -37,6 +37,16 @@ contextBridge.exposeInMainWorld('api', {
   // 后端服务地址（固定本机）
   getServerUrl: () => SERVER_URL,
 
+  // ─── 客户端配置（仅 Claude Code，路径由主进程固定）───
+  // 只暴露固定通道；渲染层不能传路径，也不存在通用 invoke。
+  clientConfig: {
+    getPaths: () => ipcRenderer.invoke('client-config:paths'),
+    readClaude: () => ipcRenderer.invoke('client-config:read-claude'),
+    readBackupClaude: () => ipcRenderer.invoke('client-config:read-backup-claude'),
+    saveClaude: (text) => ipcRenderer.invoke('client-config:save-claude', text),
+    rollbackClaude: () => ipcRenderer.invoke('client-config:rollback-claude'),
+  },
+
   // 打开外部链接（默认浏览器）
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });

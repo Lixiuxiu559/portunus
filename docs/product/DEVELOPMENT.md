@@ -17,6 +17,8 @@
 
 单实例锁在设置独立 `userData` 后获取。热开发和打包 Dev 共用一个 Dev 身份；两种 Dev 启动方式之间需先退出当前 Dev，正式版可以一直运行。Dev 不自动读取、迁移、复制正式数据库、上游密钥、设置或缓存。需要真实渠道时，在 Dev 中单独添加测试配置。
 
+「服务接入 → 客户端配置」读写当前用户真实的 `~/.claude/settings.json`，Dev 与正式版相同；首次写入前生成 `.portunus.bak`，Dev 界面会显示提示。开发验收可设置 `PORTUNUS_CLIENT_HOME=/tmp/portunus-client-home` 指向临时目录，避免改动真实客户端配置。
+
 ## 启动方式
 
 在 `web/` 执行：

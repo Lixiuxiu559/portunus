@@ -7,6 +7,7 @@ const { forwardEvents, checkForUpdates, register: registerUpdate } = require('./
 const { createBackend } = require('./sidecar');
 const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
+const clientConfig = require('./client-config');
 const { createTray } = require('./tray');
 
 // 开发模式下应用跑在 node_modules 的 Electron 默认 bundle 里，Dock/任务栏显示的是
@@ -152,10 +153,12 @@ function showMainWindow() {
 
 // ─── IPC：无编排依赖的家族由各模块 register 收口 ───
 // update:* → updater.register；
-// config:get-network-mode → app-config.register。这些模块 electron-free，
+// config:get-network-mode → app-config.register；
+// client-config:* → client-config.register。这些模块 electron-free，
 // register 只注入 ipcMain，注册与实现同模块（locality）。
 registerUpdate(ipcMain);
 appConfig.register(ipcMain);
+clientConfig.register(ipcMain);
 
 // ─── IPC：应用信息（依赖 electron app，留 main.js）───
 ipcMain.handle('app:version', () => app.getVersion());
