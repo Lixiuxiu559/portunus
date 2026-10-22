@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpen, Copy, Eye, EyeOff, ExternalLink, Info, RefreshCw } from 'lucide-react';
+import { BookOpen, Check, Copy, Eye, EyeOff, ExternalLink, Info, RefreshCw } from 'lucide-react';
 import { Button, Typography, Modal, Select, ListBox, Label, toast } from '@heroui/react';
 import { ClaudeMark, OpenAIMark } from '../components/BrandMarks';
 import { listGroups } from '../api/group';
@@ -14,21 +14,33 @@ async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success('已复制');
+    return true;
   } catch {
     toast.danger('复制失败，请手动选择并复制');
+    return false;
   }
 }
 
-function CopyValue({ label, value, display = value, disabled = false }) {
+function CopyValue({ label, value, display = value, disabled = false, actions = null, wrap = false }) {
+  // 复制成功后就地显示对勾，避免连续复制三个地址时只能靠 toast 确认
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 py-3">
       <div className="min-w-0 flex-1">
         <Typography type="body-xs" className="text-muted mb-1">{label}</Typography>
-        <code className="block truncate text-xs" title={String(display)}>{display}</code>
+        <code className={`block text-xs ${wrap ? 'break-all' : 'truncate'}`} title={String(display)}>{display}</code>
       </div>
-      <Button isIconOnly size="sm" variant="tertiary" aria-label={`复制${label}`} isDisabled={disabled} onPress={() => copy(value)}>
-        <Copy className="size-3.5" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        {actions}
+        <Button isIconOnly size="sm" variant="tertiary" aria-label={copied ? `${label}已复制` : `复制${label}`} isDisabled={disabled} onPress={async () => { if (await copy(value)) setCopied(true); }}>
+          {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -213,57 +225,67 @@ export default function Clients() {
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="service-access-grid">
           <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5" aria-label="连接配置">
-            <div className="mb-5 flex items-center justify-between gap-2">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">连接配置</h2>
-              <span className="rounded-md bg-surface-secondary px-2 py-1 text-[11px] text-muted">本地网关</span>
-            </div>
-            <Select
-              placeholder={loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}
-              selectedKey={selectedGroup || null}
-              onSelectionChange={(key) => { if (key !== null) chooseGroup(String(key)); }}
-              isDisabled={loading || !groups.length}
-              className="w-full min-w-0"
-            >
-              <Label className="mb-1 text-xs text-muted">模型分组 · 客户端 model</Label>
-              <Select.Trigger aria-label={selected ? `模型分组：${selected.name}` : '选择模型分组'} aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
-                <Select.Value className="min-w-0 flex-1 text-left">
-                  {() => selected ? <span className="block min-w-0"><span className="block truncate font-medium text-sm" title={selected.name}>{selected.name}</span><span className="mt-1 block truncate text-[11px] text-muted">{selectedDescription}</span></span> : <span className="text-sm text-muted">{loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}</span>}
-                </Select.Value>
-                <Select.Indicator className="size-4 shrink-0 text-muted" />
-              </Select.Trigger>
-              <Select.Popover className="service-group-popover">
-                <ListBox aria-label="可接入的模型分组">
-                  {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
-                    <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{strategyLabels[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>)}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-            {!loading && missingRequestedGroup && <p role="alert" className="mt-3 text-xs leading-5 text-warning">链接中的分组「{requestedGroup || '空名称'}」不存在，请重新选择。未替换为其他分组。</p>}
-            {!loading && !groups.length && <p className="mt-3 text-xs leading-5 text-muted">添加<Link to="/channels" className="text-accent underline">上游渠道</Link>后，创建<Link to="/groups" className="text-accent underline">模型分组</Link>再接入。</p>}
-            {selected && !selected.items?.length && <p className="mt-3 text-xs leading-5 text-warning">分组尚无成员，请先添加上游模型。</p>}
-            <div className="mt-5 divide-y divide-separator border-y border-separator">
-              <CopyValue label="网关地址" value={guide.baseUrl} />
-              <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} />
-              <CopyValue label="访问令牌" value={apiKey} display={loading ? '加载中…' : apiKey ? (showKey ? apiKey : '••••••••••••••••') : '尚未生成'} disabled={!apiKey || loading} />
-            </div>
-            {loadError && <p role="alert" className="mt-3 text-xs text-danger">连接信息加载失败，请刷新重试。</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-1">
-              <Button size="sm" variant="tertiary" isDisabled={!apiKey} onPress={() => setShowKey(!showKey)}>{showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}{showKey ? '隐藏令牌' : '显示令牌'}</Button>
-              <Button size="sm" variant="tertiary" isDisabled={loading || loadError} isPending={regenerating} onPress={() => apiKey ? setRegenerateOpen(true) : generateKey()}>{apiKey ? '重置令牌' : '生成令牌'}</Button>
-            </div>
-            <div className="mt-3 border-t border-separator pt-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium">访问范围</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted">访问范围</span>
                 {window.api?.setNetworkMode ? <div className="service-network-segment" role="group" aria-label="服务访问范围" aria-busy={savingMode}>
                   {[['local', '仅本机'], ['lan', '局域网']].map(([mode, label]) => <button type="button" key={mode} className="service-network-option" aria-pressed={networkMode === mode} disabled={savingMode || networkMode === null} onClick={() => saveNetworkMode(mode)}>{label}</button>)}
                 </div> : <span className="text-xs text-muted">{networkMode === 'lan' ? '局域网' : networkMode === 'local' ? '仅本机' : window.api?.getNetworkMode ? '正在读取' : '由启动配置决定'}</span>}
               </div>
-              <details className="service-disclosure mt-2 text-xs text-muted">
+            </div>
+            <div className="service-config-grid">
+              <div className="service-config-primary">
+                <Select
+                  placeholder={loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}
+                  selectedKey={selectedGroup || null}
+                  onSelectionChange={(key) => { if (key !== null) chooseGroup(String(key)); }}
+                  isDisabled={loading || !groups.length}
+                  className="w-full min-w-0"
+                >
+                  <Label className="mb-1 text-xs text-muted">模型分组</Label>
+                  <Select.Trigger aria-label={selected ? `模型分组：${selected.name}` : '选择模型分组'} aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
+                    <Select.Value className="min-w-0 flex-1 text-left">
+                      {() => selected ? <span className="block min-w-0"><span className="block truncate font-medium text-sm" title={selected.name}>{selected.name}</span><span className="mt-1 block truncate text-[11px] text-muted">{selectedDescription}</span></span> : <span className="text-sm text-muted">{loading ? '加载中…' : groups.length ? '请选择分组' : '暂无分组'}</span>}
+                    </Select.Value>
+                    <Select.Indicator className="size-4 shrink-0 text-muted" />
+                  </Select.Trigger>
+                  <Select.Popover className="service-group-popover">
+                    <ListBox aria-label="可接入的模型分组">
+                      {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
+                        <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{strategyLabels[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>)}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+                {!loading && missingRequestedGroup && <p role="alert" className="mt-3 text-xs leading-5 text-warning">链接中的分组「{requestedGroup || '空名称'}」不存在，请重新选择。未替换为其他分组。</p>}
+                {!loading && !groups.length && <p className="mt-3 text-xs leading-5 text-muted">添加<Link to="/channels" className="text-accent underline">上游渠道</Link>后，创建<Link to="/groups" className="text-accent underline">模型分组</Link>再接入。</p>}
+                {selected && !selected.items?.length && <p className="mt-3 text-xs leading-5 text-warning">分组尚无成员，请先添加上游模型。</p>}
+              </div>
+              <div className="service-config-detail">
+                <div className="service-config-values">
+                  <CopyValue label="网关地址" value={guide.baseUrl} />
+                  <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} />
+                  <CopyValue
+                    label="访问令牌"
+                    value={apiKey}
+                    display={loading ? '加载中…' : apiKey ? (showKey ? apiKey : '••••••••••••••••') : '尚未生成'}
+                    disabled={!apiKey || loading}
+                    wrap={showKey}
+                    actions={<Button isIconOnly size="sm" variant="tertiary" aria-label={showKey ? '隐藏访问令牌' : '显示访问令牌'} isDisabled={!apiKey} onPress={() => setShowKey(!showKey)}>{showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</Button>}
+                  />
+                </div>
+                <p className="service-config-hint">Claude Code 等 Anthropic 协议客户端用网关地址；OpenAI 兼容客户端用含 /v1 的地址。</p>
+                {loadError && <p role="alert" className="mt-3 text-xs text-danger">连接信息加载失败，请刷新重试。</p>}
+              </div>
+            </div>
+            <div className="service-config-footer">
+              <details className="service-disclosure text-xs text-muted">
                 <summary>访问与令牌说明</summary>
                 <div className="space-y-2 pt-3 leading-6"><p>网关地址供本机调用。其他设备请使用本机局域网 IP 和端口 {new URL(serverUrl).port || '80'}，不能使用 127.0.0.1 或 0.0.0.0 作为目标地址。</p><p>切换范围会自动重启服务，进行中的请求可能中断。管理操作仅限本机，服务请求始终需要令牌。</p><p>重置令牌后旧令牌立即失效，所有调用方都需更新。上游 API Key 只在上游渠道中保存。</p><p>应用运行期间提供服务，退出后停止。分组名称就是客户端 model，调整组内上游无需修改客户端。</p></div>
               </details>
+              <Button size="sm" variant="tertiary" isDisabled={loading || loadError} isPending={regenerating} onPress={() => apiKey ? setRegenerateOpen(true) : generateKey()}>{apiKey ? '重置令牌' : '生成令牌'}</Button>
             </div>
           </aside>
 
