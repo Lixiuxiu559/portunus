@@ -196,17 +196,15 @@ export default function Clients() {
   const logsPath = selectedGroup ? `/logs?group=${encodeURIComponent(selectedGroup)}` : '/logs';
 
   return (
-    <div className="service-page flex flex-1 min-h-0 flex-col">
-      <header className="resource-page-heading">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">服务接入</h1>
-          <p className="mt-1 text-sm text-muted">选择模型分组，为你的应用提供一个稳定入口。</p>
-        </div>
-        <Button size="md" variant="tertiary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
-      </header>
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-3">
+    <div className="service-page flex flex-col flex-1 min-h-0 min-w-0">
+      <h1 className="sr-only">服务接入</h1>
+      <div className="service-toolbar">
+        <p className="service-toolbar-hint">选择模型分组，为你的应用提供一个稳定入口。</p>
+        <Button size="md" variant="secondary" onPress={load} isPending={loading} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="service-access-grid">
-          <aside className="service-connection-panel rounded-2xl border border-separator bg-surface/70 p-5" aria-label="连接配置">
+          <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5" aria-label="连接配置">
             <div className="mb-5 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">连接配置</h2>
               <span className="rounded-md bg-surface-secondary px-2 py-1 text-[11px] text-muted">本地网关</span>
@@ -261,7 +259,7 @@ export default function Clients() {
             </div>
           </aside>
 
-          <section className="min-w-0 rounded-2xl border border-separator bg-surface/50" aria-label="接入示例">
+          <section className="min-w-0 rounded-2xl bg-surface/70" aria-label="接入示例">
             <div className="border-b border-separator px-5 pt-5 pb-4">
               <div className="mb-4 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">接入示例</h2><span className="text-[11px] text-muted">手动配置 · 保留现有设置</span></div>
               <nav aria-label="选择接入工具" className="service-tool-nav flex gap-1 overflow-x-auto no-scrollbar">

@@ -1,4 +1,4 @@
-/* 服务接入（设计规范 v2.0）：左侧连接参数卡 + 右侧示例/指南卡，均为实底卡。 */
+/* 服务接入：左侧连接参数卡 + 右侧示例/指南卡，卡片材质由页面类统一提供。 */
 .service-access-grid {
   display: grid;
   grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
@@ -8,12 +8,11 @@
 .service-access-grid > aside,
 .service-access-grid > section {
   min-width: 0;
-  border: none !important;
-  border-radius: 14px !important;
-  background: var(--surface) !important;
-  box-shadow: var(--elev-1), var(--sheen);
 }
-.service-connection-panel { padding: 20px !important; }
+/* 顶部工具行与其他页面一致：左侧说明、右侧操作按钮。 */
+.service-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-shrink: 0; }
+.service-toolbar-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 20px; color: var(--muted); }
+.service-toolbar .button { margin-left: auto; flex-shrink: 0; }
 .service-connection-panel > .mb-5 { margin-bottom: 16px; }
 .service-network-segment {
   display: inline-flex;
@@ -28,9 +27,9 @@
   border-radius: 7px;
   font-size: 12.5px;
   line-height: 18px;
-  color: var(--text-secondary);
+  color: var(--muted);
   cursor: pointer;
-  transition: background-color 140ms var(--ease-standard), color 140ms var(--ease-standard);
+  transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out);
 }
 .service-network-option[aria-pressed="true"] {
   background: var(--surface);
@@ -44,7 +43,7 @@
 .service-group-popover [role="option"] { min-width: 0; }
 .service-code {
   max-height: 27rem; tab-size: 2; font-family: var(--font-mono) !important; font-size: 12px; line-height: 1.8;
-  background: var(--surface-secondary) !important; border-radius: 12px !important; color: var(--text-secondary);
+  background: var(--surface-secondary) !important; border-radius: 12px !important; color: var(--muted);
 }
 .service-disclosure > summary {
   cursor: pointer;
@@ -60,7 +59,6 @@
 }
 .service-stream-check { accent-color: var(--accent); width: .9rem; height: .9rem; }
 .service-tool-nav { padding-bottom: .125rem; flex-wrap: wrap; gap: 4px; overflow-x: visible; }
-.service-tool-nav .button { height: 30px; min-height: 30px; font-size: 12.5px; padding-inline: 12px; }
 .service-manual .scroll-mt-5 { scroll-margin-top: 1rem; }
 .service-manual { line-height: 1.8; }
 .service-guide-step > div { padding-left: 0; }
