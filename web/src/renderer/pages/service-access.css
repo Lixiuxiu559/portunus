@@ -10,7 +10,7 @@
 }
 /* 连接参数：三列等宽，列间只用竖线；窄屏逐级折行。 */
 .service-config-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.service-config-values > div { padding-block: 0 6px; }
+.service-config-values > div { padding-block: 0 6px; padding-right: 16px; }
 .service-config-values > div + div { border-left: 1px solid var(--separator); padding-left: 20px; }
 .service-config-hint { margin-top: 6px; max-width: 68ch; font-size: 12px; line-height: 18px; color: var(--muted); }
 .service-config-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; margin-top: 12px; border-top: 1px solid var(--separator); padding-top: 12px; }
