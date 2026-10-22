@@ -1,9 +1,10 @@
-/* 新增渠道搜索沿用发布版表单的实底、细描边材质。 */
+/* 渠道搜索沿用其他菜单 HeroUI 输入框的材质：field 实底、16px 圆角、无描边。 */
 .channel-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; flex-shrink: 0; }
 .channel-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
-.channel-search { display: flex; align-items: center; gap: 9px; width: min(100%, 390px); min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); background: var(--surface-secondary); }
-.channel-search:focus-within { border-color: var(--accent); outline: 2px solid color-mix(in oklch, var(--accent) 15%, transparent); }
-.channel-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; color: var(--foreground); font-size: 13px; }
+.channel-search { display: flex; align-items: center; gap: 9px; width: min(100%, 390px); min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--field-radius); color: var(--field-placeholder); background: var(--field-background); }
+.channel-search:focus-within { outline: 2px solid color-mix(in oklch, var(--accent) 40%, transparent); outline-offset: 1px; }
+.channel-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; color: var(--field-foreground); font-size: 14px; }
+.channel-search input::placeholder { color: var(--field-placeholder); }
 .channel-search input::-webkit-search-cancel-button { display: none; }
 .channel-search button { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 28px; cursor: pointer; border-radius: 6px; }
 .channel-search button:focus-visible { outline: 2px solid var(--accent); }
