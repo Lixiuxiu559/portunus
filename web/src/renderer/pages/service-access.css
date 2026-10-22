@@ -8,16 +8,27 @@
 .service-access-grid > section {
   min-width: 0;
 }
+/* 连接配置：刷新时顶部扫光表示正在重新读取；完成后各值逐字重放一次。 */
+.service-connection-panel { position: relative; overflow: hidden; }
+.service-refresh-bar { position: absolute; top: 0; left: 0; width: 40%; height: 2px; border-radius: 999px; background: linear-gradient(90deg, transparent, var(--accent)); animation: service-refresh-sweep 1s cubic-bezier(.4, 0, .2, 1) infinite; }
+@keyframes service-refresh-sweep { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+.service-typing-caret { display: inline-block; width: 1px; height: .95em; margin-left: 2px; vertical-align: -.1em; background: currentColor; animation: service-caret-blink .9s steps(2, start) infinite; }
+@keyframes service-caret-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .service-refresh-bar { width: 100%; animation: none; opacity: .5; }
+  .service-typing-caret { display: none; }
+}
 /* 连接参数：三列等宽，列间只用竖线；窄屏逐级折行。 */
 .service-config-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .service-config-values > div { padding-block: 0 6px; padding-right: 16px; }
 .service-config-values > div + div { border-left: 1px solid var(--separator); padding-left: 20px; }
-.service-config-hint { margin-top: 6px; max-width: 68ch; font-size: 12px; line-height: 18px; color: var(--muted); }
+.service-config-hint { max-width: 68ch; font-size: 12px; line-height: 18px; color: var(--muted); }
 .service-config-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; margin-top: 12px; border-top: 1px solid var(--separator); padding-top: 12px; }
 .service-config-footer > .service-disclosure { flex: 1 1 auto; min-width: 0; }
 .service-config-footer > .button { flex-shrink: 0; }
-/* 工作区：左树 + 右内容。不要加 overflow-hidden，否则左树的 sticky 失效。 */
-.service-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; }
+/* 工作区：左树 + 右内容。不要加 overflow-hidden，否则左树的 sticky 失效。
+   min-height 由页面按滚动容器高度写入，保证切换右栏内容时卡片始终可滚到顶部对齐。 */
+.service-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; min-height: var(--service-workspace-min, 0px); }
 .service-tree { position: sticky; top: 0; align-self: start; max-height: calc(100dvh - 140px); overflow-y: auto; padding: 12px; border-right: 1px solid var(--separator); }
 .service-tree-list { display: flex; flex-direction: column; gap: 2px; }
 .service-tree-section { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; cursor: pointer; transition: color 140ms var(--ease-out), background-color 140ms var(--ease-out); }

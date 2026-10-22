@@ -11,6 +11,8 @@ export default function ConnectionCard({
   showKey,
   onToggleKey,
   loading,
+  refreshing,
+  revealKey,
   loadError,
   regenerating,
   onResetToken,
@@ -22,9 +24,13 @@ export default function ConnectionCard({
 
   return (
     <>
-      <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5" aria-label="连接配置">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">连接配置</h2>
+      <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5" aria-label="连接配置" aria-busy={refreshing}>
+        {refreshing && <span className="service-refresh-bar" aria-hidden="true" />}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-sm font-semibold">连接配置</h2>
+            <p className="service-config-hint">Claude Code 等 Anthropic 协议客户端用网关地址；OpenAI 兼容客户端用含 /v1 的地址。</p>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted">访问范围</span>
             {window.api?.setNetworkMode ? (
@@ -49,18 +55,18 @@ export default function ConnectionCard({
         </div>
 
         <div className="service-config-values">
-          <CopyValue label="网关地址" value={guide.baseUrl} />
-          <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} />
+          <CopyValue label="网关地址" value={guide.baseUrl} revealKey={revealKey} />
+          <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} revealKey={revealKey} />
           <CopyValue
             label="访问令牌"
             value={apiKey}
             display={loading ? '加载中…' : apiKey ? (showKey ? apiKey : '••••••••••••••••') : '尚未生成'}
+            revealKey={revealKey}
             disabled={!apiKey || loading}
             wrap={showKey}
             actions={<Button isIconOnly size="sm" variant="tertiary" aria-label={showKey ? '隐藏访问令牌' : '显示访问令牌'} isDisabled={!apiKey} onPress={onToggleKey}>{showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</Button>}
           />
         </div>
-        <p className="service-config-hint">Claude Code 等 Anthropic 协议客户端用网关地址；OpenAI 兼容客户端用含 /v1 的地址。</p>
         {loadError && <p role="alert" className="mt-3 text-xs text-danger">连接信息加载失败，请刷新重试。</p>}
 
         <div className="service-config-footer">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Typography, toast } from '@heroui/react';
 import { Check, Copy, ExternalLink, Info } from 'lucide-react';
 
@@ -13,9 +13,60 @@ export async function copy(text) {
   }
 }
 
-export function CopyValue({ label, value, display = value, disabled = false, actions = null, wrap = false }) {
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches));
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!query) return undefined;
+    const onChange = () => setReduced(query.matches);
+    query.addEventListener?.('change', onChange);
+    return () => query.removeEventListener?.('change', onChange);
+  }, []);
+  return reduced;
+}
+
+// 刷新后逐字显示，让用户看清这些值刚刚重新读取；只在 revealKey 变化时播放，其他更新直接落到完整文本。
+function useRevealText(text, revealKey, { speed = 22, maxDuration = 900 } = {}) {
+  const full = String(text ?? '');
+  const reduced = usePrefersReducedMotion();
+  const lastKey = useRef(revealKey);
+  const [shown, setShown] = useState(full);
+  const [typing, setTyping] = useState(false);
+
+  useEffect(() => {
+    const animate = revealKey !== lastKey.current;
+    lastKey.current = revealKey;
+    if (!animate || reduced || !full) {
+      setShown(full);
+      setTyping(false);
+      return undefined;
+    }
+    const maxSteps = Math.max(1, Math.floor(maxDuration / speed));
+    const step = Math.max(1, Math.ceil(full.length / maxSteps));
+    let revealed = 0;
+    setShown('');
+    setTyping(true);
+    const timer = setInterval(() => {
+      revealed = Math.min(full.length, revealed + step);
+      setShown(full.slice(0, revealed));
+      if (revealed >= full.length) {
+        clearInterval(timer);
+        setTyping(false);
+      }
+    }, speed);
+    return () => {
+      clearInterval(timer);
+      setTyping(false);
+    };
+  }, [full, revealKey, reduced, speed, maxDuration]);
+
+  return { shown, typing };
+}
+
+export function CopyValue({ label, value, display = value, disabled = false, actions = null, wrap = false, revealKey = 0 }) {
   // 复制成功后就地显示对勾，避免连续复制多个值的时候只能靠 toast 确认
   const [copied, setCopied] = useState(false);
+  const { shown, typing } = useRevealText(display, revealKey);
   useEffect(() => {
     if (!copied) return undefined;
     const timer = setTimeout(() => setCopied(false), 1600);
@@ -25,7 +76,7 @@ export function CopyValue({ label, value, display = value, disabled = false, act
     <div className="flex min-w-0 items-center justify-between gap-2 py-3">
       <div className="min-w-0 flex-1">
         <Typography type="body-xs" className="text-muted mb-1">{label}</Typography>
-        <code className={`block text-xs ${wrap ? 'break-all' : 'truncate'}`} title={String(display)}>{display}</code>
+        <code className={`block text-xs ${wrap ? 'break-all' : 'truncate'}`} title={String(display)}>{shown}{typing && <span className="service-typing-caret" aria-hidden="true" />}</code>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {actions}

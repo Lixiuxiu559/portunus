@@ -13,7 +13,7 @@ export const tabs = [
   { id: 'models', label: '模型', path: '/models' },
   { id: 'groups', label: '分组', path: '/groups' },
   { id: 'logs', label: '日志', path: '/logs' },
-  { id: 'clients', label: '服务接入', path: '/clients' },
+  { id: 'clients', label: '接入', path: '/clients' },
   { id: 'settings', label: '设置', path: '/settings' },
 ];
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, toast } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
@@ -15,6 +15,8 @@ import { normalizeSearch, parseSelection, selectionSearch } from './sectionState
 import '../service-access.css';
 
 const STRATEGY_LABELS = { manual: '手动选择', round_robin: '轮询', failover: '故障转移' };
+// 工作区顶部对齐视口顶部时留一点余量，和滚动目标共用同一个值
+const WORKSPACE_TOP_GAP = 8;
 
 export default function Clients() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,6 +33,8 @@ export default function Clients() {
   const [loading, setLoading] = useState(true);
   // 已有数据时的刷新不进入加载态：保留当前配置展示，只在按钮上给反馈
   const [refreshing, setRefreshing] = useState(false);
+  // 刷新成功后递增，连接配置按这个 key 逐字重放一次，给出「刚重新读取」的反馈
+  const [revealKey, setRevealKey] = useState(0);
   const [loadError, setLoadError] = useState(false);
   // 客户端配置面板上报的未保存状态；树内切换前用它决定是否确认
   const [configDirty, setConfigDirty] = useState(false);
@@ -61,6 +65,8 @@ export default function Clients() {
     else if (blocking) setApiKey('');
     setLoading(false);
     setRefreshing(false);
+    // 刷新失败保留旧值，不动画；成功时重放一次逐字显示
+    if (isRefresh && !failed) setRevealKey((key) => key + 1);
   };
 
   useEffect(() => { load(); }, []);
@@ -79,7 +85,7 @@ export default function Clients() {
     }
   }, [searchParams, setSearchParams]);
 
-  // 切换树节点时把工作区定位回视口；只在已经滚过工作区顶部时调整，避免首屏被拉走
+  // 切换树节点时把工作区平滑滚回视口；只在已经滚过工作区顶部时调整，避免首屏被拉走
   useEffect(() => {
     const key = `${selection.section}/${selection.tool}`;
     if (lastSelection.current === key) return;
@@ -89,8 +95,26 @@ export default function Clients() {
     if (!scroller || !workspace) return;
     const offset = workspace.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
     if (scroller.scrollTop <= offset) return;
-    scroller.scrollTo({ top: offset - 8 });
+    // offset 是「工作区顶部距滚动容器顶部」的剩余距离，绝对目标是当前 scrollTop + offset
+    const target = Math.max(0, scroller.scrollTop + offset - WORKSPACE_TOP_GAP);
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    scroller.scrollTo({ top: target, behavior: reduceMotion ? 'auto' : 'smooth' });
   }, [selection.section, selection.tool]);
+
+  // 工作区卡至少铺满一屏：右栏换内容时页面高度不会突然塌缩，
+  // 浏览器也就不会把滚动位置夹回页面顶部；内容变短时最多停在「工作区顶部对齐视口」的位置。
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const sync = () => {
+      const minHeight = Math.max(0, scroller.clientHeight - WORKSPACE_TOP_GAP);
+      scroller.style.setProperty('--service-workspace-min', `${minHeight}px`);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
 
   const saveNetworkMode = async (mode) => {
     if (mode === networkMode || !window.api?.setNetworkMode) return;
@@ -160,6 +184,8 @@ export default function Clients() {
             showKey={showKey}
             onToggleKey={() => setShowKey((v) => !v)}
             loading={loading}
+            refreshing={refreshing}
+            revealKey={revealKey}
             loadError={loadError}
             regenerating={regenerating}
             onResetToken={generateKey}
