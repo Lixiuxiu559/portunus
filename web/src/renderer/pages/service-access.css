@@ -1,21 +1,76 @@
-/* v0.4.1 uses full-width stacked cards and HeroUI controls, not a split workspace. */
-.service-page, .service-access-content { min-width: 0; }
-.service-access-grid { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.service-connection-panel.card, .service-example-panel.card { flex-shrink: 0; min-width: 0; }
-.service-connection-content { min-width: 0; }
-.service-network-segment { display: flex; flex-shrink: 0; gap: 4px; }
-.service-group-trigger { min-height: 4rem; height: auto; padding: .75rem; }
+/* 服务接入（设计规范 v2.0）：左侧连接参数卡 + 右侧示例/指南卡，均为实底卡。 */
+.service-access-grid {
+  display: grid;
+  grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.service-access-grid > aside,
+.service-access-grid > section {
+  min-width: 0;
+  border: none !important;
+  border-radius: 14px !important;
+  background: var(--surface) !important;
+  box-shadow: var(--elev-1), var(--sheen);
+}
+.service-connection-panel { padding: 20px !important; }
+.service-connection-panel > .mb-5 { margin-bottom: 16px; }
+.service-network-segment {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-secondary);
+}
+.service-network-option {
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-standard), color 140ms var(--ease-standard);
+}
+.service-network-option[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--elev-1), var(--sheen);
+}
+.service-network-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.service-network-option:disabled { cursor: default; opacity: .5; }
+.service-group-trigger { min-height: 4rem; height: auto; padding: .75rem; border-radius: 9px !important; }
 .service-group-popover { width: var(--trigger-width); max-width: calc(100vw - 3rem); }
 .service-group-popover [role="option"] { min-width: 0; }
-.service-tool-tabs { overflow-x: auto; flex-shrink: 0; }
-.service-tool-tabs [role="tablist"] { flex-wrap: nowrap; }
-.service-code { max-height: 27rem; tab-size: 2; font-size: 12px; line-height: 1.8; }
-.service-disclosure > summary { cursor: pointer; list-style-position: inside; font-weight: 500; line-height: 1.5rem; }
-.service-disclosure > summary::marker { font-size: .65em; }
-.service-disclosure > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: .25rem; }
-.service-stream-check { accent-color: var(--accent); width: .9rem; height: .9rem; }
-.service-manual .scroll-mt-5 { scroll-margin-top: 1rem; }
-@media (max-width: 767px) {
-  .service-code { max-height: 24rem; }
-  .service-network-segment { flex-wrap: wrap; justify-content: flex-end; }
+.service-code {
+  max-height: 27rem; tab-size: 2; font-family: var(--font-mono) !important; font-size: 12px; line-height: 1.8;
+  background: var(--surface-secondary) !important; border-radius: 12px !important; color: var(--text-secondary);
 }
+.service-disclosure > summary {
+  cursor: pointer;
+  list-style-position: inside;
+  font-weight: 500;
+  line-height: 1.5rem;
+}
+.service-disclosure > summary::marker { font-size: .65em; }
+.service-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: .25rem;
+}
+.service-stream-check { accent-color: var(--accent); width: .9rem; height: .9rem; }
+.service-tool-nav { padding-bottom: .125rem; flex-wrap: wrap; gap: 4px; overflow-x: visible; }
+.service-tool-nav .button { height: 30px; min-height: 30px; font-size: 12.5px; padding-inline: 12px; }
+.service-manual .scroll-mt-5 { scroll-margin-top: 1rem; }
+.service-manual { line-height: 1.8; }
+.service-guide-step > div { padding-left: 0; }
+.service-guide-step h2 { font-size: 14px; margin-bottom: 12px; }
+.service-guide-step h2 > span { width: 24px; height: 24px; font-size: 12px; border-radius: 50%; }
+@media (max-width: 960px) {
+  .service-access-grid { grid-template-columns: minmax(0, 1fr); }
+  .service-code { max-height: 24rem; }
+  .service-connection-panel { max-width: none; }
+  .service-tool-nav { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+.service-page { min-width: 0; }
