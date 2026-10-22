@@ -61,7 +61,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
   };
   return <>
     <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="dialog-form-content">
+      <div className="flex flex-col gap-4">
         <fieldset disabled={saving} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
           <ConnectionFields state={state} editing />
           {state.draft.type !== channel.type && <p role="alert" className="text-sm text-danger">
@@ -71,7 +71,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
           <CallTestPanel state={state} existing={models} />
         </fieldset>
       </div>
-      <div className="dialog-form-actions">
+      <div className="flex justify-end gap-2 mt-2">
         <Button variant="secondary" isDisabled={saving} onPress={onClose}>取消</Button>
         <Button variant="primary" isPending={saving} onPress={() => formRef.current?.requestSubmit()}>{saving ? '保存中…' : '保存并导入所选模型'}</Button>
       </div>

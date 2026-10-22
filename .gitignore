@@ -13,6 +13,10 @@
 /data/
 config.json
 
+# 本地草稿与工具工作区（设计稿、外部助手记忆，不随仓库分发）
+/tmp/
+.workbuddy/
+
 # 编译产物
 /portunus
 .DS_Store

@@ -1,67 +1,21 @@
-.service-access-grid {
-  display: grid;
-  grid-template-columns: minmax(15rem, 17.5rem) minmax(0, 1fr);
-  align-items: start;
-  gap: 1rem;
-}
-.service-connection-panel { min-width: 0; padding: 18px; border-radius: 16px; }
-.service-network-segment {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: .125rem;
-  padding: .1875rem;
-  border-radius: .625rem;
-  background: var(--surface-secondary);
-}
-.service-network-option {
-  padding: .3125rem .625rem;
-  border-radius: .4375rem;
-  font-size: .75rem;
-  line-height: 1rem;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background-color 150ms, color 150ms;
-}
-.service-network-option[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--accent);
-  box-shadow: 0 1px 3px rgb(0 0 0 / .1);
-}
-.service-network-option:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.service-network-option:disabled { cursor: default; opacity: .5; }
+/* v0.4.1 uses full-width stacked cards and HeroUI controls, not a split workspace. */
+.service-page, .service-access-content { min-width: 0; }
+.service-access-grid { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.service-connection-panel.card, .service-example-panel.card { flex-shrink: 0; min-width: 0; }
+.service-connection-content { min-width: 0; }
+.service-network-segment { display: flex; flex-shrink: 0; gap: 4px; }
 .service-group-trigger { min-height: 4rem; height: auto; padding: .75rem; }
 .service-group-popover { width: var(--trigger-width); max-width: calc(100vw - 3rem); }
 .service-group-popover [role="option"] { min-width: 0; }
-.service-code { max-height: 27rem; tab-size: 2; font-size: 11px; line-height: 1.8; }
-.service-disclosure > summary {
-  cursor: pointer;
-  list-style-position: inside;
-  font-weight: 500;
-  line-height: 1.5rem;
-}
+.service-tool-tabs { overflow-x: auto; flex-shrink: 0; }
+.service-tool-tabs [role="tablist"] { flex-wrap: nowrap; }
+.service-code { max-height: 27rem; tab-size: 2; font-size: 12px; line-height: 1.8; }
+.service-disclosure > summary { cursor: pointer; list-style-position: inside; font-weight: 500; line-height: 1.5rem; }
 .service-disclosure > summary::marker { font-size: .65em; }
-.service-disclosure > summary:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 4px;
-  border-radius: .25rem;
-}
+.service-disclosure > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: .25rem; }
 .service-stream-check { accent-color: var(--accent); width: .9rem; height: .9rem; }
-.service-tool-nav { padding-bottom: .125rem; flex-wrap: wrap; gap: 4px; overflow-x: visible; }
 .service-manual .scroll-mt-5 { scroll-margin-top: 1rem; }
-@media (max-width: 960px) {
-  .service-access-grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 767px) {
   .service-code { max-height: 24rem; }
-}
-
-.service-page { min-width: 0; }
-.service-access-grid > section { border-radius: 16px; min-width: 0; }
-.service-tool-nav .button { font-size: 12px; }
-.service-connection-panel > .mb-5 { margin-bottom: 18px; }
-.service-guide-step > div { padding-left: 0; }
-.service-guide-step h2 { font-size: 14px; margin-bottom: 12px; }
-.service-guide-step h2 > span { width: 24px; height: 24px; font-size: 12px; }
-.service-manual { line-height: 1.8; }
-@media (max-width: 960px) {
-  .service-connection-panel { max-width: none; }
-  .service-tool-nav { flex-wrap: nowrap; overflow-x: auto; }
+  .service-network-segment { flex-wrap: wrap; justify-content: flex-end; }
 }

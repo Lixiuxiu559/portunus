@@ -51,7 +51,7 @@ export default function EditGroupEditor({ group, onClose, onUpdated }) {
   return (
     <>
     <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="dialog-form-content">
+      <div className="flex flex-col gap-4">
       <TextField
         isRequired
         name="name"
@@ -92,7 +92,7 @@ export default function EditGroupEditor({ group, onClose, onUpdated }) {
       <p className="text-xs text-muted">{strategyDescriptions[form.strategy]}</p>
 
       </div>
-        <div className="dialog-form-actions">
+        <div className="flex justify-end gap-2 mt-2">
         <Button variant="secondary" onPress={onClose}>
           取消
         </Button>

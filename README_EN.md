@@ -39,7 +39,7 @@ Portunus brings that work into one desktop app. Connect your providers, organize
 </p>
 <p align="center"><sub>Organize models around your workflow and give them a fallback plan.</sub></p>
 
-> Screenshots show the running product with a separate copy of local data. Channel names and service addresses have been anonymized. The remaining screenshot shows model groups and routing configuration.
+> Screenshots show an earlier running version with a separate copy of local data. Channel names and service addresses have been anonymized. The current source retains top capsule navigation with later page-layout improvements; the screenshot illustrates model groups and routing configuration.
 
 ## Serve clients through model groups
 
@@ -71,9 +71,15 @@ Record counts refer to log rows; retries or target switches can produce several 
 
 Filter by channel, group, or exact request ID; open a record to copy its request ID or error summary. The request association view groups persisted logs by request ID and shows ordinary retries, token-budget compatibility retries, and target switches. Historical logs without an ID stay separate. The latest persisted result is not proof of a final client outcome, and a continuous attempt sequence does not prove completeness. See the [call-record guide (Chinese)](docs/call-records.md).
 
+### Check upstream balances and quotas
+
+Add query sources from an upstream channel card. Built-in adapters cover DeepSeek, SiliconFlow China, OpenRouter, and NewAPI accounts; custom sources use GET/POST and JSON field mappings. Query credentials are configured separately from generation credentials, and accounts and currencies are displayed separately.
+
+Cards show the last queried balance, its timestamp, and a refresh action. Successful values remain visible as they age; failed updates and invalid credentials have separate states. Automatic refresh is off by default. These values do not affect routing, circuit breakers, or call-cost calculation. See the [balance and quota guide (Chinese)](docs/channel-quota.md). This describes the current source tree; packaged availability depends on the Release.
+
 ### Keep everyday maintenance on your desktop
 
-Fetch model lists when saving a channel, on a schedule, or across all channels on demand. Sync adds newly discovered models while preserving existing models; it does not delete missing upstream models or run paid generation checks. Automatically clean up logs by retention period, switch themes, and update inside the app.
+When adding or editing a channel, fetch and select models or enter model names manually. Saving imports only the selected models; it does not trigger a full sync. Scheduled and manual sync remain available. Sync adds newly discovered models while preserving existing models; it does not delete missing upstream models or run paid generation checks. Automatically clean up logs by retention period, switch themes, and update inside the app.
 
 Service Access manages the existing single token and localhost/LAN access mode. In LAN mode, other devices can call `/v1` with the token. Management routes under `/api` accept only real loopback connections and do not trust forwarding headers. Do not expose `/api` through a local reverse proxy; local processes remain inside the management trust boundary.
 
@@ -93,7 +99,7 @@ If your system blocks the first launch, see [Installation help](#installation-he
 
 ### 2. Add a channel and create a group
 
-In Upstream Channels, enter your provider's endpoint, API key, and protocol type, then save to fetch its model list. On the Model Groups home page, select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order.
+In Upstream Channels, choose a provider preset and protocol, enter the endpoint and API key, then fetch and select models or enter their names manually before saving. See the [upstream-channel guide (Chinese)](docs/upstream-channels.md). On the Model Groups home page, select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order.
 
 ### 3. Connect clients and applications
 

@@ -47,8 +47,13 @@ export default function Logs() {
   useEffect(() => { fetchChannels(); }, []);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // 首次成功后，即使结果为空，后续查询也保留内容而不退回首次加载态。
+  const hasLoaded = useRef(false);
+  const [showRefreshing, setShowRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [view, setView] = useState('records');
+  // 已提交的表格视图：旧数据与旧列一起保留，成功后同时切换。
+  const [tableView, setTableView] = useState('records');
   const pageSize = 20;
   // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
@@ -74,9 +79,9 @@ export default function Logs() {
   }, [linkedGroup]);
 
   // targetPage 显式传页码，避免 setPage 与请求闭包页码不一致的双请求竞态
-  const fetchLogs = async (isRefresh = false, targetPage = page) => {
-    // 有数据时使用 refreshing（不遮挡表格），无数据时使用 loading（显示骨架屏）
-    const setRefreshState = isRefresh || logs.data?.length > 0 ? setRefreshing : setLoading;
+  const fetchLogs = async (targetPage = page) => {
+    // 首次成功前保留 loading（包括失败重试）；之后仅显示延迟刷新反馈。
+    const setRefreshState = hasLoaded.current ? setRefreshing : setLoading;
     setRefreshState(true);
     const sequence = ++requestSequence.current;
     try {
@@ -86,21 +91,40 @@ export default function Logs() {
       if (sequence !== requestSequence.current) return;
       setLogs(l || { total: 0, data: [] });
       setStats(s);
+      setTableView(view);
+      hasLoaded.current = true;
       setLoadError(false);
     } catch {
-      // 无数据时进错误态而非伪造空态；stats 保留旧值（表格错误态已表明数据不可信）
-      if (sequence === requestSequence.current && (logs.data?.length || 0) === 0) setLoadError(true);
+      // 切换失败进入目标视图错误态，不能把旧视图数据解释成新视图。
+      if (sequence === requestSequence.current) {
+        if (view !== tableView) {
+          setLogs({ total: 0, data: [] });
+          setTableView(view);
+          setLoadError(true);
+        } else if ((logs.data?.length || 0) === 0) setLoadError(true);
+      }
     } finally {
-      if (sequence === requestSequence.current) { setLoading(false); setRefreshing(false); }
+      if (sequence === requestSequence.current) {
+        setLoading(false); setRefreshing(false); setShowRefreshing(false);
+      }
     }
   };
+
+  // 连续刷新超过 200ms 才显示反馈；快速完成时不闪遮罩。
+  useEffect(() => {
+    if (!refreshing) { setShowRefreshing(false); return undefined; }
+    const timer = setTimeout(() => setShowRefreshing(true), 200);
+    return () => clearTimeout(timer);
+  }, [refreshing]);
+
+  // 离开页面后，未决请求不能再提交数据或加载状态。
+  useEffect(() => () => { requestSequence.current += 1; }, []);
 
   useEffect(() => { fetchLogs(); }, [page, query, view]);
 
   const channelIds = [...new Set([...channels.map((item) => String(item.id)), ...(logs.data || []).map((item) => (item.latest_log || item).channel_id).filter((id) => id > 0).map(String), ...(filters.channel_id !== 'all' ? [filters.channel_id] : [])])];
 
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
-  const advancedFilterCount = [filters.group_name, filters.model_name, filters.client_protocol !== 'all', filters.range].filter(Boolean).length;
 
   const defaultDate = (() => { const d = today(getLocalTimeZone()); return new CalendarDateTime(d.year, d.month, d.day, 0, 0, 0); })();
 
@@ -258,29 +282,11 @@ export default function Logs() {
   const changeView = (next) => {
     if (next === view) return;
     requestSequence.current += 1;
-    setView(next); setPage(1); setLogs({ total: 0, data: [] }); setLoading(true); setRefreshing(false); setLoadError(false); setDetail(null);
+    setView(next); setPage(1); setLoadError(false); setDetail(null);
   };
 
   return (
     <div className="logs-page flex flex-col flex-1 min-h-0">
-      <div className="resource-page-heading logs-heading">
-        <div>
-          <h1 className="text-xl font-semibold">调用记录</h1>
-          <p className="mt-1 text-sm text-muted">追踪模型调用，查看用量与排查结果。</p>
-        </div>
-        <div className="resource-page-actions">
-        <Button
-          size="md"
-          variant="secondary"
-          aria-label="刷新调用记录"
-          onPress={() => fetchLogs(true)}
-          isPending={refreshing}
-          className="logs-refresh-action"
-        >
-          <RotateCw className="size-4" />
-        </Button>
-        </div>
-      </div>
       <div className="logs-toolbar">
       <div className="logs-view-switch" role="group" aria-label="调用记录视图">
         <Button size="sm" variant={view === 'records' ? 'primary' : 'secondary'} aria-pressed={view === 'records'} onPress={() => changeView('records')}>日志记录</Button>
@@ -353,8 +359,6 @@ export default function Logs() {
           <Search className="size-4" /> 查询
         </Button>
 
-        <details className="logs-advanced">
-          <summary>更多筛选{advancedFilterCount > 0 && <span> · 已配置 {advancedFilterCount} 项</span>}</summary>
           <div className="logs-advanced-fields">
             <TextField name="group_name" value={filters.group_name} onChange={(v) => setFilters((f) => ({ ...f, group_name: v }))} className="logs-filter-field">
               <Label>模型分组</Label>
@@ -456,7 +460,16 @@ export default function Logs() {
             )}
 
           </div>
-        </details>
+        <Button
+          size="md"
+          variant="secondary"
+          aria-label="刷新调用记录"
+          onPress={() => fetchLogs()}
+          isPending={showRefreshing}
+          className="logs-refresh-action ml-auto"
+        >
+          <RotateCw className="size-4" />
+        </Button>
       </div>
       <div className="logs-query-summary" aria-label="已生效筛选">
         <span className="logs-query-caption">当前查询</span>
@@ -480,10 +493,10 @@ export default function Logs() {
       <DataTable
         className="logs-table"
         ariaLabel="调用记录"
-        dataSource={view === 'requests' ? (logs.data || []).map((item) => ({ ...item, id: item.key })) : logs.data || []}
-        columns={view === 'requests' ? requestColumns : columns}
+        dataSource={tableView === 'requests' ? (logs.data || []).map((item) => ({ ...item, id: item.key })) : logs.data || []}
+        columns={tableView === 'requests' ? requestColumns : ['created_at', 'model_name', 'group_name', 'client_protocol', 'input_token', 'output_token', 'duration_ms', 'success', 'detail'].map((key) => columns.find((column) => column.key === key))}
         loading={loading}
-        refreshing={refreshing}
+        refreshing={showRefreshing}
         emptyText={
           query.channel_id !== 'all' || query.request_id.trim() || query.group_name || query.model_name || query.client_protocol !== 'all' || query.success !== 'all' || query.range
             ? '没有符合条件的调用记录，可调整或清除筛选'
@@ -498,7 +511,7 @@ export default function Logs() {
       {/* 分页 */}
       <div className="logs-pagination">
         <Typography type="body-sm" className="text-muted">
-          共 {logs.total} {view === 'requests' ? '个关联项' : '条'}，第 {page}/{totalPages} 页
+          共 {logs.total} {tableView === 'requests' ? '个关联项' : '条'}，第 {page}/{totalPages} 页
         </Typography>
         <div className="flex gap-1">
           <Button size="sm" variant="secondary" isDisabled={page <= 1} onPress={() => setPage((p) => p - 1)}>上一页</Button>
@@ -511,12 +524,12 @@ export default function Logs() {
 
 function StatCard({ label, value, detail }) {
   return (
-    <Card className="logs-stat-card">
+    <Card className="logs-stat-card gap-1 px-4 py-2 rounded-2xl">
       <Card.Header className="p-0">
         <Typography type="body-sm" className="text-muted">{label}</Typography>
       </Card.Header>
       <Card.Content className="p-0">
-        <Typography type="body" className="logs-stat-value">{value}</Typography>
+        <Typography type="body" className="font-semibold">{value}</Typography>
         {detail && <Typography type="body-xs" className="mt-1 text-muted">{detail}</Typography>}
       </Card.Content>
     </Card>

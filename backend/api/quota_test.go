@@ -87,6 +87,8 @@ func TestQuotaAPIPreviewSaveRefreshAndSecrets(t *testing.T) {
 	if src.Enabled || calls != 0 || !src.HasToken {
 		t.Fatalf("create must be passive: %+v calls=%d", src, calls)
 	}
+	// 一个渠道只允许一个查询来源：再次创建必须冲突，不能静默追加。
+	quotaRequest(t, r, "POST", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), in, 409)
 	preview := quota.PreviewInput{SourceInput: in, ChannelID: ch.ID, SourceID: src.ID}
 	preview.Credentials = nil
 	w = quotaRequest(t, r, "POST", "/api/quota-sources/preview", preview, 200)

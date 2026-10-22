@@ -1,18 +1,3 @@
-.model-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
-.model-toolbar .resource-model-filters { margin-bottom: 0; gap: 8px; flex: 1; }
-.model-search { width: 255px; min-width: 180px; }
-.model-channel-filter { width: 175px; }
-.model-count { font-size: 12px; white-space: nowrap; color: var(--muted); }
-.model-page .resource-grid { align-items: stretch; }
-.model-page .resource-card { gap: 16px; }
-.model-page .model-card-name { white-space: normal; overflow-wrap: anywhere; padding-top: 5px; font-weight: 600; line-height: 22px; }
-.model-card-footer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; margin-top: auto; border-top: 1px solid color-mix(in oklch, var(--muted) 12%, transparent); }
-.model-source-label { display: block; margin-bottom: 2px; font-size: 10px; color: var(--muted); }
-.model-card-footer .resource-card-source { color: var(--foreground); font-size: 12px; }
-.model-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; flex-shrink: 0; padding: 16px 0 0; margin-top: 16px; border-top: 1px solid color-mix(in oklch, var(--muted) 14%, transparent); }
-.model-page-controls { display: flex; align-items: center; gap: 6px; }
-.model-page-number { color: var(--muted); font-size: 12px; margin-right: 8px; white-space: nowrap; }
-@media (max-width: 1090px) {
-  .model-search { width: 220px; }
-  .model-channel-filter { width: 160px; }
-}
+/* 网格、卡片、表单和分页直接使用 v0.4.1 的原版控件及 utility 层级。 */
+.model-page .model-filters { min-width: 0; }
+.model-page .model-filters .select__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

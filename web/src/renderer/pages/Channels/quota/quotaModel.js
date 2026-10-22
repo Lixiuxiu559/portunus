@@ -18,7 +18,7 @@ export function quotaPayload(draft, source, query = false) {
     name: draft.name.trim(), adapter_id: draft.adapter_id, schema_version: 1,
     enabled: query || draft.enabled, query_base_url: draft.query_base_url.trim(),
     credential_mode: draft.credential_mode, options: Object.fromEntries(Object.entries(options).filter(([, value]) => value !== '')),
-    auto_refresh_minutes: query ? 0 : Number(draft.auto_refresh_minutes),
+    auto_refresh_minutes: Number(draft.auto_refresh_minutes),
     ...(source ? { expected_revision: source.config_revision } : {}),
   };
   if (draft.credential_mode === 'dedicated') {
@@ -95,7 +95,3 @@ export function createCachePoller({ load, visible, interval, cancel, timers = gl
 
 const quotaRoot = (value = '') => value.trim().replace(/\/+$/, '');
 export const canKeepQuotaToken = (source, draft) => Boolean(source?.has_token && source.adapter_id === draft.adapter_id && (draft.adapter_id !== 'custom.balance' || quotaRoot(source.query_base_url) === quotaRoot(draft.query_base_url)));
-export function duplicateQuotaSource(sources, draft, sourceId) {
-  const root = draft.query_base_url.trim().replace(/\/+$/, '');
-  return sources.find((source) => source.id !== sourceId && source.adapter_id === draft.adapter_id && source.query_base_url.trim().replace(/\/+$/, '') === root);
-}

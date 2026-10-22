@@ -1,20 +1,11 @@
-.channel-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; flex-shrink: 0; }
-.channel-search { display: flex; align-items: center; gap: 9px; width: min(100%, 390px); min-height: 40px; padding: 0 12px; border: 1px solid color-mix(in oklch, var(--muted) 20%, transparent); border-radius: 12px; color: var(--muted); background: color-mix(in oklch, var(--surface) 60%, transparent); }
+/* 新增渠道搜索沿用发布版表单的实底、细描边材质。 */
+.channel-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; flex-shrink: 0; }
+.channel-search { display: flex; align-items: center; gap: 9px; width: min(100%, 390px); min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); background: var(--surface-secondary); }
 .channel-search:focus-within { border-color: var(--accent); outline: 2px solid color-mix(in oklch, var(--accent) 15%, transparent); }
 .channel-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; color: var(--foreground); font-size: 13px; }
 .channel-search input::-webkit-search-cancel-button { display: none; }
 .channel-search button { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 28px; cursor: pointer; border-radius: 6px; }
 .channel-search button:focus-visible { outline: 2px solid var(--accent); }
 .channel-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.channel-page .resource-grid { align-items: stretch; }
-.channel-page .resource-card { gap: 14px; }
-.channel-card-heading { flex-direction: row; align-items: flex-start; flex-shrink: 0; }
-.channel-provider-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 13px; background: color-mix(in oklch, var(--accent) 8%, transparent); }
-.channel-page .channel-card-name { white-space: normal; overflow-wrap: anywhere; font-size: 16px; line-height: 23px; font-weight: 600; }
-.channel-provider-label { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
-.channel-card-actions { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-top: auto; padding-top: 8px; }
-.channel-delete { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; margin-left: auto; color: var(--muted); cursor: pointer; border-radius: 8px; }
-.channel-delete:hover { color: var(--danger); background: color-mix(in oklch, var(--danger) 8%, transparent); }
-.channel-delete:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
 .channel-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 48px 16px; color: var(--muted); text-align: center; font-size: 13px; }
 .channel-empty strong { color: var(--foreground); font-size: 16px; }

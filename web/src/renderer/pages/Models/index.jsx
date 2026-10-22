@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Typography, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
-import { Plus, Trash2, RotateCw, X, Search, Box } from 'lucide-react';
+import { Button, Typography, Chip, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
+import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
@@ -118,30 +118,21 @@ export default function Models() {
 
   return (
     <div className="model-page flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="resource-page-heading">
-        <div>
-          <h1 className="text-xl font-semibold">上游模型</h1>
-          <p className="mt-1 text-sm text-muted">按渠道维护分组可使用的模型资源。客户端应填写分组名称，而不是这里的上游模型 ID。</p>
-        </div>
-        <div className="resource-page-actions">
-          <Button variant="secondary" size="md" onPress={() => performSearch(queryChannel, queryName, page)} isPending={loading || refreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
-          <Button variant="primary" size="md" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
-        </div>
-      </div>
-      <div className="resource-toolbar model-toolbar">
-        <div className="model-filters resource-model-filters">
-        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="搜索模型名称，回车查询" className="model-search resource-search" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
+      <div className="model-filters flex flex-wrap items-center gap-2 mb-3 shrink-0">
+        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
         {draftName && <IconButton size="sm" label="清除名称筛选" onClick={() => { setDraftName(''); performSearch(draftChannel, '', 1); }}><X className="size-3.5" /></IconButton>}
-        <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="model-channel-filter">
+        <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="w-52">
           <Select.Trigger aria-label="按上游渠道筛选" aria-labelledby={null}><Select.Value /><Select.Indicator /></Select.Trigger>
-          <Select.Popover className="resource-channel-popover"><ListBox aria-label="上游渠道">
+          <Select.Popover ><ListBox aria-label="上游渠道">
             <ListBox.Item id="all" textValue="全部渠道">全部渠道<ListBox.ItemIndicator /></ListBox.Item>
             {channels.map((c) => <ListBox.Item key={c.id} id={String(c.id)} textValue={c.name}><span className="min-w-0 truncate" title={c.name}>{c.name}</span><ListBox.ItemIndicator /></ListBox.Item>)}
           </ListBox></Select.Popover>
         </Select>
         <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}><Search className="size-4" />查询</Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" size="sm" onPress={() => performSearch(queryChannel, queryName, page)} isPending={loading || refreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
+          <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
         </div>
-        <span className="resource-count model-count" role="status">{queryName || queryChannel !== 'all' ? '筛选结果 · ' : ''}{total} 个模型</span>
       </div>
       {loading ? <div className="flex justify-center py-12"><Spinner size="sm" /></div>
       : loadError && models.length === 0 ? <div className="flex flex-col items-center gap-3 py-16 text-muted">
@@ -154,26 +145,28 @@ export default function Models() {
             : <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>}
         </div>
       : <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="resource-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {models.map((m) => {
               const channelName = channelMap[m.channel_id] || m.channel_id;
-              return <Card key={m.id} className="resource-card">
-                <Card.Header className="flex-row items-start gap-3 shrink-0">
-                  <span className="resource-card-symbol" aria-hidden="true"><Box className="size-4" /></span>
-                  <Typography className="resource-card-title resource-card-model model-card-name" title={m.name}>{m.name}</Typography>
+              return <Card key={m.id} className="gap-4 p-5">
+                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                  <Typography className="min-w-0 flex-1 truncate font-medium text-lg" title={m.name}>{m.name}</Typography>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
+                  </div>
                 </Card.Header>
-                <Card.Footer className="model-card-footer">
-                  <div className="min-w-0"><span className="model-source-label">上游渠道</span><span className="resource-card-source" title={String(channelName)}>{channelName}</span></div>
-                  <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
-                </Card.Footer>
+                <Card.Content className="min-w-0">
+                  <Chip variant="soft" size="sm" color="default" className="min-w-0 max-w-[60%]">
+                    <span className="truncate" title={String(channelName)}>{channelName}</span>
+                  </Chip>
+                </Card.Content>
               </Card>;
             })}
           </div>
         </div>}
-      <div className="model-pagination">
-        <Typography type="body-sm" className="text-muted">{total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)}，共 ${total} 个` : '0 个模型'}</Typography>
-        <div className="model-page-controls">
-          <span className="model-page-number">第 {page} / {Math.max(1, Math.ceil(total / pageSize))} 页</span>
+      <div className="flex items-center justify-between mt-3 shrink-0">
+        <Typography type="body-sm" className="text-muted">共 {total} 条，第 {page}/{Math.max(1, Math.ceil(total / pageSize))} 页</Typography>
+        <div className="flex gap-1">
           <Button size="sm" variant="secondary" isDisabled={page <= 1 || loading || refreshing} onPress={() => handlePageChange(page - 1)}>上一页</Button>
           <Button size="sm" variant="secondary" isDisabled={page >= Math.max(1, Math.ceil(total / pageSize)) || loading || refreshing} onPress={() => handlePageChange(page + 1)}>下一页</Button>
         </div>

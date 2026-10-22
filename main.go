@@ -35,6 +35,11 @@ func main() {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}
 
+	// 渠道级 1:1：先收敛历史多来源，再由 AutoMigrate 建立唯一索引。
+	if err := quota.DedupeSources(shared.DB); err != nil {
+		log.Fatalf("收敛余额查询来源失败: %v", err)
+	}
+
 	if err := shared.AutoMigrate(
 		&channel.Channel{},
 		&model.Model{},

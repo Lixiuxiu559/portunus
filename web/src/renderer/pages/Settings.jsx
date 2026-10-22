@@ -92,17 +92,11 @@ export default function Settings() {
 
   return (
     <div className="settings-page flex flex-col flex-1 min-h-0">
-      <div className="resource-page-heading">
-        <div>
-          <h1>设置</h1>
-          <p>管理模型同步与应用更新。</p>
-        </div>
-      </div>
       <div className="settings-sections flex-1 min-h-0 overflow-y-auto no-scrollbar">
       {/* 上游模型同步 */}
-      <Card className="settings-card">
+      <Card className="settings-card gap-4 p-5">
         <Card.Header className="p-0">
-          <Typography className="settings-section-title">
+          <Typography type="body-sm" className="settings-section-title text-muted">
             上游模型同步
           </Typography>
         </Card.Header>
@@ -154,8 +148,8 @@ export default function Settings() {
         </Card.Content>
       </Card>
 
-      <Card className="settings-card">
-        <Card.Header className="p-0"><Typography className="settings-section-title">服务接入</Typography></Card.Header>
+      <Card className="settings-card gap-4 p-5">
+        <Card.Header className="p-0"><Typography type="body-sm" className="settings-section-title text-muted">服务接入</Typography></Card.Header>
         <Card.Content className="settings-access p-0">
           <Typography type="body-sm" className="settings-hint">网关地址、访问令牌、监听范围及 API / 客户端接入示例统一在服务接入页维护。</Typography>
           <Link to="/clients" className="settings-access-link text-sm text-accent hover:underline">前往服务接入 →</Link>
@@ -163,9 +157,9 @@ export default function Settings() {
       </Card>
 
       {/* 版本信息 */}
-      <Card className="settings-card">
+      <Card className="settings-card gap-4 p-5">
         <Card.Header className="p-0">
-          <Typography className="settings-section-title">
+          <Typography type="body-sm" className="settings-section-title text-muted">
             关于 {window.api?.appName || "Portunus"}
           </Typography>
         </Card.Header>
@@ -186,13 +180,13 @@ export default function Settings() {
                 </a>
                 <div className="settings-version">
                   <Tag className="size-3.5 shrink-0" />
-                  <Typography className="text-xs text-muted">当前 v{appVersion || '—'}</Typography>
+                  <Typography className="text-sm text-muted">当前 v{appVersion || '—'}</Typography>
                 </div>
                 {latestVersion && (
                   <Typography
-                    className={`settings-latest-version text-xs ${available ? 'text-accent' : 'text-muted'}`}
+                    className={`settings-latest-version text-sm ${available ? 'text-accent' : 'text-muted'}`}
                   >
-                    最新 v{latestVersion}
+                    · 最新 v{latestVersion}
                     {available ? '（可更新）' : '（已是最新）'}
                   </Typography>
                 )}

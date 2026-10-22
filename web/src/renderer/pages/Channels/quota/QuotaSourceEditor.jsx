@@ -3,14 +3,13 @@ import { Button } from '@heroui/react';
 import CustomQuotaEditor from './CustomQuotaEditor';
 import useQuotaDraft from './useQuotaDraft';
 import { QuotaSourceState } from './QuotaSummary';
-import { canKeepQuotaToken, duplicateQuotaSource } from './quotaModel';
+import { canKeepQuotaToken } from './quotaModel';
 
-export default function QuotaSourceEditor({ channelId, source, adapters, sources, onSaved, onCommitted, onCancel }) {
-  const state = useQuotaDraft({ channelId, source, adapters, sources, onSaved, onCommitted });
+export default function QuotaSourceEditor({ channelId, source, adapters, onSaved, onCommitted, onCancel }) {
+  const state = useQuotaDraft({ channelId, source, adapters, onSaved, onCommitted });
   const { draft, patch, pending } = state;
   const adapter = adapters.find((item) => item.id === draft.adapter_id);
   const keepToken = canKeepQuotaToken(source, draft);
-  const duplicate = duplicateQuotaSource(sources, draft, source?.id);
   const form = useRef(null);
   const scroll = useRef(null);
   useEffect(() => {
@@ -30,7 +29,6 @@ export default function QuotaSourceEditor({ channelId, source, adapters, sources
       </select></label>
       </div>
       {adapter?.description && <p className="text-xs text-muted">{adapter.description}</p>}
-      {duplicate && <p role="status" className="text-xs text-muted">与「{duplicate.name}」使用相同查询类型和地址，可能重复展示同一账户额度。</p>}
       <div className="quota-form-grid">
       <label>来源名称<input required value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
       <label>查询根地址<input required type="url" value={draft.query_base_url} onChange={(event) => patch({ query_base_url: event.target.value, ...(draft.adapter_id === 'custom.balance' ? { token: '', clearToken: false } : {}) })} /></label>
@@ -65,7 +63,7 @@ export default function QuotaSourceEditor({ channelId, source, adapters, sources
       <label>自动刷新间隔（分钟，0 为关闭，1–60）<input type="number" min="0" max="60" step="1" required value={draft.auto_refresh_minutes}
         onChange={(event) => patch({ auto_refresh_minutes: event.target.value })} /></label>
       </div>
-      <p className="quota-help">新来源默认关闭。“测试草稿”不保存；“保存并查询”启用来源并只查询一次，定时刷新设为关闭。</p>
+      <p className="quota-help">查询默认关闭。“测试草稿”不保存；“保存并查询”启用查询并立即查询一次，定时刷新按上方间隔执行。</p>
       </section>
     </fieldset>
     {state.preview && <div className="quota-preview"><h4 className="text-sm font-medium mb-2">草稿测试结果（未保存）</h4><QuotaSourceState view={state.preview} details /></div>}

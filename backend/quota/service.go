@@ -97,6 +97,14 @@ func (s *Service) load(ctx context.Context, id int64) (src Source, st State, key
 }
 func (s *Service) Create(ctx context.Context, channelID int64, in SourceInput) (out SourceView, err error) {
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 一个渠道只对应一个上游账户，余额查询配置是单例；已有配置时要求编辑原记录。
+		var existing int64
+		if e := tx.Model(&Source{}).Where("channel_id = ?", channelID).Count(&existing).Error; e != nil {
+			return e
+		}
+		if existing > 0 {
+			return statusError(409, "该渠道已配置查询来源，请编辑现有配置")
+		}
 		key, e := s.loader(tx, channelID)
 		if e != nil {
 			return e

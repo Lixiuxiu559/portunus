@@ -241,7 +241,12 @@ func TestServiceGlobalConcurrencyAndCancelNoBackoff(t *testing.T) {
 	in.Enabled = true
 	var ids []int64
 	for i := 0; i < 3; i++ {
-		src, e := s.Create(ctx, 1, in)
+		// 每个渠道只允许一个查询来源；并发限制跨渠道验证。
+		db := s.db
+		if e := db.Create(&quotaTestChannel{ID: int64(i + 2), Key: "channel-secret"}).Error; e != nil {
+			t.Fatal(e)
+		}
+		src, e := s.Create(ctx, int64(i+1), in)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -551,5 +556,76 @@ func TestServiceNoopRollbackAndOtherCallerDoNotCancelTask(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("caller cancel did not finish")
+	}
+}
+
+func TestServiceRejectsSecondSourcePerChannel(t *testing.T) {
+	s := quotaServiceTest(t)
+	ctx := context.Background()
+	if _, err := s.Create(ctx, 1, quotaInput()); err != nil {
+		t.Fatal(err)
+	}
+	_, err := s.Create(ctx, 1, quotaInput())
+	quotaStatus(t, err, 409)
+}
+
+func TestDedupeSourcesKeepsMostRecentSuccess(t *testing.T) {
+	s := quotaServiceTest(t)
+	db := s.db
+	if err := db.Migrator().DropIndex(&Source{}, "uniq_channel_quota_sources_channel_id"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Truncate(time.Second)
+	older := now.Add(-time.Hour)
+
+	newSource := func(channelID int64, name string, updatedAt time.Time) Source {
+		src := Source{ChannelID: channelID, Name: name, AdapterID: "deepseek.balance", CredentialMode: CredentialInherit, SchemaVersion: 1}
+		if err := db.Create(&src).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&Source{}).Where("id = ?", src.ID).UpdateColumn("updated_at", updatedAt).Error; err != nil {
+			t.Fatal(err)
+		}
+		return src
+	}
+
+	// 渠道 1：有成功记录的来源优先，即使它不是最后更新的。
+	stale := newSource(1, "stale", now)
+	succeeded := newSource(1, "succeeded", older)
+	if err := db.Create(&State{SourceID: succeeded.ID, LastSuccessAt: &now}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// 渠道 2：都没有成功记录时保留最近更新的一条。
+	oldUpdated := newSource(2, "old-updated", older)
+	newUpdated := newSource(2, "new-updated", now)
+	// 渠道 3：单来源不受影响。
+	single := newSource(3, "single", older)
+
+	if err := DedupeSources(db); err != nil {
+		t.Fatal(err)
+	}
+
+	assertKept := func(channelID, wantID int64) {
+		t.Helper()
+		var sources []Source
+		if err := db.Where("channel_id = ?", channelID).Find(&sources).Error; err != nil {
+			t.Fatal(err)
+		}
+		if len(sources) != 1 || sources[0].ID != wantID {
+			t.Fatalf("channel %d: want source %d, got %+v", channelID, wantID, sources)
+		}
+	}
+	assertKept(1, succeeded.ID)
+	assertKept(2, newUpdated.ID)
+	assertKept(3, single.ID)
+
+	for _, dropped := range []int64{stale.ID, oldUpdated.ID} {
+		var states int64
+		if err := db.Model(&State{}).Where("source_id = ?", dropped).Count(&states).Error; err != nil {
+			t.Fatal(err)
+		}
+		if states != 0 {
+			t.Fatalf("source %d state not cleaned", dropped)
+		}
 	}
 }

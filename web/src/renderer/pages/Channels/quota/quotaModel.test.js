@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { headersWithoutToken } from './customQuotaModel.js';
 import assert from 'node:assert/strict';
-import { quotaDraft, quotaPayload, quotaValue, visibleSnapshot, createRequestGate, createCachePoller, canKeepQuotaToken, duplicateQuotaSource, formatQuotaRelativeTime } from './quotaModel.js';
+import { quotaDraft, quotaPayload, quotaValue, visibleSnapshot, createRequestGate, createCachePoller, canKeepQuotaToken, formatQuotaRelativeTime } from './quotaModel.js';
 
 const adapter = { id: 'fixture.balance', name: '测试余额', default_base_url: 'https://example.test', credential_modes: ['inherit_channel_key', 'dedicated'] };
 
@@ -25,12 +25,13 @@ test('读取来源仅初始化脱敏草稿，Token 留空不清除，清除与�
   assert.equal(quotaPayload(draft, source).expected_revision, 3);
 });
 
-test('保存并查询只打开一次主动查询，明确关闭定时', () => {
+test('保存并查询保留表单间隔，只额外启用并立即查询一次', () => {
   const draft = { ...quotaDraft(null, adapter), auto_refresh_minutes: '5' };
   assert.equal(quotaPayload(draft).auto_refresh_minutes, 5);
   const query = quotaPayload(draft, null, true);
   assert.equal(query.enabled, true);
-  assert.equal(query.auto_refresh_minutes, 0);
+  assert.equal(query.auto_refresh_minutes, 5);
+  assert.equal(quotaPayload({ ...draft, auto_refresh_minutes: '0' }, null, true).auto_refresh_minutes, 0);
 });
 
 test('站点原始额度与显式换算配置均按原值传输，无浮点计算或币种猜测', () => {
@@ -95,13 +96,10 @@ test('缓存读取失败后仍调度；隐藏停止，重新可见读取，卸�
 });
 
 
-test('切换适配器后不能承诺保留旧Token；同类型同地址重复来源非阻塞提示', () => {
+test('切换适配器后不能承诺保留旧 Token', () => {
   const source = { id: 1, adapter_id: 'old', query_base_url: 'https://example.test/', has_token: true, name: '已有来源' };
   assert.equal(canKeepQuotaToken(source, { adapter_id: 'old' }), true);
   assert.equal(canKeepQuotaToken(source, { adapter_id: 'new' }), false);
-  assert.equal(duplicateQuotaSource([source], { adapter_id: 'old', query_base_url: 'https://example.test' })?.id, 1);
-  assert.equal(duplicateQuotaSource([source], { adapter_id: 'old', query_base_url: 'https://example.test' }, 1), undefined);
-  assert.equal(duplicateQuotaSource([source], { adapter_id: 'new', query_base_url: 'https://example.test' }), undefined);
 });
 
 test('自定义结构化配置深拷贝，按字符串传输单位和金额路径', () => {

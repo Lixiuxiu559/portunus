@@ -22,7 +22,7 @@ function failureLabel(failure) {
   return { authentication: '凭据无效', permission: '无查询权限', configuration: '请检查查询设置', rate_limited: '查询过于频繁' }[failure?.category] || '更新失败';
 }
 
-function CompactSource({ source, multiple, onConfigure, onRefresh, pending, refreshError, showSettings }) {
+function CompactSource({ source, onConfigure, onRefresh, pending, refreshError }) {
   const view = source.state;
   const snapshot = visibleSnapshot(view);
   const items = snapshot?.items || [];
@@ -31,7 +31,7 @@ function CompactSource({ source, multiple, onConfigure, onRefresh, pending, refr
   const cooling = view?.next_allowed_at && new Date(view.next_allowed_at).getTime() > Date.now();
   const refreshTitle = !source.enabled ? '先在余额查询设置中启用此来源' : cooling ? `可再次查询：${formatQuotaTime(view.next_allowed_at)}` : busy ? '正在更新余额' : '刷新余额';
   const summary = source.enabled ? quotaStatus[view?.status] || '尚未查询' : '查询已关闭';
-  const heading = multiple ? source.name : items.length ? items.every((item) => item.kind === 'balance' && item.unit?.kind === 'money') ? '账户余额' : '可用额度' : '余额查询';
+  const heading = items.length ? items.every((item) => item.kind === 'balance' && item.unit?.kind === 'money') ? '账户余额' : '可用额度' : '余额查询';
   return <section className="quota-compact-source" aria-label={source.name}>
     <div className="quota-compact-heading">
       <span className="quota-compact-name" title={source.name}>{heading}</span>
@@ -40,7 +40,7 @@ function CompactSource({ source, multiple, onConfigure, onRefresh, pending, refr
           disabled={!source.enabled || busy || Boolean(cooling)} onClick={() => { onRefresh?.(source)?.catch(() => {}); }}>
           <RefreshCw size={13} className={busy ? 'quota-refresh-spinning' : ''} aria-hidden="true" />
         </button>
-        {showSettings && <button type="button" className="quota-icon-button" title="余额查询设置" aria-label="余额查询设置" onClick={onConfigure}><Settings2 size={14} aria-hidden="true" /></button>}
+        <button type="button" className="quota-icon-button" title="余额查询设置" aria-label="余额查询设置" onClick={onConfigure}><Settings2 size={14} aria-hidden="true" /></button>
       </div>
     </div>
     {!!items.length && <div className="quota-compact-values">
@@ -56,13 +56,17 @@ function CompactSource({ source, multiple, onConfigure, onRefresh, pending, refr
   </section>;
 }
 
+/**
+ * 渠道卡片上的余额摘要：渠道级 1:1，只读取第一个（也是唯一）查询来源。
+ * 接口仍以数组返回，便于与后端保持一致并兼容旧响应。
+ */
 export default function QuotaSummary({ sources = [], error, loading, onConfigure, onRefresh, pending = {}, refreshErrors = {} }) {
+  const source = sources[0] || null;
   return <div className="quota-card-summary">
-    {sources.slice(0, 2).map((source, index) => <CompactSource key={source.id} source={source} multiple={sources.length > 1}
-      onConfigure={onConfigure} onRefresh={onRefresh} pending={pending[source.id]} refreshError={refreshErrors[source.id]} showSettings={index === 0} />)}
-    {sources.length > 2 && <button type="button" className="quota-more-items" onClick={onConfigure}>查看全部 {sources.length} 个查询来源</button>}
+    {source && <CompactSource source={source}
+      onConfigure={onConfigure} onRefresh={onRefresh} pending={pending[source.id]} refreshError={refreshErrors[source.id]} />}
     {error && <p role="alert" className="quota-summary-error">余额暂未载入</p>}
-    {!sources.length && <button type="button" className="quota-empty-link" onClick={onConfigure} disabled={loading}>
+    {!source && <button type="button" className="quota-empty-link" onClick={onConfigure} disabled={loading}>
       <Wallet size={14} aria-hidden="true" /><span>{loading ? '正在读取余额…' : '查询余额'}</span><Settings2 size={13} aria-hidden="true" />
     </button>}
   </div>;

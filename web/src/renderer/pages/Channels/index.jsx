@@ -5,6 +5,7 @@ import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
 import EditChannelEditor from './EditChannelEditor';
 import ProviderIcon from '../../components/ProviderIcon';
+import IconButton from '../../components/IconButton';
 import ExpandEditor from '../../components/ExpandEditor';
 import { captureCardRect } from '../../utils/expandRect';
 import { listChannels, syncChannel } from '../../api';
@@ -64,12 +65,8 @@ export default function Channels() {
 
   return (
     <div className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="resource-page-heading">
-        <div>
-          <h1 className="text-xl font-semibold">上游渠道</h1>
-          <p className="mt-1 text-sm text-muted">统一接入官方 API 和各类中转站。获取模型列表后，将模型加入分组对外提供服务。</p>
-        </div>
-        <div className="resource-page-actions">
+      <div className="flex items-center justify-end mb-4 shrink-0">
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             size="md"
@@ -86,13 +83,13 @@ export default function Channels() {
         </div>
       </div>
 
-      {!loading && !loadError && channels.length > 0 && <div className="resource-toolbar channel-toolbar">
-        <label className="channel-search resource-search">
+      {!loading && !loadError && channels.length > 0 && <div className="channel-toolbar">
+        <label className="channel-search">
           <Search className="size-4 shrink-0" aria-hidden="true" />
           <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
           {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
         </label>
-        <span className="resource-count channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
+        <span className="channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
       </div>}
 
       {loading ? (
@@ -123,16 +120,24 @@ export default function Channels() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          <div className="resource-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {visibleChannels.map((ch) => (
-              <Card key={ch.id} data-expand-card className="resource-card">
-                <Card.Header className="channel-card-heading">
-                  <div className="resource-card-identity">
-                    <span className="channel-provider-icon"><ProviderIcon type={ch.type} className="size-6 shrink-0" /></span>
-                    <div className="min-w-0 flex-1">
-                      <Typography className="resource-card-title channel-card-name" title={ch.name}>{ch.name}</Typography>
-                      <span className="channel-provider-label">{ch.provider_id && ch.provider_id !== 'generic' ? ch.provider_id : '自定义渠道'}</span>
-                    </div>
+              <Card key={ch.id} data-expand-card className="gap-4 p-5">
+                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <ProviderIcon type={ch.type} className="size-6 shrink-0" />
+                    <Typography className="font-medium text-lg truncate" title={ch.name}>{ch.name}</Typography>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <IconButton label={`同步渠道 ${ch.name} 的全部模型`} onClick={() => handleSync(ch)}
+                      disabled={syncingId === ch.id || ch.connection_options?.model_discovery === 'manual'}>
+                      <RefreshCw className={`size-4 ${syncingId === ch.id ? 'animate-spin' : ''}`} />
+                    </IconButton>
+                    <IconButton label={`编辑渠道 ${ch.name}`} onClick={(e) => {
+                      setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
+                      setEditTarget(ch);
+                    }}><Pencil className="size-4" /></IconButton>
+                    <IconButton label={`删除渠道 ${ch.name}`} onClick={() => setDeleteTarget(ch)} danger><Trash2 className="size-4" /></IconButton>
                   </div>
                 </Card.Header>
 
@@ -140,28 +145,17 @@ export default function Channels() {
                   <Chip variant="soft" size="sm">
                     {ch.type.replace(/_/g, ' ')}
                   </Chip>
-                  <div className="resource-card-address">
-                    <code
+                  <div className="mt-3">
+                    <div className="text-xs text-muted mb-1">Base URL</div>
+                    <span className="block truncate font-mono text-xs text-foreground/70"
                       title={ch.base_url}
                     >
                       {ch.base_url}
-                    </code>
+                    </span>
                   </div>
                   <QuotaSummary sources={quota.summaries[ch.id]} error={quota.error} loading={quota.loading}
                     onConfigure={() => setQuotaTarget(ch)} onRefresh={quota.refresh} pending={quota.pending} refreshErrors={quota.refreshErrors} />
                 </Card.Content>
-                <Card.Footer className="channel-card-actions">
-                  <Button variant="secondary" size="sm" onPress={(e) => {
-                    setEditRect(captureCardRect(e.target.closest('[data-expand-card]')));
-                    setEditTarget(ch);
-                  }} aria-label={`编辑渠道 ${ch.name}`}><Pencil className="size-3.5" />编辑</Button>
-                  <Button variant="tertiary" size="sm" onPress={() => handleSync(ch)}
-                    isDisabled={syncingId === ch.id || ch.connection_options?.model_discovery === 'manual'}
-                    isPending={syncingId === ch.id} aria-label={`同步渠道 ${ch.name} 的全部模型`}>
-                    <RefreshCw className="size-3.5" />同步模型
-                  </Button>
-                  <button type="button" className="channel-delete" onClick={() => setDeleteTarget(ch)} aria-label={`删除渠道 ${ch.name}`} title={`删除渠道 ${ch.name}`}><Trash2 className="size-3.5" /></button>
-                </Card.Footer>
               </Card>
             ))}
           </div>

@@ -7,11 +7,11 @@ import useLiquidNav from '../hooks/useLiquidNav';
 import '../workspace.css';
 
 export const tabs = [
-  { id: 'groups', label: '模型分组', path: '/groups' },
-  { id: 'channels', label: '上游渠道', path: '/channels' },
-  { id: 'models', label: '上游模型', path: '/models' },
-  { id: 'clients', label: '服务接入', path: '/clients' },
-  { id: 'logs', label: '调用记录', path: '/logs' },
+  { id: 'channels', label: '渠道', path: '/channels' },
+  { id: 'models', label: '模型', path: '/models' },
+  { id: 'groups', label: '分组', path: '/groups' },
+  { id: 'logs', label: '日志', path: '/logs' },
+  { id: 'clients', label: '客户端', path: '/clients' },
   { id: 'settings', label: '设置', path: '/settings' },
 ];
 
@@ -27,7 +27,7 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <a href="#workspace-content" className="app-skip-link" onClick={(event) => { event.preventDefault(); document.getElementById('workspace-content')?.focus(); }}>跳转到内容</a>
-      <header className="app-topbar">
+      <header className="app-topbar glass">
         <div className="app-topbar-brand">
           <img src={logo} alt="" aria-hidden="true" />
           <span className={`brand-name${isDev ? ' brand-name--dev' : ''}`} title={isDev ? '开发环境 · 13061' : undefined}>{appName}</span>

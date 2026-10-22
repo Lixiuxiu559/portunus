@@ -102,12 +102,13 @@ func TestCustomQuotaAPINoAuthAndInvalidConfiguration(t *testing.T) {
 		t.Fatal("cache read sent query")
 	}
 	in.Options.Custom.Request.Headers = map[string]string{"Authorization": "Bearer quota-private-token"}
-	quotaRequest(t, r, "POST", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), in, 400)
+	quotaRequest(t, r, "PUT", fmt.Sprintf("/api/quota-sources/%d", src.ID), in, 400)
 	in = customQuotaInput()
 	in.AdapterID = "deepseek.balance"
 	in.QueryBaseURL = "https://api.deepseek.com"
 	in.CredentialMode = "inherit_channel_key"
-	quotaRequest(t, r, "POST", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), in, 400)
+	in.ExpectedRevision = src.ConfigRevision
+	quotaRequest(t, r, "PUT", fmt.Sprintf("/api/quota-sources/%d", src.ID), in, 400)
 	if calls != 1 {
 		t.Fatal("invalid custom config sent request")
 	}

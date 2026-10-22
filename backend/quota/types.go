@@ -59,7 +59,7 @@ type CredentialPatch struct {
 
 type Source struct {
 	ID                 int64 `gorm:"primaryKey"`
-	ChannelID          int64 `gorm:"not null;index"`
+	ChannelID          int64 `gorm:"not null;uniqueIndex:uniq_channel_quota_sources_channel_id"`
 	Name               string
 	AdapterID          string
 	SchemaVersion      int

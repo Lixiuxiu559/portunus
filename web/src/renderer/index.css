@@ -1,7 +1,5 @@
 /* HeroUI v3 样式（内部已引入 Tailwind CSS v4），必须放在最前 */
 @import '@heroui/styles';
-@import './resource-style.css';
-@import './dialog-style.css';
 
 /* 本地字体：Inter（正文拉丁/数字）+ JetBrains Mono（等宽）；中文回退系统字体（苹方/微软雅黑） */
 @font-face {
@@ -191,7 +189,7 @@ body {
   position: absolute;
   border-radius: 50%;
   filter: blur(64px);
-  opacity: .28;
+  opacity: 1;
   will-change: transform;
   animation: blob-drift 24s ease-in-out infinite;
 }
@@ -278,8 +276,8 @@ html.dark {
     color-mix(in oklch, var(--surface) 58%, transparent)
   );
   background-image: var(--glass-noise);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(200%);
   /* 顶亮下暗受光；底部内侧弱反光与宿主 border-b 暗线构成"外暗内亮"厚度双圈 */
   box-shadow:
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -303,12 +301,11 @@ html.dark .glass {
  * 质感四件套：内亮外暗双圈描边（厚度）、顶部 specular + 底部弱反光（受光不对称）、
  * 磨砂颗粒噪声（消除纯 blur 的塑料感）、分层悬浮投影（elevation）。
  */
-/* 前缀声明在前、标准声明在后，确保打包后保留 Chromium 使用的标准模糊属性。 */
 .modal__dialog {
   background-color: color-mix(in oklch, var(--surface) 80%, transparent);
   background-image: var(--glass-noise);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
   backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
   box-shadow:
     var(--glass-shadow-float),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -323,8 +320,8 @@ html.dark .modal__dialog {
 
 .modal__backdrop {
   background: color-mix(in oklch, var(--background) 55%, transparent);
-  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* 暗色蒙层改用近黑 scrim：背景世界整体沉下去，让玻璃边缘高光显形 */
@@ -516,8 +513,8 @@ html.dark .button--secondary:hover {
 .popover {
   background-color: color-mix(in oklch, var(--surface) 62%, transparent);
   background-image: var(--glass-noise);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -531,8 +528,8 @@ html.dark .popover {
 .tooltip {
   background-color: color-mix(in oklch, var(--surface) 72%, transparent);
   background-image: var(--glass-noise);
-  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   box-shadow:
     var(--glass-shadow),
     inset 0 1px 0 color-mix(in oklch, white var(--glass-highlight), transparent),
@@ -616,6 +613,181 @@ html.dark .tooltip {
   }
 }
 
+/*
+ * 顶部导航 Tabs 玻璃化（Layout.jsx 中挂 nav-tabs 类的那组）：
+ * 外壳为玻璃长椭圆（半透明提亮 + 高光描边 + 柔投影）包住全部按钮，保留容器感；
+ * 选中胶囊为液态玻璃（材质见下），选中文字亮色下用加深 accent 保对比度，
+ * 暗色下维持默认近白。作用域限定 nav-tabs，不影响设置页等其他 Tabs。
+ */
+.nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 32%, transparent);
+  border: 1px solid color-mix(in oklch, white 45%, transparent);
+  border-radius: 99rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
+  overflow: hidden; /* 点击涟漪裁剪在胶囊圆角内 */
+}
+
+html.dark .nav-tabs .tabs__list-container {
+  background: color-mix(in oklch, white 8%, transparent);
+  border-color: color-mix(in oklch, white 14%, transparent);
+}
+
+/*
+ * 液态玻璃选中胶囊：
+ * 流动机制——HeroUI 的 Tabs.Indicator 是 RAC SharedElement，切页时旧 indicator
+ * 快照 translate/width/height，新 indicator 从旧值过渡到本 tab 值，动画完全由
+ * 下面的 transition 定义。曲线用液态 spring（快启动、长减速、约 1.5% 微过冲，
+ * 粘性液体感而非弹簧振荡）；拉伸/回弹（scale）与点击涟漪由 useLiquidNav 播放。
+ */
+:root {
+  --nav-liquid-spring: linear(
+    0, 0.062 8.1%, 0.216 16.3%, 0.408 25.2%, 0.612 34.8%, 0.79 44.6%,
+    0.912 54%, 0.977 63.2%, 1.008 72.3%, 1.016 78.8%, 1.015 84.3%,
+    1.008 90.1%, 1 97.4%
+  );
+}
+
+.nav-tabs .tabs__indicator {
+  background-color: color-mix(in oklch, white 52%, transparent);
+  background-image: var(--glass-noise);
+  backdrop-filter: blur(6px) saturate(150%);
+  -webkit-backdrop-filter: blur(6px) saturate(150%);
+  /* 四边内高光（上强下弱 = 受光）+ 悬浮投影 + 半像素发丝描边 */
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 65%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 20%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 25%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 25%, transparent),
+    0 2px 10px rgb(0 0 0 / 12%),
+    0 0 0 0.5px color-mix(in oklch, white 38%, transparent);
+  transition:
+    translate 620ms var(--nav-liquid-spring),
+    width 620ms var(--nav-liquid-spring),
+    height 620ms var(--nav-liquid-spring);
+}
+
+/* 顶部 specular 光带：真实受光玻璃的镜面反射 */
+.nav-tabs .tabs__indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 32%),
+    rgb(255 255 255 / 5%) 46%,
+    transparent 62%
+  );
+  pointer-events: none;
+}
+
+html.dark .nav-tabs .tabs__indicator {
+  background-color: color-mix(in oklch, white 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 24%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, white 6%, transparent),
+    inset 1px 0 0 color-mix(in oklch, white 10%, transparent),
+    inset -1px 0 0 color-mix(in oklch, white 10%, transparent),
+    0 2px 10px rgb(0 0 0 / 30%),
+    0 0 0 0.5px color-mix(in oklch, white 12%, transparent);
+}
+
+html.dark .nav-tabs .tabs__indicator::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 12%),
+    rgb(255 255 255 / 2%) 46%,
+    transparent 62%
+  );
+}
+
+/* 首次出现（无前快照可循）从液滴凝出成胶囊 */
+.nav-tabs .tabs__indicator[data-entering='true'] {
+  animation: nav-liquid-condense 320ms var(--ease-out);
+}
+
+@keyframes nav-liquid-condense {
+  from {
+    opacity: 0;
+    scale: 0.72 0.64;
+  }
+}
+
+/*
+ * 点击液态扩散：从指针落点泛起一圈微光，挂在胶囊容器内被圆角裁剪，
+ * 由 useLiquidNav 生成，动画结束自删。
+ * 亮色用深色暗晕（液体按压的表面张力变形，白光在浅粉玻璃上不可见），
+ * 暗色用白色高光（暗玻璃上白光才是反光语义）。
+ */
+.nav-tabs .nav-liquid-ripple {
+  position: absolute;
+  z-index: 2;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgb(66 32 18 / 14%) 0%,
+    rgb(66 32 18 / 6%) 42%,
+    transparent 68%
+  );
+  animation: nav-liquid-ripple 480ms var(--ease-out) forwards;
+}
+
+html.dark .nav-tabs .nav-liquid-ripple {
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 22%) 0%,
+    rgb(255 255 255 / 8%) 42%,
+    transparent 68%
+  );
+}
+
+@keyframes nav-liquid-ripple {
+  from {
+    transform: scale(0.24);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* 减弱动态：流动/凝出/涟漪全部停用，切换退化为直接落位 */
+@media (prefers-reduced-motion: reduce) {
+  .nav-tabs .tabs__indicator,
+  .nav-tabs .tabs__indicator[data-entering='true'] {
+    transition: none;
+    animation: none;
+  }
+
+  .nav-tabs .nav-liquid-ripple {
+    display: none;
+  }
+}
+
+.nav-tabs .tabs__tab[data-selected="true"] {
+  color: color-mix(in oklch, var(--accent) 80%, black);
+}
+
+/*
+ * 暗色下未选中 tab 提亮：全局 --muted（76%L）在实色底上够用，
+ * 但玻璃顶栏叠了 accent 染色、色块飘过时背景亮度波动，对比被吃掉。
+ * hover 从"降透明度"（暗底上是负反馈）改为"提亮到前景色"（暗色模式的正确语义）。
+ */
+html.dark .nav-tabs .tabs__tab {
+  color: color-mix(in oklch, var(--foreground) 70%, transparent);
+}
+
+html.dark .nav-tabs .tabs__tab:not([data-selected="true"]):hover,
+html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) {
+  opacity: 1;
+  color: var(--foreground);
+}
+
 @keyframes blob-drift {
   0% {
     transform: translate(0, 0) scale(1);
@@ -692,22 +864,30 @@ html.dark .tooltip {
 }
 
 /*
- * Electron 窗口拖拽区域：
- * header 设置 -webkit-app-region: drag 后整体可拖拽，
- * 其中 tabs 和按钮需设为 no-drag 保持可点击。
- * 此处兜底防止拖拽区域内文本被选中。
+ * Electron 窗口拖拽区域：只保留在顶栏空白处，页面内容与浮层不参与拖动窗口。
+ * 不要用 header 元素选择器：页面区块也用 <header>，会在内容中间生成拖拽区。
+ * 其中 tabs 和按钮需设为 no-drag 保持可点击，并防止拖拽区域内文本被选中。
  */
-header {
+.app-topbar {
   -webkit-app-region: drag;
   user-select: none;
 }
 
-header [style*="no-drag"],
-header button,
-header a,
-header input,
-header [role="tab"],
-header .theme-switch {
+.app-topbar button,
+.app-topbar a,
+.app-topbar input,
+.app-topbar [role="tab"],
+.app-topbar .theme-switch {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * 浮层（模态框、展开编辑器）覆盖顶栏拖拽带时，其交互元素必须优先命中：
+ * Electron 的拖拽区按布局矩形计算，不会因为浮层层级更高而让位。
+ * 打开期间整层设为 no-drag，避免关闭按钮等被窗口拖动吞掉点击。
+ */
+.modal__backdrop,
+.expand-editor {
   -webkit-app-region: no-drag;
 }
 
@@ -879,6 +1059,97 @@ header .theme-switch {
 .theme-switch__toggle:checked ~ .theme-switch__icon .theme-switch__icon-part:nth-child(9) { transform: rotate(360deg) translateY(0.8em); }
 
 /* ============================================================
+   客户端配置编辑器（复刻 client-config-editor.html 的视觉）
+   ============================================================ */
+:root {
+  --bg: var(--background);
+  --fg: var(--foreground);
+  --surface-2: var(--surface-secondary);
+  --field: var(--field-background);
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --editor-fs: 13px;
+  --editor-lh: 20px;
+}
+
+/* 语法高亮 */
+.tk-com { color: var(--muted); font-style: italic; }
+.tk-sec { color: var(--warning); font-weight: 600; }
+.tk-key { color: var(--fg); }
+.tk-str { color: var(--success); }
+.tk-num { color: var(--warning); }
+.tk-kw  { color: var(--muted); font-weight: 600; }
+
+/* 编辑器内「当前 / 备份」查看模式切换 */
+.view-tabs { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: 0.5rem; }
+.view-tab { padding: 3px 10px; font-size: 12px; font-weight: 600; color: var(--muted); border-radius: 0.375rem; border: none; background: transparent; cursor: pointer; transition: color .15s, background .15s; }
+.view-tab:hover { color: var(--fg); }
+.view-tab.active { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.view-tab:disabled { opacity: .45; cursor: not-allowed; }
+
+/* 模型映射表 */
+.models-pane { display: flex; flex-direction: column; gap: 0.9rem; }
+.mm-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 0.625rem; overflow: hidden; }
+.mm-row { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 14px; transition: background-color .15s; }
+.mm-row:hover { background: color-mix(in oklch, var(--surface-2) 55%, transparent); }
+.mm-row + .mm-row { border-top: 1px solid var(--separator); }
+.mm-head { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 14px; font-size: 12px; color: var(--muted); background: var(--surface-2); text-align: center; }
+.mm-slot { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mm-label { font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.mm-key { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: "tnum"; }
+.mm-select-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+.mm-select-wrap::after { content: ""; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-50%) rotate(45deg); pointer-events: none; }
+.mm-select { width: 100%; min-width: 0; height: 36px; padding: 0 32px 0 12px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; appearance: none; -webkit-appearance: none; }
+.mm-input { width: 100%; height: 36px; padding: 0 10px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; }
+.mm-select:focus, .mm-input:focus { border-color: var(--accent); outline: none; }
+.mm-select:focus-visible, .mm-input:focus-visible, .view-tab:focus-visible, .mm-1m input:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: transparent; }
+.mm-input:disabled { opacity: .55; cursor: not-allowed; }
+.mm-na { font-size: 13px; color: var(--muted); text-align: center; user-select: none; }
+.mm-model { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.mm-solo { display: flex; align-items: center; gap: 16px; border: 1px solid var(--border); border-radius: 0.625rem; padding: 10px 14px; }
+.mm-solo .mm-slot { flex: 0 0 auto; }
+.mm-solo .mm-model { flex: 1 1 auto; }
+.mm-1m { display: inline-flex; align-items: center; align-self: stretch; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.mm-1m input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.mm-1m input:checked + span { color: var(--fg); }
+.mm-1m--ghost { visibility: hidden; }
+.mm-1m-box { width: 16px; height: 16px; }
+
+/* 编辑器叠层 */
+.editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; transition: border-color .15s; }
+.editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 30%, transparent);
+}
+.editor.dirty { border-color: color-mix(in oklch, var(--warning) 55%, transparent); }
+.editor-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--separator); font-size: 12px; }
+.editor-head .lang { font-family: var(--font-mono); color: var(--muted); }
+.stat { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.stat.ok { color: var(--success); }
+.stat.err { color: var(--danger); }
+.editor-body { position: relative; min-height: 120px; }
+.editor-body textarea {
+  position: relative; width: 100%; min-height: 120px; margin: 0; display: block;
+  padding: 12px 16px 12px 60px; border: none; outline: none; resize: none;
+  background: transparent; color: transparent; caret-color: var(--accent);
+  -webkit-text-fill-color: transparent; white-space: pre; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+  font-family: var(--font-mono); font-size: var(--editor-fs); line-height: var(--editor-lh);
+}
+.editor-body textarea::-webkit-scrollbar { display: none; }
+.editor-body .gutter {
+  position: absolute; left: 0; top: 0; width: 48px; padding: 12px 10px 12px 0;
+  text-align: right; color: var(--muted); pointer-events: none;
+  font-family: var(--font-mono); font-size: var(--editor-fs); line-height: var(--editor-lh);
+}
+.editor-body .gutter div { height: var(--editor-lh); }
+.editor-body .code-wrap { position: absolute; left: 48px; top: 0; right: 0; pointer-events: none; overflow: hidden; }
+.editor-body pre { margin: 0; padding: 12px 16px 12px 12px; white-space: pre; overflow: visible; font-family: var(--font-mono); font-size: var(--editor-fs); line-height: var(--editor-lh); color: var(--fg); font-feature-settings: "tnum"; }
+.editor-foot { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--separator); }
+.editor-foot .savetime { margin-left: auto; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.editor-foot .unsaved { color: var(--warning); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.editor-foot .unsaved .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); }
+
+/* ============================================================
    主题切换圆形揭示（ThemeToggle 的 View Transition）
    禁用默认交叉淡入淡出，由 JS 对 ::view-transition-new(root)
    做 clip-path 圆形扩散；旧主题快照静止在底层
@@ -923,8 +1194,8 @@ header .theme-switch {
   position: absolute;
   inset: 0;
   background: color-mix(in oklch, var(--background) 42%, transparent);
-  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   opacity: 0;
   transition: opacity var(--dur-expand) var(--ease-expand);
 }
@@ -955,8 +1226,8 @@ html.dark .expand-editor__scrim {
   /* 玻璃材质（同卡片/弹窗体系）；去掉 inset 高光以保持 box-shadow 层数一致可插值 */
   background-color: color-mix(in oklch, var(--surface) 82%, transparent);
   background-image: var(--glass-noise);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
   backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
   box-shadow: var(--glass-shadow-float);
   transition:
     transform var(--dur-expand) var(--ease-expand),
@@ -1054,4 +1325,5 @@ html.dark .expand-editor__panel {
   }
 }
 
-.brand-name.brand-name--dev { font-size: 18px; }
+/* Development identity only; the release visual recipes above remain unchanged. */
+.brand-name--dev { font-size: 1rem; }

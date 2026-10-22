@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Spinner, toast } from '@heroui/react';
-import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, Check, Layers2, ArrowUpRight, List, Info } from 'lucide-react';
+import { Button, Typography, Chip, Card, ScrollShadow, Spinner, toast } from '@heroui/react';
+import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
 import { listGroups, updateGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -30,7 +30,7 @@ function MemberRow({ provided, dragging, name, channelName, active, manual, sort
         : <span className="group-member-order" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>}
       {manual ? <button type="button" className="group-member-main group-member-select" aria-label={`设为当前模型 ${name}`} aria-pressed={active} onClick={onActivate}>{content}</button>
         : <div className="group-member-main">{content}</div>}
-      {active && <span className="group-member-current"><Check className="size-3" />当前</span>}
+      {active && <CircleCheck className="size-4 shrink-0 text-success" aria-label="当前模型" />}
       <IconButton label={`移除模型 ${name}`} size="sm" danger onClick={onRemove}><X className="size-3.5" /></IconButton>
     </div>
   );
@@ -127,12 +127,8 @@ export default function Groups() {
 
   return (
     <div className="groups-page flex flex-col flex-1 min-h-0">
-      <div className="resource-page-heading">
-        <div>
-          <h1 className="text-xl font-semibold">模型分组</h1>
-          <p className="mt-1 text-sm text-muted">按用途组织上游模型，让每个分组成为稳定的调用入口。</p>
-        </div>
-        <div className="resource-page-actions">
+      <div className="flex items-center justify-end mb-4 shrink-0">
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             size="md"
@@ -177,37 +173,37 @@ export default function Groups() {
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">
         <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="group-services-grid">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {groups.map((g) => {
             const configuration = groupConfiguration(g);
             return (
-              <section key={g.id} data-expand-card className="group-service-card" aria-label={`模型分组 ${g.name}`}>
-                <header className="group-service-header">
-                  <span className="group-service-icon"><Layers2 className="size-4" /></span>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="group-service-name" title={g.name}>{g.name}</h2>
+              <Card key={g.id} data-expand-card className="gap-4 p-5 h-[24rem]" aria-label={`模型分组 ${g.name}`}>
+                <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Typography className="font-medium text-lg truncate" title={g.name}>{g.name}</Typography>
+                    <Chip size="sm" variant="soft" className="shrink-0" title={strategyDescriptions[g.strategy]}>
+                      {STRATEGIES.find((strategy) => strategy.key === g.strategy)?.label || g.strategy}
+                    </Chip>
                   </div>
+                  <div className="flex items-center gap-1 shrink-0">
                   <IconButton label={`编辑分组 ${g.name}`} onClick={(e) => {
                     setEditRect(captureCardRect(e.currentTarget.closest('[data-expand-card]')));
                     setEditTarget(g);
-                  }}><Pencil className="size-3.5" /></IconButton>
-                  <IconButton label={`删除分组 ${g.name}`} onClick={() => setDeleteTarget(g)} danger><Trash2 className="size-3.5" /></IconButton>
-                </header>
+                  }}><Pencil className="size-4" /></IconButton>
+                  <IconButton label={`删除分组 ${g.name}`} onClick={() => setDeleteTarget(g)} danger><Trash2 className="size-4" /></IconButton>
+                  </div>
+                </Card.Header>
                 <div className="group-service-meta">
-                  <span className="group-strategy" title={`${strategyDescriptions[g.strategy]} 流式已提交后不自动重放。`}>
-                    {STRATEGIES.find((strategy) => strategy.key === g.strategy)?.label || g.strategy}
-                    <Info className="size-3 text-muted" aria-hidden="true" />
-                    <span className="group-meta-separator" aria-hidden="true">·</span>
-                    <span>{g.items?.length || 0} 个成员</span>
-                  </span>
+                  <span className="text-xs text-muted">{g.items?.length || 0} 个成员</span>
                   <span className={`group-configuration ${configuration.complete ? '' : 'group-configuration--incomplete'}`} title={`${configuration.label}；配置状态不代表上游在线。`}>
                     <span className="group-configuration-dot" />{configuration.complete ? '已配置' : '待完善'}
                   </span>
                 </div>
                 {!configuration.complete && <p className="group-service-warning">{g.items?.length ? '选择一个当前模型以开始调用' : '添加上游模型以开始调用'}</p>}
-                <div className="group-members-list thin-scrollbar">
+                <Card.Content className="flex-1 min-h-0 p-0">
+                <ScrollShadow orientation="vertical" className="h-full thin-scrollbar">
                   {g.items?.length ? <Droppable droppableId={String(g.id)}>
-                    {(droppableProvided) => <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
+                    {(droppableProvided) => <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps} className="space-y-2">
                       {g.items.map((item, index) => {
                         const name = item.model_name || `#${item.model_id}`;
                         const isActive = g.strategy === 'manual' && g.active_item_id === item.id;
@@ -223,15 +219,16 @@ export default function Groups() {
                       {droppableProvided.placeholder}
                     </div>}
                   </Droppable> : <div className="group-members-empty"><Layers2 className="size-5" /><span>还没有上游模型</span></div>}
-                </div>
-                <footer className="group-service-footer">
-                  <button type="button" className="group-add-member" onClick={() => setAddItemTarget(g)}><Plus className="size-3.5" />添加成员</button>
+                </ScrollShadow>
+                </Card.Content>
+                <Card.Footer className="group-service-footer shrink-0">
+                  <Button size="sm" variant="tertiary" onPress={() => setAddItemTarget(g)}><Plus className="size-3.5" />添加模型</Button>
                   <div className="group-footer-links">
                     <Link className="group-record-link" to={groupServicePath('/logs', g.name)} aria-label={`查看 ${g.name} 的调用记录`}><List className="size-3.5" />调用记录</Link>
                     <Link className="group-connect-link" to={groupServicePath('/clients', g.name)}>接入<ArrowUpRight className="size-3.5" /></Link>
                   </div>
-                </footer>
-              </section>
+                </Card.Footer>
+              </Card>
             );
           })}
         </div>
