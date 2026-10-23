@@ -679,13 +679,13 @@ html.dark .tooltip {
  * 只用 opacity/transform，遵守 prefers-reduced-motion。
  */
 .page-in {
-  animation: page-in 240ms var(--ease-smooth);
+  animation: page-in 180ms var(--ease-smooth);
 }
 
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
 }
 
@@ -1409,3 +1409,51 @@ html.dark .expand-editor__panel {
 
 /* Development identity only; the release visual recipes above remain unchanged. */
 .brand-name--dev { font-size: 1rem; }
+
+/* 列表首帧保留占位；数据就绪后只过渡内容，后台刷新不重新淡入。 */
+.page-in:has([data-page-ready]) { animation: none; }
+[data-page-ready="true"] { animation: page-in 180ms var(--ease-smooth); }
+.page-skeleton { flex: 1; min-height: 0; overflow: hidden; }
+.skeleton-card, .skeleton-stat {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.skeleton-card { min-height: 190px; }
+.page-skeleton--models .skeleton-card { min-height: 112px; padding: 16px; gap: 12px; }
+.page-skeleton--groups .skeleton-card { height: 24rem; }
+.skeleton-heading { display: flex; align-items: center; gap: 12px; }
+.skeleton-block {
+  display: block;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  animation: skeleton-pulse 1.4s ease-in-out 200ms infinite;
+}
+.skeleton-icon { width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; }
+.skeleton-title { width: 40%; height: 16px; }
+.skeleton-line { width: 85%; height: 12px; }
+.skeleton-line--short { width: 55%; }
+.skeleton-member { width: 100%; height: 52px; }
+.skeleton-table { border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+.skeleton-row { display: flex; align-items: center; gap: 24px; height: 55px; border-bottom: 1px solid var(--border); }
+.skeleton-row .skeleton-heading { width: 30%; }
+.skeleton-row > .skeleton-line { flex: 1; }
+.skeleton-row .skeleton-icon { width: 24px; height: 24px; }
+.skeleton-stat { min-height: 100px; }
+@keyframes skeleton-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-page-ready="true"], .skeleton-block { animation: none; }
+}
+
+.skeleton-connection { min-height: 130px; }
+.skeleton-connection > .skeleton-heading { margin-bottom: 28px; }
+.skeleton-connection .service-config-values > div { display: flex; flex-direction: column; gap: 16px; }
+
+.skeleton-content { display: flex; flex-direction: column; gap: 32px; overflow: hidden; }
+.skeleton-content-fields { display: flex; flex-direction: column; gap: 16px; }
+.skeleton-field { width: 50%; height: 40px; }
+.skeleton-code { width: 100%; height: 160px; border-radius: 12px; }

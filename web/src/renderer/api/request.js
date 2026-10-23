@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { responseCache } from './responseCache';
 import { toast } from '@heroui/react';
 import { shouldRetryNetworkError, RETRY_INTERVAL_MS, RETRY_MAX_ATTEMPTS } from './retryPolicy';
 
@@ -28,13 +29,24 @@ const request = axios.create({
 // ─── 请求拦截器 ───
 // 管理访问由后端本机边界保护；服务 API 令牌不用于管理授权。
 request.interceptors.request.use(
-  (config) => config,
+  (config) => {
+    config.__cacheGeneration = responseCache.generation();
+    return config;
+  },
   (error) => Promise.reject(error),
 );
 
 // ─── 响应拦截器 ───
 request.interceptors.response.use(
   (response) => {
+    const { method, url, params, __cacheGeneration } = response.config;
+    if (method === 'get') {
+      responseCache.write(url, params, response.data, __cacheGeneration);
+    } else if (['post', 'put', 'patch', 'delete'].includes(method)
+      && !['/channels/preview-models', '/channels/resolve', '/channels/test', '/quota-sources/preview'].includes(url)) {
+      // 渠道/模型/分组相互关联，写成功后统一失效，下一次进入重新加载。
+      responseCache.invalidate();
+    }
     // 后端无 R 包装，直接返回业务数据
     return response.data;
   },

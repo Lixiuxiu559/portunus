@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getQuotaSummaries, refreshQuotaSource } from '../../../api/quota';
 import { createCachePoller, createRequestGate } from './quotaModel';
+import { getCachedResponse } from '../../../api/responseCache';
+
+function readSummaries(channels) {
+  if (!channels.length) return null;
+  const entries = [];
+  for (let i = 0; i < channels.length; i += 100) {
+    const channel_ids = channels.slice(i, i + 100).map((channel) => channel.id).join(',');
+    const batch = getCachedResponse('/quota/summaries', { channel_ids });
+    if (batch === undefined) return null;
+    entries.push(...batch);
+  }
+  return Object.fromEntries(entries.map((entry) => [entry.channel_id, entry.sources || []]));
+}
 
 const refreshMessage = (err) => {
   if (err?.status === 429) return '查询频率受限，请稍后刷新';
@@ -10,19 +23,20 @@ const refreshMessage = (err) => {
 };
 
 export default function useQuotaSummaries(channels) {
-  const [summaries, setSummaries] = useState({});
+  const [cached] = useState(() => readSummaries(channels));
+  const [summaries, setSummaries] = useState(cached ?? {});
   const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(channels.length > 0 && !cached);
   const [pending, setPending] = useState({});
   const [refreshErrors, setRefreshErrors] = useState({});
   const gate = useRef(createRequestGate());
   const commands = useRef(new Map());
   const lifecycle = useRef({ active: false, epoch: 0 });
-  const current = useRef({});
+  const current = useRef(cached ?? {});
   // 只有首次成功读取前的全局 loading 才代表"余额尚未载入"。
   // 刷新后的静默重读不能把其他没有查询来源的卡片切到"正在读取余额"，
   // 否则点击一个卡片的刷新会让相邻卡片文字闪动。
-  const loaded = useRef(false);
+  const loaded = useRef(!!cached);
   const ids = channels.map((channel) => channel.id).join(',');
   const cancelCommands = useCallback(() => {
     lifecycle.current.epoch += 1;
@@ -34,15 +48,16 @@ export default function useQuotaSummaries(channels) {
     if (invalidate) {
       cancelCommands();
       gate.current.cancel();
-      current.current = {}; setSummaries({}); setPending({}); setRefreshErrors({});
-      loaded.current = false;
+      const snapshot = readSummaries(ids.split(',').filter(Boolean).map((id) => ({ id })));
+      current.current = snapshot ?? {}; setSummaries(snapshot ?? {}); setPending({}); setRefreshErrors({});
+      loaded.current = !!snapshot;
     }
     // POST 结束前的缓存可能仍是旧值；结束后统一重读，轮询不触发上游查询。
     if (commands.current.size) return;
     if (!ids) { setLoading(false); return; }
     const task = gate.current.start();
     // 静默重读只更新数据，不改变全局载入态（见 loaded 注释）。
-    if (!loaded.current) setLoading(true);
+    setLoading(!loaded.current);
     try {
       const channelIds = ids.split(',');
       const batches = [];

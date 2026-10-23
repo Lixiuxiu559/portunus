@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Typography, Card, Chip, Spinner, toast } from '@heroui/react';
+import { Button, Typography, Card, Chip, toast } from '@heroui/react';
 import { Plus, Trash2, RefreshCw, Pencil, RotateCw, Search, X } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import DeleteChannelModal from './DeleteChannelModal';
@@ -13,17 +13,22 @@ import QuotaSummary from './quota/QuotaSummary';
 import QuotaPanel from './quota/QuotaPanel';
 import useQuotaSummaries from './quota/useQuotaSummaries';
 import { filterChannels } from './channelSearch.js';
+import PageSkeleton from '../../components/PageSkeleton';
+import { getCachedResponse } from '../../api/responseCache';
+import useDelayedFlag from '../../hooks/useDelayedFlag';
 import './channels.css';
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
-  const [channels, setChannels] = useState([]);
+  const [cached] = useState(() => getCachedResponse('/channels'));
+  const [channels, setChannels] = useState(cached ?? []);
   const [search, setSearch] = useState('');
   const visibleChannels = useMemo(() => filterChannels(channels, search), [channels, search]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cached === undefined);
   const [quotaTarget, setQuotaTarget] = useState(null);
   const quota = useQuotaSummaries(channels);
   const [refreshing, setRefreshing] = useState(false);
+  const showRefreshing = useDelayedFlag(refreshing);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   // 展开编辑器的起点：点编辑按钮时记录的卡片矩形
@@ -34,7 +39,7 @@ export default function Channels() {
 
   const fetchChannels = async (isRefresh = false) => {
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
-    const setRefreshState = isRefresh || channels.length > 0 ? setRefreshing : setLoading;
+    const setRefreshState = isRefresh || cached !== undefined || channels.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
       setChannels(await listChannels());
@@ -48,7 +53,7 @@ export default function Channels() {
   };
 
   useEffect(() => {
-    fetchChannels();
+    fetchChannels(cached !== undefined);
   }, []);
 
   const handleSync = async (ch) => {
@@ -64,15 +69,15 @@ export default function Channels() {
   };
 
   return (
-    <div className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
+    <div data-page-ready={!loading} className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="channel-toolbar">
-        {!loading && !loadError && channels.length > 0 && <>
+        {(loading || (!loadError && channels.length > 0)) && <>
           <label className="channel-search">
             <Search className="size-4 shrink-0" aria-hidden="true" />
             <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
             {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
           </label>
-          <span className="channel-count" role="status">{search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
+          <span className="channel-count" role="status">{loading ? '加载中…' : search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
         </>}
         <div className="channel-actions">
           <Button
@@ -80,7 +85,7 @@ export default function Channels() {
             size="md"
             aria-label="刷新渠道列表"
             onPress={() => fetchChannels(true)}
-            isPending={refreshing}
+            isDisabled={refreshing || loading} isPending={showRefreshing}
           >
             <RotateCw className="size-4" />
           </Button>
@@ -92,9 +97,7 @@ export default function Channels() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="sm" />
-        </div>
+        <PageSkeleton variant="channels" />
       ) : loadError && channels.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted">
           <span>渠道加载失败，请检查后端服务后重试</span>

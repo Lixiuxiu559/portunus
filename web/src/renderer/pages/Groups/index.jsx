@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions, strategyLabels } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Card, ScrollShadow, Spinner, TextField, Input, toast } from '@heroui/react';
+import { Button, Typography, Chip, Card, ScrollShadow, TextField, Input, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
 import { listGroups, updateGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
@@ -14,6 +14,9 @@ import CreateGroupModal from './CreateGroupModal';
 import EditGroupEditor from './EditGroupEditor';
 import DeleteGroupModal from './DeleteGroupModal';
 import AddGroupItemModal from './AddGroupItemModal';
+import PageSkeleton from '../../components/PageSkeleton';
+import { getCachedResponse } from '../../api/responseCache';
+import useDelayedFlag from '../../hooks/useDelayedFlag';
 import './groups.css';
 
 function MemberRow({ provided, dragging, name, channelName, active, manual, sortable, index, onActivate, onRemove }) {
@@ -33,11 +36,18 @@ function MemberRow({ provided, dragging, name, channelName, active, manual, sort
 
 export default function Groups() {
   const navigate = useNavigate();
-  const [groups, setGroups] = useState([]);
-  const [modelCount, setModelCount] = useState(0);
-  const [channels, setChannels] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [cached] = useState(() => {
+    const groups = getCachedResponse('/groups');
+    const models = getCachedResponse('/models', { page: 1, page_size: 1 });
+    const channels = getCachedResponse('/channels');
+    return groups !== undefined && models !== undefined && channels !== undefined ? { groups, models, channels } : null;
+  });
+  const [groups, setGroups] = useState(cached?.groups ?? []);
+  const [modelCount, setModelCount] = useState(cached?.models?.total ?? 0);
+  const [channels, setChannels] = useState(cached?.channels ?? []);
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
+  const showRefreshing = useDelayedFlag(refreshing);
   const [editTarget, setEditTarget] = useState(null);
   // 展开编辑器的起点：点编辑按钮时记录的卡片矩形
   const [editRect, setEditRect] = useState(null);
@@ -55,7 +65,7 @@ export default function Groups() {
 
   const fetchAll = async (isRefresh = false) => {
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
-    const setRefreshState = isRefresh || groups.length > 0 ? setRefreshing : setLoading;
+    const setRefreshState = isRefresh || !!cached || groups.length > 0 ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
       const [g, m, c] = await Promise.all([listGroups(), listModels({ page: 1, page_size: 1 }), listChannels()]);
@@ -71,7 +81,7 @@ export default function Groups() {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(!!cached); }, []);
 
   const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
 
@@ -131,7 +141,7 @@ export default function Groups() {
   };
 
   return (
-    <div className="groups-page flex flex-col flex-1 min-h-0">
+    <div data-page-ready={!loading} className="groups-page flex flex-col flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
         <TextField
           size="sm"
@@ -145,7 +155,7 @@ export default function Groups() {
           <Input />
         </TextField>
         {draftName && <IconButton size="sm" label="清除名称查询" onClick={clearSearch}><X className="size-3.5" /></IconButton>}
-        <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}>
+        <Button variant="secondary" size="sm" onPress={handleSearch} isDisabled={refreshing || loading} isPending={loading || showRefreshing}>
           <Search className="size-4" />
           查询
         </Button>
@@ -155,7 +165,7 @@ export default function Groups() {
             size="sm"
             aria-label="刷新分组"
             onPress={() => fetchAll(true)}
-            isPending={refreshing}
+            isDisabled={refreshing || loading} isPending={showRefreshing}
           >
             <RotateCw className="size-4" />
           </Button>
@@ -167,9 +177,7 @@ export default function Groups() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="sm" />
-        </div>
+        <PageSkeleton variant="groups" />
       ) : loadError && groups.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted">
           <span>分组加载失败，请检查后端服务后重试</span>

@@ -3,6 +3,7 @@ import { Button } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import { CopyValue } from './shared';
+import PageSkeleton from '../../components/PageSkeleton';
 
 /** 连接配置卡：网关地址、令牌、访问范围等全局信息；模型分组已移到接入示例。 */
 export default function ConnectionCard({
@@ -21,6 +22,7 @@ export default function ConnectionCard({
   onSaveNetworkMode,
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  if (loading) return <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5"><PageSkeleton variant="connection" /></aside>;
 
   return (
     <>

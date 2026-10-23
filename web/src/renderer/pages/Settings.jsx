@@ -4,6 +4,7 @@ import { Typography, Button, Card, Spinner, Input, TextField, toast } from '@her
 import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw } from 'lucide-react';
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
+import { getCachedResponse } from '../api/responseCache';
 import './settings.css';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
@@ -12,8 +13,9 @@ export default function Settings() {
   const { checking, available, downloading, downloaded, installing, latestVersion, progress, error, check, download, install } =
     useUpdater();
 
-  const [syncInterval, setSyncIntervalState] = useState('');
-  const [lastSyncAt, setLastSyncAt] = useState(0);
+  const [cached] = useState(() => getCachedResponse('/settings'));
+  const [syncInterval, setSyncIntervalState] = useState(cached ? String(cached.sync_interval ?? 0) : '');
+  const [lastSyncAt, setLastSyncAt] = useState(cached?.last_sync_at ?? 0);
   const [savingInterval, setSavingInterval] = useState(false);
   const [syncing, setSyncing] = useState(false);
 

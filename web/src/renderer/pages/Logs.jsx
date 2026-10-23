@@ -7,6 +7,7 @@ import { buildLogParams } from '../utils/logQuery';
 import { listLogs, getLogStats, listChannels } from '../api';
 import { errKindLabels, logChannelLabel } from '../utils/logDetails';
 import LogDetailModal from './LogDetailModal';
+import { getCachedResponse } from '../api/responseCache';
 import './logs.css';
 
 const successOptions = [
@@ -31,9 +32,15 @@ export default function Logs() {
   const linkedGroup = searchParams.get('group') || '';
   const lastLinkedGroup = useRef(linkedGroup);
   const requestSequence = useRef(0);
-  const [logs, setLogs] = useState({ total: 0, data: [] });
-  const [stats, setStats] = useState(null);
-  const [channels, setChannels] = useState([]);
+  const [cached] = useState(() => {
+    const params = buildLogParams({ group_name: linkedGroup, channel_id: 'all', success: 'all' }, 1, 20);
+    const logs = getCachedResponse('/logs', params);
+    const stats = getCachedResponse('/logs/stat', params);
+    return logs !== undefined && stats !== undefined ? { logs, stats } : null;
+  });
+  const [logs, setLogs] = useState(cached?.logs ?? { total: 0, data: [] });
+  const [stats, setStats] = useState(cached?.stats ?? null);
+  const [channels, setChannels] = useState(() => getCachedResponse('/channels') ?? []);
   const [channelError, setChannelError] = useState(false);
   const [detail, setDetail] = useState(null);
   const fetchChannels = async () => {
@@ -41,10 +48,10 @@ export default function Logs() {
     catch { setChannelError(true); }
   };
   useEffect(() => { fetchChannels(); }, []);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
   // 首次成功后，即使结果为空，后续查询也保留内容而不退回首次加载态。
-  const hasLoaded = useRef(false);
+  const hasLoaded = useRef(!!cached);
   const [showRefreshing, setShowRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 20;
@@ -259,17 +266,17 @@ export default function Logs() {
   const hasActiveFilters = query.channel_id !== 'all' || Boolean(query.group_name) || Boolean(query.model_name) || query.success !== 'all' || query.client_protocol !== 'all';
 
   return (
-    <div className="logs-page flex flex-col flex-1 min-h-0">
+    <div data-page-ready={!loading} className="logs-page flex flex-col flex-1 min-h-0">
       <h1 className="sr-only">调用记录</h1>
       {/* 统计按当前查询范围汇总，不把日志行数当作独立客户端请求数。 */}
-      {stats && (
+      {stats ? (
         <div className="logs-stats">
           <StatCard label="记录数" value={String(stats.total_requests || 0)} />
           <StatCard label="非缓存输入 Token" value={formatNum(stats.input_tokens)} detail={`缓存读 ${formatNum(stats.cache_read_tokens)} · 缓存写 ${formatNum(stats.cache_write_tokens)}`} />
           <StatCard label="输出 Token" value={formatNum(stats.output_tokens)} />
           <StatCard label="近期记录" value={String(stats.recent_requests || 0)} />
         </div>
-      )}
+      ) : loading ? <div className="logs-stats" aria-hidden="true">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton-stat"><span className="skeleton-block skeleton-title" /><span className="skeleton-block skeleton-line" /></div>)}</div> : null}
 
       {/* 筛选栏：五个条件等宽排布，查询与刷新固定在右侧 */}
       <div className="logs-filters">

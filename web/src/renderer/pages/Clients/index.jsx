@@ -9,10 +9,13 @@ import { buildConnectionGuide } from '../../utils/connectionGuide';
 import { selectServiceGroup } from '../../utils/serviceAccess';
 import ConfirmModal from '../../components/ConfirmModal';
 import ConnectionCard from './ConnectionCard';
+import PageSkeleton from '../../components/PageSkeleton';
 import TreeNav from './TreeNav';
 import ExamplesPane from './ExamplesPane';
 import ClaudeConfigPanel from './ClaudeConfigPanel';
 import { normalizeSearch, parseSelection, selectionSearch } from './sectionState';
+import { getCachedResponse } from '../../api/responseCache';
+import useDelayedFlag from '../../hooks/useDelayedFlag';
 import '../service-access.css';
 
 // 工作区顶部对齐视口顶部时留一点余量，和滚动目标共用同一个值
@@ -26,13 +29,19 @@ export default function Clients() {
   const [networkMode, setNetworkMode] = useState(null);
   const [savingMode, setSavingMode] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [groups, setGroups] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [cached] = useState(() => {
+    const groups = getCachedResponse('/groups');
+    const key = getCachedResponse('/apikey');
+    return groups !== undefined && key !== undefined ? { groups, key } : null;
+  });
+  const [groups, setGroups] = useState(cached?.groups ?? []);
+  const [selectedGroup, setSelectedGroup] = useState(() => selectServiceGroup(cached?.groups ?? [], requestedGroup, ''));
+  const [apiKey, setApiKey] = useState(cached?.key?.key ?? '');
   const [showKey, setShowKey] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   // 已有数据时的刷新不进入加载态：保留当前配置展示，只在按钮上给反馈
   const [refreshing, setRefreshing] = useState(false);
+  const showRefreshing = useDelayedFlag(refreshing);
   // 刷新成功后递增，连接配置按这个 key 逐字重放一次，给出「刚重新读取」的反馈
   const [revealKey, setRevealKey] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -47,7 +56,7 @@ export default function Clients() {
 
   const load = async (isRefresh = false) => {
     // 首次加载或没有可展示的数据时才遮蔽内容；刷新失败保留旧配置
-    const blocking = !isRefresh || (!groups.length && !apiKey);
+    const blocking = !cached && (!isRefresh || (!groups.length && !apiKey));
     if (blocking) setLoading(true); else setRefreshing(true);
     const [groupResult, keyResult] = await Promise.allSettled([listGroups(), getAPIKey()]);
     const failed = groupResult.status === 'rejected' || keyResult.status === 'rejected';
@@ -169,11 +178,11 @@ export default function Clients() {
   const onDirtyChange = useCallback((dirty) => setConfigDirty(dirty), []);
 
   return (
-    <div className="service-page flex flex-col flex-1 min-h-0 min-w-0">
+    <div data-page-ready={!loading} className="service-page flex flex-col flex-1 min-h-0 min-w-0">
       <h1 className="sr-only">服务接入</h1>
       <div className="service-toolbar">
         <p className="service-toolbar-hint">选择模型分组，为你的应用提供一个稳定入口。</p>
-        <Button size="md" variant="secondary" onPress={() => load(true)} isPending={loading || refreshing} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
+        <Button size="md" variant="secondary" onPress={() => load(true)} isDisabled={loading || refreshing} isPending={loading || showRefreshing} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
@@ -184,7 +193,7 @@ export default function Clients() {
             showKey={showKey}
             onToggleKey={() => setShowKey((v) => !v)}
             loading={loading}
-            refreshing={refreshing}
+            refreshing={showRefreshing}
             revealKey={revealKey}
             loadError={loadError}
             regenerating={regenerating}
@@ -197,7 +206,7 @@ export default function Clients() {
           <section ref={workspaceRef} className="service-workspace rounded-2xl bg-surface/70" aria-label="接入内容">
             <TreeNav searchParams={searchParams} selection={selection} onSelect={navigateSelection} />
             <div className="service-pane">
-              {selection.section === 'examples' ? (
+              {loading ? <PageSkeleton variant="content" /> : selection.section === 'examples' ? (
                 <ExamplesPane
                   groups={groups}
                   selectedGroup={selectedGroup}

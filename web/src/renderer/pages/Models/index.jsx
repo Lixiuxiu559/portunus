@@ -1,26 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Typography, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
+import { Button, Typography, Card, toast, Select, ListBox, TextField, Input } from '@heroui/react';
 import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ProviderIcon from '../../components/ProviderIcon';
+import PageSkeleton from '../../components/PageSkeleton';
+import { getCachedResponse } from '../../api/responseCache';
+import useDelayedFlag from '../../hooks/useDelayedFlag';
 import './models.css';
 
 export default function Models() {
-  const [models, setModels] = useState([]);
-  const [channels, setChannels] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [cached] = useState(() => {
+    const models = getCachedResponse('/models', { page: 1, page_size: 24 });
+    const channels = getCachedResponse('/channels');
+    return models !== undefined && channels !== undefined ? { models, channels } : null;
+  });
+  const [models, setModels] = useState(cached?.models?.data ?? []);
+  const [channels, setChannels] = useState(cached?.channels ?? []);
+  const [total, setTotal] = useState(cached?.models?.total ?? 0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
+  const showRefreshing = useDelayedFlag(refreshing);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   // 首次/查询失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
   // 列表滚动容器：翻页/换筛选后回顶，避免停留在上一页的滚动位置
   const listRef = useRef(null);
+  const hasLoaded = useRef(!!cached);
   // 查询条件（点击查询按钮后才生效）
   const [queryChannel, setQueryChannel] = useState('all');
   const [queryName, setQueryName] = useState('');
@@ -30,21 +40,20 @@ export default function Models() {
   const pageSize = 24;
 
   const fetchAll = async () => {
-    setLoading(true);
+    const setRefreshState = hasLoaded.current ? setRefreshing : setLoading;
+    setRefreshState(true);
     try {
-      const start = Date.now();
       const [m, c] = await Promise.all([listModels({ page: 1, page_size: pageSize }), listChannels()]);
       setModels(Array.isArray(m?.data) ? m.data : []);
       setTotal(m?.total ?? 0);
       setPage(1);
       setChannels(Array.isArray(c) ? c : []);
-      // 确保加载状态至少显示 300ms，避免闪烁
-      const elapsed = Date.now() - start;
-      if (elapsed < 300) await new Promise((r) => setTimeout(r, 300 - elapsed));
+      hasLoaded.current = true;
+      setLoadError(false);
     } catch {
       if (models.length === 0) setLoadError(true); // 无数据时进错误态而非伪造空态
     } finally {
-      setLoading(false);
+      setRefreshState(false);
     }
   };
 
@@ -63,13 +72,14 @@ export default function Models() {
     if (channel !== 'all') params.channel_id = channel;
     if (name.trim()) params.name = name.trim();
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
-    const setRefreshState = models.length > 0 ? setRefreshing : setLoading;
+    const setRefreshState = hasLoaded.current ? setRefreshing : setLoading;
     setRefreshState(true);
     try {
       const res = await listModels(params);
       setModels(Array.isArray(res?.data) ? res.data : []);
       setTotal(res?.total ?? 0);
       setPage(targetPage);
+      hasLoaded.current = true;
       setLoadError(false);
       // 内容整体替换后回到列表顶部，避免停留在上一页的滚动位置
       listRef.current?.scrollTo({ top: 0 });
@@ -118,7 +128,7 @@ export default function Models() {
   };
 
   return (
-    <div className="model-page flex flex-col flex-1 min-h-0 min-w-0">
+    <div data-page-ready={!loading} className="model-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="model-filters flex flex-wrap items-center gap-2 mb-3 shrink-0">
         <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
         {draftName && <IconButton size="sm" label="清除名称筛选" onClick={() => { setDraftName(''); performSearch(draftChannel, '', 1); }}><X className="size-3.5" /></IconButton>}
@@ -129,13 +139,13 @@ export default function Models() {
             {channels.map((c) => <ListBox.Item key={c.id} id={String(c.id)} textValue={c.name}><span className="min-w-0 truncate" title={c.name}>{c.name}</span><ListBox.ItemIndicator /></ListBox.Item>)}
           </ListBox></Select.Popover>
         </Select>
-        <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}><Search className="size-4" />查询</Button>
+        <Button variant="secondary" size="sm" onPress={handleSearch} isDisabled={refreshing || loading} isPending={loading || showRefreshing}><Search className="size-4" />查询</Button>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="secondary" size="sm" onPress={() => performSearch(queryChannel, queryName, page)} isPending={loading || refreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
+          <Button variant="secondary" size="sm" onPress={() => performSearch(queryChannel, queryName, page)} isDisabled={refreshing || loading} isPending={loading || showRefreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
           <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
         </div>
       </div>
-      {loading ? <div className="flex justify-center py-12"><Spinner size="sm" /></div>
+      {loading ? <PageSkeleton variant="models" />
       : loadError && models.length === 0 ? <div className="flex flex-col items-center gap-3 py-16 text-muted">
           <span>模型加载失败，请检查后端服务后重试</span>
           <Button variant="secondary" size="sm" onPress={() => (channels.length === 0 ? fetchAll() : performSearch(queryChannel, queryName, page))}>重试</Button>

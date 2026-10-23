@@ -2,7 +2,7 @@
  * 通用数据表格组件（基于 HeroUI Table）
  * - dataSource: 数据数组
  * - columns: 列配置 [{ title, dataIndex, key?, render?, width?, isRowHeader?, copy? }]
- * - loading?: 加载状态（首次加载显示 Spinner，有数据时仅叠加半透明遮罩）
+ * - loading?: 加载状态（首次加载显示骨架屏，有数据时仅叠加半透明遮罩）
  * - emptyText?: 空态文案
  *
  * copy 字段：设置为 true 时，单元格内容旁会显示复制图标，hover 时可见，点击可复制文本到剪贴板。
@@ -10,6 +10,7 @@
 import { useState, useCallback, memo, type ReactNode } from 'react';
 import { Table, Spinner, Button } from '@heroui/react';
 import { Copy, Check } from 'lucide-react';
+import PageSkeleton from './PageSkeleton';
 
 /* ──────────── 类型定义 ──────────── */
 
@@ -35,7 +36,7 @@ export interface DataTableProps<T = Record<string, unknown>> {
   dataSource?: T[];
   /** 列配置 */
   columns?: ColumnType<T>[];
-  /** 加载状态（首次加载显示 Spinner） */
+  /** 加载状态（首次加载显示骨架屏） */
   loading?: boolean;
   /** 刷新状态（仅在表格右上角显示旋转图标） */
   refreshing?: boolean;
@@ -107,14 +108,8 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
 }: DataTableProps<T>) {
   const hasData = dataSource.length > 0;
 
-  // 首次加载（无数据）：居中显示 Spinner
-  if (loading && !hasData) {
-    return (
-      <div className="flex items-center justify-center flex-1">
-        <Spinner />
-      </div>
-    );
-  }
+  // 首次加载保持表格区域尺寸，避免空白和内容整体替换。
+  if (loading && !hasData) return <PageSkeleton variant="table" />;
 
   // 错误态：与"真没数据"区分，提供重试入口
   if (errorText && !hasData) {
