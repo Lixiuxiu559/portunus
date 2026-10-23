@@ -141,12 +141,15 @@ export default function Channels() {
                 </Card.Header>
 
                 <Card.Content className="min-w-0">
-                  <Chip variant="soft" size="sm">
-                    {ch.type.replace(/_/g, ' ')}
-                  </Chip>
-                  <div className="mt-3">
-                    <div className="text-xs text-muted mb-1">Base URL</div>
-                    <span className="block truncate font-mono text-xs text-foreground/70"
+                  {/* 类型与 Base URL 标签同行靠右，地址单独占下一行，避免类型独占一行。 */}
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs text-muted">Base URL</span>
+                      <Chip variant="soft" size="sm" className="shrink-0">
+                        {ch.type.replace(/_/g, ' ')}
+                      </Chip>
+                    </div>
+                    <span className="mt-1 block truncate font-mono text-xs text-foreground/70"
                       title={ch.base_url}
                     >
                       {ch.base_url}
