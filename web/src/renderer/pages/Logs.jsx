@@ -123,7 +123,7 @@ export default function Logs() {
       dataIndex: 'created_at',
       key: 'created_at',
       isRowHeader: true,
-      width: '132px',
+      width: '108px',
       render: (val) => {
         if (!val) return <span className="block text-center text-xs text-muted">—</span>;
         const date = new Date(val);
@@ -139,9 +139,9 @@ export default function Logs() {
       title: '状态',
       dataIndex: 'success',
       key: 'success',
-      width: '96px',
+      width: '88px',
       render: (val, record) => (
-        <span className="flex flex-col items-center gap-0.5">
+        <span className="flex w-full flex-col items-center gap-0.5">
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
             val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
           }`}>
@@ -149,7 +149,7 @@ export default function Logs() {
           </span>
           {!val && record?.err_kind && (
             <span
-              className="max-w-[84px] truncate text-xs text-muted"
+              className="block max-w-full truncate text-xs text-muted"
               title={record?.err_msg || record.err_kind}
             >
               {errKindLabels[record.err_kind] || record.err_kind}
@@ -162,7 +162,7 @@ export default function Logs() {
       title: '实际模型 / 渠道',
       dataIndex: 'model_name',
       key: 'model_name',
-      width: '184px',
+      width: '216px',
       render: (val, record) => <span className="block text-center"><span className="block truncate" title={String(val || '')}>{val || '未记录模型'}</span><span className="block truncate text-xs text-muted" title={logChannelLabel(record.channel_id, channels)}>{logChannelLabel(record.channel_id, channels)}</span></span>,
     },
     { title: '详情', dataIndex: 'id', key: 'detail', width: '78px', render: (id, record) => <Button size="sm" variant="secondary" aria-label={`查看日志 ${id} 详情`} onPress={() => setDetail({ record })}>详情</Button> },
