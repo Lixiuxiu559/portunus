@@ -5,10 +5,11 @@ export const errKindLabels = {
 };
 
 // 名称来自当前渠道目录，历史日志只保存 ID；已删除渠道仍可定位。
+// 渠道名在保存时唯一，展示只用名称；ID 仅在名称缺失时作为兜底。
 export function logChannelLabel(channelId, channels) {
   if (!channelId) return '未记录渠道';
   const channel = channels.find((item) => Number(item.id) === Number(channelId));
-  return channel ? `${channel.name}（#${channelId}）` : `渠道 #${channelId}（已删除或未加载）`;
+  return channel ? channel.name : `渠道 #${channelId}（已删除或未加载）`;
 }
 
 export function logErrorSummary(record) {

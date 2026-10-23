@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { logChannelLabel, logErrorSummary, copyLogText } from './logDetails.js';
 
-test('同名渠道保留 ID，删除及历史缺失渠道不伪造名称', () => {
-  const channels = [{ id: 1, name: '同名' }, { id: 2, name: '同名' }];
-  assert.equal(logChannelLabel(1, channels), '同名（#1）');
-  assert.equal(logChannelLabel(2, channels), '同名（#2）');
+test('渠道展示只用名称，删除及历史缺失渠道不伪造名称', () => {
+  const channels = [{ id: 1, name: '个人-deepseek' }, { id: 2, name: '乐聚-newapi' }];
+  assert.equal(logChannelLabel(1, channels), '个人-deepseek');
+  assert.equal(logChannelLabel(2, channels), '乐聚-newapi');
   assert.equal(logChannelLabel(9, channels), '渠道 #9（已删除或未加载）');
   assert.equal(logChannelLabel(0, channels), '未记录渠道');
 });
