@@ -1,7 +1,7 @@
 /* v0.4.1 workspace: 56px glass header, p-6 content, max-w-7xl. */
 .app-shell { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100dvh; background: color-mix(in oklch, var(--background) 70%, transparent); color: var(--foreground); }
 .app-topbar { position: relative; display: flex; align-items: center; height: 56px; flex-shrink: 0; padding: 0 24px 0 88px; border-bottom: 1px solid color-mix(in oklch, var(--foreground) 10%, transparent); -webkit-app-region: drag; }
-.app-topbar-brand { display: flex; align-items: center; gap: 10px; }
+.app-topbar-brand { display: flex; align-items: center; gap: 12px; }
 .app-topbar-brand img { height: 40px; width: auto; pointer-events: none; }
 .app-top-navigation { position: absolute; left: 50%; transform: translateX(-50%); -webkit-app-region: no-drag; }
 .app-topbar-actions { display: flex; align-items: center; margin-left: auto; -webkit-app-region: no-drag; }
@@ -9,5 +9,5 @@
 .app-main { display: flex; flex: 1; min-height: 0; min-width: 0; padding: 24px; outline: none; }
 .app-page { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; width: 100%; max-width: 1280px; margin-inline: auto; }
 .app-update-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 24px; font-size: 12px; background: var(--surface-secondary); }
-.app-skip-link { position: fixed; z-index: 100; top: 8px; left: 88px; padding: 8px 14px; background: var(--surface); border-radius: 8px; transform: translateY(-180%); }
+.app-skip-link { position: fixed; z-index: 100; top: 8px; left: 88px; padding: 8px 16px; background: var(--surface); border-radius: 8px; transform: translateY(-180%); }
 .app-skip-link:focus { transform: none; outline: 2px solid var(--accent); }

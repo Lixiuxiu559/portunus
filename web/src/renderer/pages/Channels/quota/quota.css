@@ -1,11 +1,11 @@
 .quota-card-summary { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--separator); }
-.quota-link { color: var(--muted); text-align: left; cursor: pointer; width: fit-content; border-radius: 6px; }
+.quota-link { color: var(--muted); text-align: left; cursor: pointer; width: fit-content; border-radius: 8px; }
 .quota-link:hover { color: var(--accent); }
 .quota-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .quota-panel-container { width: min(900px, calc(100vw - 32px)); max-width: 900px; padding: 24px 0; }
 .modal__container .quota-panel-dialog { display: flex; flex-direction: column; width: 100%; max-width: none; max-height: calc(100dvh - 48px); padding: 24px; overflow: hidden; }
 .quota-panel-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.quota-panel-icon, .quota-back { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid var(--separator); border-radius: 13px; background: var(--surface-secondary); color: var(--muted); }
+.quota-panel-icon, .quota-back { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--separator); border-radius: 12px; background: var(--surface-secondary); color: var(--muted); }
 .quota-back { cursor: pointer; }
 .quota-back:hover { color: var(--foreground); background: var(--surface-tertiary); }
 .quota-eyebrow { color: var(--muted); font-size: 11px; line-height: 16px; margin-bottom: 2px; overflow-wrap: anywhere; }
@@ -13,18 +13,18 @@
 .modal__dialog .quota-panel-body.is-editing { display: flex; overflow: hidden; }
 .quota-panel-content { display: flex; flex-direction: column; gap: 16px; min-width: 0; width: 100%; }
 .is-editing .quota-panel-content { min-height: 0; overflow: hidden; }
-.quota-source-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 2px 0 6px; }
+.quota-source-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 0 8px; }
 .quota-source-toolbar h3 { font-size: 14px; font-weight: 600; }
-.quota-source-toolbar h3 span { margin-left: 6px; color: var(--muted); font-size: 12px; font-weight: 400; }
-.quota-source-toolbar p { color: var(--muted); font-size: 12px; margin-top: 3px; }
-.quota-source, .quota-preview { padding: 18px; border: 1px solid var(--separator); border-radius: 16px; background: color-mix(in oklch, var(--surface) 76%, transparent); }
-.quota-source-name { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; min-width: 0; }
+.quota-source-toolbar h3 span { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.quota-source-toolbar p { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.quota-source, .quota-preview { padding: 20px; border: 1px solid var(--separator); border-radius: 16px; background: color-mix(in oklch, var(--surface) 76%, transparent); }
+.quota-source-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .quota-source-name h3 { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.quota-enabled { font-size: 10px; line-height: 20px; padding: 0 7px; border-radius: 6px; color: var(--muted); background: var(--surface-secondary); white-space: nowrap; }
+.quota-enabled { font-size: 10px; line-height: 20px; padding: 0 8px; border-radius: 8px; color: var(--muted); background: var(--surface-secondary); white-space: nowrap; }
 .quota-enabled.is-enabled { color: var(--success); background: color-mix(in oklch, var(--success) 10%, transparent); }
 .quota-source .quota-delete { color: var(--muted); }
 .quota-source .quota-delete:hover { color: var(--danger); }
-.quota-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 44px 20px; border: 1px dashed var(--separator); border-radius: 16px; text-align: center; color: var(--muted); }
+.quota-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 44px 20px; border: 1px dashed var(--separator); border-radius: 16px; text-align: center; color: var(--muted); }
 .quota-empty h3 { font-size: 14px; font-weight: 500; color: var(--foreground); }
 .quota-empty p { max-width: 360px; font-size: 12px; }
 .modal__dialog .quota-panel-footer { justify-content: space-between; }
@@ -34,70 +34,70 @@
 .quota-item strong { font-size: 18px; letter-spacing: -.025em; line-height: 28px; }
 .quota-item + .quota-item { padding-top: 12px; border-top: 1px solid var(--separator); }
 .quota-editor { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.quota-editor-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 5px 5px 2px; }
+.quota-editor-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px 4px; }
 .quota-editor-fields { display: flex; flex-direction: column; gap: 16px; min-width: 0; border: 0; margin: 0; padding: 0; }
-.quota-form-section { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px; border: 1px solid var(--separator); border-radius: 16px; background: color-mix(in oklch, var(--surface) 68%, transparent); }
-.quota-section-title { display: flex; align-items: center; gap: 9px; margin-bottom: 2px; }
+.quota-form-section { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--separator); border-radius: 16px; background: color-mix(in oklch, var(--surface) 68%, transparent); }
+.quota-section-title { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .quota-section-title > span { color: var(--muted); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .quota-section-title h3 { color: var(--foreground); font-size: 14px; font-weight: 600; }
-.quota-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.quota-editor label { display: flex; flex-direction: column; gap: 7px; min-width: 0; color: var(--foreground); font-size: 12px; line-height: 18px; }
-.quota-editor input:not([type=checkbox]), .quota-editor select, .quota-custom textarea { width: 100%; min-width: 0; min-height: 38px; padding: 9px 11px; border: 1px solid var(--separator); border-radius: 10px; background: color-mix(in oklch, var(--surface) 90%, transparent); color: var(--foreground); font-size: 13px; line-height: 20px; }
+.quota-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.quota-editor label { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--foreground); font-size: 12px; line-height: 18px; }
+.quota-editor input:not([type=checkbox]), .quota-editor select, .quota-custom textarea { width: 100%; min-width: 0; min-height: 36px; padding: 8px 12px; border: 1px solid var(--separator); border-radius: 12px; background: color-mix(in oklch, var(--surface) 90%, transparent); color: var(--foreground); font-size: 13px; line-height: 20px; }
 .quota-editor input::placeholder, .quota-custom textarea::placeholder { color: var(--muted); }
 .quota-editor input:focus-visible, .quota-editor select:focus-visible, .quota-custom textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.quota-editor .quota-check { flex-direction: row; align-items: center; gap: 9px; }
-.quota-editor input[type=checkbox] { accent-color: var(--accent); flex: 0 0 auto; width: 14px; height: 14px; }
+.quota-editor .quota-check { flex-direction: row; align-items: center; gap: 8px; }
+.quota-editor input[type=checkbox] { accent-color: var(--accent); flex: 0 0 auto; width: 16px; height: 16px; }
 .quota-refresh-fields { align-items: center; }
 .quota-help { color: var(--muted); font-size: 11px; line-height: 18px; overflow-wrap: anywhere; }
 .quota-editor :disabled { opacity: .6; }
 .quota-editor-footer { display: flex; flex-shrink: 0; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .quota-editor-footer .button:first-of-type { margin-right: auto; }
-.quota-editor-error { flex-basis: 100%; max-height: 72px; overflow-y: auto; overflow-wrap: anywhere; padding: 9px 12px; border-radius: 10px; background: color-mix(in oklch, var(--danger) 8%, transparent); }
+.quota-editor-error { flex-basis: 100%; max-height: 72px; overflow-y: auto; overflow-wrap: anywhere; padding: 8px 12px; border-radius: 12px; background: color-mix(in oklch, var(--danger) 8%, transparent); }
 .quota-preview { margin-top: 16px; }
 .quota-custom { display: flex; flex-direction: column; gap: 16px; }
-.quota-custom-item { display: flex; flex-direction: column; gap: 14px; min-width: 0; border: 1px solid var(--separator); border-radius: 12px; padding: 16px; background: color-mix(in oklch, var(--surface-secondary) 50%, transparent); }
+.quota-custom-item { display: flex; flex-direction: column; gap: 16px; min-width: 0; border: 1px solid var(--separator); border-radius: 12px; padding: 16px; background: color-mix(in oklch, var(--surface-secondary) 50%, transparent); }
 .quota-custom-item h4 { font-size: 13px; overflow-wrap: anywhere; }
 .quota-item-index { margin-right: 8px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.quota-custom textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; line-height: 19px; }
+.quota-custom textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; line-height: 20px; }
 .quota-custom button { font-size: 12px; color: var(--muted); cursor: pointer; }
 .quota-custom button:hover { color: var(--foreground); }
 .quota-custom button:disabled { opacity: .4; cursor: default; }
-.quota-custom .quota-custom-add { align-self: flex-start; padding: 8px 12px; border: 1px solid var(--separator); border-radius: 9px; background: var(--surface); color: var(--foreground); }
+.quota-custom .quota-custom-add { align-self: flex-start; padding: 8px 12px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface); color: var(--foreground); }
 .quota-custom summary { cursor: pointer; font-size: 12px; color: var(--muted); }
 .quota-advanced { border-top: 1px solid var(--separator); padding-top: 12px; }
 .quota-advanced[open] > summary { margin-bottom: 12px; }
-.quota-amount-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.quota-amount-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 640px) {
   .quota-panel-container { width: calc(100vw - 16px); padding: 12px 0; }
   .modal__container .quota-panel-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
   .quota-form-grid, .quota-amount-paths { grid-template-columns: minmax(0, 1fr); }
-  .quota-form-section { padding: 14px; }
+  .quota-form-section { padding: 16px; }
   .quota-source-toolbar { align-items: flex-start; }
   .quota-source-toolbar .button { flex-shrink: 0; }
-  .quota-editor-footer { gap: 6px; }
-  .quota-editor-footer .button { padding-inline: 10px; font-size: 12px; }
+  .quota-editor-footer { gap: 8px; }
+  .quota-editor-footer .button { padding-inline: 12px; font-size: 12px; }
 }
 
 /* Keep the card focused on the available amount; full records live in the source panel. */
-.quota-compact-source { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.quota-compact-source + .quota-compact-source { padding-top: 10px; border-top: 1px solid var(--separator); }
-.quota-compact-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-width: 0; min-height: 24px; }
+.quota-compact-source { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.quota-compact-source + .quota-compact-source { padding-top: 12px; border-top: 1px solid var(--separator); }
+.quota-compact-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-width: 0; min-height: 24px; }
 .quota-compact-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
-.quota-compact-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
-.quota-icon-button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 7px; color: var(--muted); cursor: pointer; }
+.quota-compact-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.quota-icon-button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 8px; color: var(--muted); cursor: pointer; }
 .quota-icon-button:hover { color: var(--accent); background: color-mix(in oklch, var(--accent) 8%, transparent); }
 .quota-icon-button:focus-visible, .quota-empty-link:focus-visible, .quota-more-items:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .quota-icon-button:disabled { cursor: default; opacity: .45; background: transparent; }
 .quota-compact-values { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.quota-compact-amount { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.quota-compact-amount { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
 .quota-compact-amount > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
-.quota-compact-amount strong { font-size: 20px; font-weight: 600; line-height: 27px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.quota-compact-amount strong { font-size: 20px; font-weight: 600; line-height: 28px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
 .quota-compact-amount > span + strong { font-size: 17px; line-height: 24px; text-align: right; }
 .quota-compact-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 16px; font-size: 10px; line-height: 16px; color: var(--muted); }
 .quota-compact-failure { color: var(--warning, var(--accent)); cursor: help; }
 .quota-more-items { width: fit-content; text-align: left; font-size: 11px; line-height: 18px; color: var(--muted); cursor: pointer; border-radius: 4px; }
 .quota-more-items:hover { color: var(--accent); }
-.quota-empty-link { display: flex; align-items: center; gap: 7px; min-height: 30px; width: 100%; font-size: 12px; text-align: left; color: var(--muted); cursor: pointer; border-radius: 6px; }
+.quota-empty-link { display: flex; align-items: center; gap: 8px; min-height: 32px; width: 100%; font-size: 12px; text-align: left; color: var(--muted); cursor: pointer; border-radius: 8px; }
 .quota-empty-link > svg:last-child { margin-left: auto; }
 .quota-empty-link:hover { color: var(--accent); }
 .quota-empty-link:disabled { cursor: default; }

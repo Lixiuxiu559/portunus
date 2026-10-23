@@ -15,7 +15,7 @@
 .settings-about { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; min-width: 0; }
 .settings-about-copy { min-width: 0; flex: 1; }
 .settings-version-details { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.settings-repository { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.settings-repository { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .settings-repository-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-version { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-left: 8px; }
 .settings-version > *, .settings-latest-version { overflow-wrap: anywhere; }
