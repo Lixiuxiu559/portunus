@@ -156,7 +156,7 @@ export default function Models() {
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-                      <ProviderIcon type={channelType} className="size-5" />
+                      <ProviderIcon type={channelType} providerId={channel?.provider_id} icon={channel?.icon} name={channel?.name} className="size-5" />
                     </span>
                     <div className="min-w-0">
                       <Typography className="block truncate font-mono text-sm font-medium" title={m.name}>{m.name}</Typography>

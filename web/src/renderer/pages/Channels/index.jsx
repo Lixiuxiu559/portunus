@@ -124,7 +124,7 @@ export default function Channels() {
               <Card key={ch.id} data-expand-card className="gap-4 p-5">
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
-                    <ProviderIcon type={ch.type} className="size-6 shrink-0" />
+                    <ProviderIcon type={ch.type} providerId={ch.provider_id} icon={ch.icon} name={ch.name} className="size-6 shrink-0" />
                     <Typography className="font-medium text-lg truncate" title={ch.name}>{ch.name}</Typography>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -185,7 +185,7 @@ export default function Channels() {
           ariaLabel="编辑渠道"
           title={
             <>
-              <ProviderIcon type={editTarget.type} className="size-6 shrink-0" />
+              <ProviderIcon type={editTarget.type} providerId={editTarget.provider_id} icon={editTarget.icon} name={editTarget.name} className="size-6 shrink-0" />
               <Typography className="font-medium text-lg truncate" title={editTarget.name}>
                 {editTarget.name}
               </Typography>

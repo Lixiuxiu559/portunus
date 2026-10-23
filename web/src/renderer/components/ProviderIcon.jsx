@@ -1,7 +1,10 @@
+import { useState } from 'react';
+import { providerIcons, resolveChannelIcon } from './providerIcons';
+
 /**
  * 协议供应商图标（SVG 内联）
  */
-export default function ProviderIcon({ type, className = 'size-4' }) {
+function ProtocolIcon({ type, className = 'size-4' }) {
   switch (type) {
     case 'openai':
     case 'openai_responses':
@@ -29,4 +32,21 @@ export default function ProviderIcon({ type, className = 'size-4' }) {
         </svg>
       );
   }
+}
+
+
+// 自定义 PNG 与内置品牌优先；旧渠道沿用协议图标。
+export default function ProviderIcon({ type, providerId, icon, name = '', className = 'size-4' }) {
+  const [broken, setBroken] = useState('');
+  const resolved = resolveChannelIcon({ type, providerId, icon: icon === broken ? '' : icon });
+  if (resolved.kind === 'custom') {
+    return <img src={resolved.value} alt={name} className={`${className} object-contain rounded-md`}
+      onError={() => setBroken(resolved.value)} />;
+  }
+  if (resolved.kind === 'builtin') {
+    const entry = providerIcons.find((item) => item.id === resolved.value);
+    return <span aria-hidden="true" className={`${className} inline-flex items-center justify-center [&>svg]:h-full [&>svg]:w-full`}
+      dangerouslySetInnerHTML={{ __html: entry.svg }} />;
+  }
+  return <ProtocolIcon type={type} className={className} />;
 }

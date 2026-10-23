@@ -5,6 +5,17 @@ import { applyProfile, connectionIdentity, connectionPayload, createDraft, isCur
 const preset = { id: 'generic', profiles: [] };
 const profile = { id: 'chat', type: 'openai', adapter_id: 'generic', base_url: 'https://example.test/v1', model_discovery: 'api' };
 
+test('图标保存回显，清除可提交空值，换预设不覆盖手动选择且不影响连接身份', () => {
+  const draft = createDraft({ icon: 'deepseek', type: 'openai' });
+  assert.equal(draft.icon, 'deepseek');
+  assert.equal(savePayload(draft, []).icon, 'deepseek');
+  assert.equal(savePayload({ ...draft, icon: '' }, []).icon, '');
+  assert.equal(createDraft().icon, '');
+  assert.equal(applyProfile(draft, preset, profile).icon, 'deepseek');
+  assert.equal(connectionIdentity(draft), connectionIdentity({ ...draft, icon: 'openai' }));
+  assert.equal('icon' in connectionPayload(draft), false);
+});
+
 test('通用目录的四协议原样进入渠道草稿，不由页面猜测协议', () => {
   for (const type of ['openai', 'openai_responses', 'anthropic', 'gemini']) {
     const selected = applyProfile(createDraft(), preset, { ...profile, id: type, type });

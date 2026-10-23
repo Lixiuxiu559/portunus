@@ -1,7 +1,7 @@
 // 渠道草稿规则独立于 React 和网络，创建与编辑复用。
 export function createDraft(channel) {
   return {
-    name: channel?.name || '', type: channel?.type || '',
+    name: channel?.name || '', icon: channel?.icon || '', type: channel?.type || '',
     provider_id: channel?.provider_id || 'generic', profile_id: channel?.profile_id || '',
     adapter_id: channel?.adapter_id || 'generic', base_url: channel?.base_url || '', key: '',
     connection_options: {
@@ -49,7 +49,7 @@ export function connectionPayload(draft, channelId) {
 
 export function savePayload(draft, selected) {
   return {
-    ...connectionPayload(draft), name: draft.name.trim(), models: normalizeModels(selected),
+    ...connectionPayload(draft), icon: draft.icon || '', name: draft.name.trim(), models: normalizeModels(selected),
     auto_sync: draft.connection_options.model_discovery === 'api' && draft.auto_sync,
   };
 }

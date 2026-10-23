@@ -49,7 +49,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
   };
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (saving || !formRef.current?.checkValidity()) return;
+    if (saving || state.iconPending || !formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       await updateChannel(channel.id, savePayload(state.draft, state.selected));
@@ -73,7 +73,7 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
       </div>
       <div className="flex justify-end gap-2 mt-2">
         <Button variant="secondary" isDisabled={saving} onPress={onClose}>取消</Button>
-        <Button variant="primary" isPending={saving} onPress={() => formRef.current?.requestSubmit()}>{saving ? '保存中…' : '保存并导入所选模型'}</Button>
+        <Button variant="primary" isPending={saving} isDisabled={state.iconPending} onPress={() => formRef.current?.requestSubmit()}>{saving ? '保存中…' : '保存并导入所选模型'}</Button>
       </div>
     </Form>
     <ConfirmModal isOpen={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="删除模型"

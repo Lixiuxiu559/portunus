@@ -89,7 +89,7 @@ func TestLegacyChannelSchemaMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ProviderID != "generic" || c.AdapterID != "generic" || c.AutoSync || c.ThinkingCompat || c.BaseURL != "https://old.invalid/v1" {
+	if c.ProviderID != "generic" || c.AdapterID != "generic" || c.Icon != "" || c.AutoSync || c.ThinkingCompat || c.BaseURL != "https://old.invalid/v1" {
 		t.Fatalf("migration changed legacy fields: %+v", c)
 	}
 	if _, err := upstream.Open(c.ConnectionConfig()); err != nil {

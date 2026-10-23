@@ -15,6 +15,7 @@ type Channel struct {
 	ConnectionOptions upstream.Options  `gorm:"serializer:json" json:"connection_options"`
 	ID                int64             `gorm:"primaryKey" json:"id"`
 	Name              string            `gorm:"unique;not null" json:"name"`
+	Icon              string            `gorm:"type:text;not null;default:''" json:"icon"` // 空值跟随厂商，或内置名称 / PNG data URI
 	Type              protocol.Provider `json:"type"`
 	BaseURL           string            `json:"base_url"`                      // 仅基础地址，具体路径由协议层补全
 	Key               string            `json:"key"`                           // 上游访问凭据

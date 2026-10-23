@@ -16,6 +16,7 @@ var ErrInvalid = &shared.StatusError{Status: 400, Message: "渠道字段不合�
 
 // CreateRequest 创建渠道请求。
 type CreateRequest struct {
+	Icon              string            `json:"icon"`
 	ProviderID        string            `json:"provider_id"`
 	ProfileID         string            `json:"profile_id"`
 	AdapterID         string            `json:"adapter_id"`
@@ -30,6 +31,7 @@ type CreateRequest struct {
 
 // UpdateRequest 更新渠道请求，仅包含需要变更的字段。
 type UpdateRequest struct {
+	Icon              *string            `json:"icon"`
 	ProviderID        *string            `json:"provider_id"`
 	ProfileID         *string            `json:"profile_id"`
 	AdapterID         *string            `json:"adapter_id"`
@@ -44,6 +46,7 @@ type UpdateRequest struct {
 
 // Response 是渠道的对外响应，Key 已脱敏。
 type Response struct {
+	Icon              string            `json:"icon"`
 	ProviderID        string            `json:"provider_id"`
 	ProfileID         string            `json:"profile_id"`
 	AdapterID         string            `json:"adapter_id"`
@@ -62,6 +65,7 @@ type Response struct {
 // ToResponse 将实体转为脱敏后的响应。
 func (c *Channel) ToResponse() Response {
 	return Response{
+		Icon:       c.Icon,
 		ProviderID: c.ProviderID, ProfileID: c.ProfileID, AdapterID: c.AdapterID, ConnectionOptions: c.ConnectionOptions,
 		ID:             c.ID,
 		Name:           c.Name,
@@ -120,11 +124,14 @@ func CreateTx(tx *gorm.DB, req *CreateRequest) (*Channel, error) {
 	if req == nil || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Key) == "" {
 		return nil, ErrInvalid
 	}
+	if err := validateIcon(req.Icon); err != nil {
+		return nil, err
+	}
 	cfg, err := resolveConnection(upstream.Config{ProviderID: req.ProviderID, ProfileID: req.ProfileID, AdapterID: req.AdapterID, Type: req.Type, BaseURL: req.BaseURL, Key: req.Key, Options: req.ConnectionOptions})
 	if err != nil {
 		return nil, err
 	}
-	c := Channel{Name: req.Name, AutoSync: true, ThinkingCompat: true}
+	c := Channel{Name: req.Name, Icon: req.Icon, AutoSync: true, ThinkingCompat: true}
 	c.applyConnection(cfg)
 	if req.AutoSync != nil {
 		c.AutoSync = *req.AutoSync
@@ -186,6 +193,11 @@ func Update(id int64, req UpdateRequest) (c *Channel, err error) {
 
 // UpdateTx 更新渠道。仅连接字段发生变更时重新校验连接，兼容旧渠道的纯元数据编辑。
 func UpdateTx(tx *gorm.DB, id int64, req UpdateRequest) (*Channel, error) {
+	if req.Icon != nil {
+		if err := validateIcon(*req.Icon); err != nil {
+			return nil, err
+		}
+	}
 	if req.BaseURL != nil && strings.TrimSpace(*req.BaseURL) == "" {
 		return nil, &shared.StatusError{Status: 400, Message: "API 根地址不能为空"}
 	}
@@ -198,6 +210,9 @@ func UpdateTx(tx *gorm.DB, id int64, req UpdateRequest) (*Channel, error) {
 	}
 	if req.Name != nil {
 		c.Name = *req.Name
+	}
+	if req.Icon != nil {
+		c.Icon = *req.Icon
 	}
 	if strings.TrimSpace(c.Name) == "" {
 		return nil, ErrInvalid

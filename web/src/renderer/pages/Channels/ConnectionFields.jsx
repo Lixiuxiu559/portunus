@@ -1,3 +1,5 @@
+import ChannelIconPicker from '../../components/ChannelIconPicker';
+
 import { Button, FieldError, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 
 function Choice({ label, value, options, onChange, disabled = false }) {
@@ -32,6 +34,7 @@ export default function ConnectionFields({ state, editing = false }) {
         <Button type="button" size="sm" variant="secondary" onPress={() => state.loadPresets()}>重试</Button>
       </div>}
       <div className="dialog-form-grid grid grid-cols-2 gap-3">
+        <ChannelIconPicker draft={draft} onChange={(icon) => patch({ icon })} onProcessingChange={state.setIconPending} />
         <TextField isRequired name="name" value={draft.name} onChange={(name) => patch({ name })} autoFocus autoComplete="off"
           validate={(value) => !value?.trim() ? '请填写渠道名称' : null}>
           <Label>渠道名称</Label><Input placeholder="例如：官方 API" /><FieldError />

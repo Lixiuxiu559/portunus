@@ -13,7 +13,7 @@ function CreateChannelForm({ onOpenChange, onCreated }) {
   const formRef = useRef(null);
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (saving || !state.draft.type || !formRef.current?.checkValidity()) return;
+    if (saving || state.iconPending || !state.draft.type || !formRef.current?.checkValidity()) return;
     setSaving(true);
     try {
       await createChannel(savePayload(state.draft, state.selected));
@@ -36,7 +36,7 @@ function CreateChannelForm({ onOpenChange, onCreated }) {
     </Modal.Body>
     <Modal.Footer>
       <Button slot="close" variant="secondary" isDisabled={saving}>取消</Button>
-      <Button variant="primary" isPending={saving} isDisabled={!state.draft.type} onPress={() => formRef.current?.requestSubmit()}>
+      <Button variant="primary" isPending={saving} isDisabled={state.iconPending || !state.draft.type} onPress={() => formRef.current?.requestSubmit()}>
         {saving ? '保存中…' : '保存渠道与所选模型'}
       </Button>
     </Modal.Footer>

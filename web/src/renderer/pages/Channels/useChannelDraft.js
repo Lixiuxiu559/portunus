@@ -7,6 +7,7 @@ export default function useChannelDraft(channel) {
   const [draft, setDraft] = useState(() => createDraft(channel));
   const draftRef = useRef(draft);
   const [presets, setPresets] = useState([]);
+  const [iconPending, setIconPending] = useState(false);
   const [presetError, setPresetError] = useState('');
   const [pending, setPending] = useState({});
   const [results, setResults] = useState({});
@@ -95,7 +96,7 @@ export default function useChannelDraft(channel) {
     setSelected((old) => normalizeModels([...old, ...names]));
   };
   return {
-    draft, patch, presets, presetError, loadPresets, chooseProfile, pending, results, clearResult,
+    draft, patch, presets, iconPending, setIconPending, presetError, loadPresets, chooseProfile, pending, results, clearResult,
     candidates, selected, setSelected, addModel, fetchModels,
     resolve: () => run('resolve', resolveChannel),
     test: (settings) => run('test', (data, options) => testChannel({ ...data, ...settings }, options)),
