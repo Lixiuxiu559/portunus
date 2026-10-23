@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Typography, Chip, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
+import { Button, Typography, Card, toast, Select, ListBox, TextField, Input, Spinner } from '@heroui/react';
 import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
+import ProviderIcon from '../../components/ProviderIcon';
 import './models.css';
 
 export default function Models() {
@@ -50,7 +51,7 @@ export default function Models() {
   useEffect(() => { fetchAll(); }, []);
 
   const channelMap = useMemo(
-    () => Object.fromEntries(channels.map((c) => [c.id, c.name])),
+    () => Object.fromEntries(channels.map((c) => [c.id, c])),
     [channels],
   );
 
@@ -147,19 +148,25 @@ export default function Models() {
       : <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             {models.map((m) => {
-              const channelName = channelMap[m.channel_id] || m.channel_id;
-              return <Card key={m.id} className="gap-4 p-5">
+              const channel = channelMap[m.channel_id];
+              const channelName = channel?.name || m.channel_id;
+              const channelType = channel?.type || 'generic';
+              const updated = formatRelativeTime(m.updated_at);
+              return <Card key={m.id} className="gap-3 p-4">
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
-                  <Typography className="min-w-0 flex-1 truncate font-medium text-lg" title={m.name}>{m.name}</Typography>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+                      <ProviderIcon type={channelType} className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <Typography className="block truncate font-mono text-sm font-medium" title={m.name}>{m.name}</Typography>
+                      <Typography type="body-xs" className="block truncate text-muted" title={`${channelName}${updated ? ` · ${formatFullTime(m.updated_at)}` : ''}`}>
+                        {channelName}{updated ? ` · ${updated}` : ''}
+                      </Typography>
+                    </div>
                   </div>
+                  <IconButton label={`删除模型 ${m.name}`} onClick={() => setDeleteTarget(m)} danger><Trash2 className="size-4" /></IconButton>
                 </Card.Header>
-                <Card.Content className="min-w-0">
-                  <Chip variant="soft" size="sm" color="default" className="min-w-0 max-w-[60%]">
-                    <span className="truncate" title={String(channelName)}>{channelName}</span>
-                  </Chip>
-                </Card.Content>
               </Card>;
             })}
           </div>
@@ -185,4 +192,24 @@ export default function Models() {
       />
     </div>
   );
+}
+
+// 模型记录最近一次变更的粗略时间；缺失或非法值不显示，避免伪造状态。
+function formatRelativeTime(value) {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return '';
+  const diff = Date.now() - time;
+  if (diff < 60_000) return '刚刚';
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} 天前`;
+  return new Date(value).toLocaleDateString('zh-CN');
+}
+
+function formatFullTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', { hour12: false });
 }
