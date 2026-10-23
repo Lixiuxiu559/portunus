@@ -114,6 +114,7 @@ func relayErrorKindByStatus(status int) relayErrorKind {
 // 重试循环读 Retryable / StallNoHeader；熔断 defer 读 BreakerFail / StallNoHeader；
 // 归因落库读 ErrKind；状态码裁决与错误体渲染读 Status / RelayKind / RetryAfter。
 type failDecision struct {
+	StopRequest    bool           // 请求级终止（取消、重放不安全、资源/转换失败等），禁止继续候选
 	Retryable      bool           // 值得对同一 / 下一上游重试（内层循环继续）
 	StallNoHeader  bool           // 等头假死：跳过同目标重试直接换下一家；熔断按快速阈值（2 次）开路
 	StallMidStream bool           // 流静默假死：保留同目标重试；熔断按普通阈值计数
@@ -140,8 +141,16 @@ func failSpec(err error) failDecision {
 	var committed *streamCommittedError
 	if errors.As(err, &committed) {
 		d := failDecision{ErrKind: shared.ErrKindStreamInterrupt, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
-		if errors.Is(err, context.Canceled) {
+		var writeErr *deliveryWriteError
+		var clientDeadline *clientDeadlineError
+		if errors.As(err, &clientDeadline) {
+			d.ErrKind, d.Status = shared.ErrKindClientCancel, http.StatusGatewayTimeout
+		} else if errors.As(err, &writeErr) {
+			d.ErrKind = shared.ErrKindClientWrite
+		} else if errors.Is(err, context.Canceled) {
 			d.ErrKind = shared.ErrKindClientCancel // 包装的用户取消仍归用户行为
+		} else if errors.Is(err, protocol.ErrSSEEventTooLarge) || errors.Is(err, protocol.ErrStreamInvalid) {
+			// 本地资源/解析限制不因已开始交付而变成渠道故障。
 		} else {
 			// 半途失败仍是模型不健康（假流 / 静默超时 / 断连），普通阈值计入熔断，
 			// 否则持续假死的模型永远开不了路。
@@ -149,11 +158,45 @@ func failSpec(err error) failDecision {
 		}
 		return d
 	}
+	var clientDeadline *clientDeadlineError
+	if errors.As(err, &clientDeadline) {
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusGatewayTimeout, RelayKind: relayErrAPI}
+	}
+	var budgetErr *attemptBudgetError
+	if errors.As(err, &budgetErr) {
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindAttemptBudget, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+	}
+	var nonStreamDeadline *nonStreamDeadlineError
+	if errors.As(err, &nonStreamDeadline) {
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindNonStreamDeadline, Status: http.StatusGatewayTimeout, RelayKind: relayErrAPI}
+	}
+	var contentDeadline *firstContentDeadlineError
+	if errors.As(err, &contentDeadline) {
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindFirstContentDeadline, Status: http.StatusGatewayTimeout, RelayKind: relayErrAPI}
+	}
 	// 客户端主动取消（context.Canceled）不是上游故障，不重试也不计入熔断。
 	// 否则 doRequest 返回的 "Post ...: context canceled"（*url.Error 包装）会命中
 	// 下方 net.Error 分支被误判为可重试，一次用户取消就污染熔断器健康度。
 	if errors.Is(err, context.Canceled) {
-		return failDecision{ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+	}
+	var unsafe *streamReplayUnsafeError
+	if errors.As(err, &unsafe) {
+		d := failSpec(unsafe.err)
+		d.Retryable, d.StopRequest = false, true
+		return d
+	}
+	var bufferErr *precommitBufferError
+	if errors.As(err, &bufferErr) || errors.Is(err, protocol.ErrSSEEventTooLarge) || errors.Is(err, protocol.ErrStreamInvalid) {
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindConvert, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+	}
+	if errors.Is(err, protocol.ErrStreamIncomplete) {
+		return failDecision{Retryable: true, BreakerFail: true, ErrKind: shared.ErrKindUpstream, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+	}
+	var streamFailure *protocol.StreamFailureError
+	if errors.As(err, &streamFailure) {
+		retryable := streamFailure.Status >= 500 || streamFailure.Status == 429
+		return failDecision{Retryable: retryable, BreakerFail: retryable, ErrKind: shared.ErrKindUpstream, Status: streamFailure.Status, RelayKind: relayErrorKindByStatus(streamFailure.Status)}
 	}
 	// 等头假死：连响应头都不吐的目标在一个超时窗口内自愈概率极低，
 	// 同目标重试只会再等满一轮超时——换下一家 + 熔断快速开路 + 504。

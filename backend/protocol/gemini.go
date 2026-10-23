@@ -528,17 +528,17 @@ func geminiPartsToText(parts []GeminiPart) string {
 
 // geminiToOpenAIStream 把 Gemini 流式 chunk 逐条映射为 OpenAI chunk。
 type geminiToOpenAIStream struct {
-	st openAIStreamState
+	st sourceStreamState
 }
 
 func newGeminiToOpenAIStream() StreamConverter { return &geminiToOpenAIStream{} }
 
-func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+func (g *geminiToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
 	var resp GenerateContentResponse
 	if err := json.Unmarshal(payload, &resp); err != nil {
 		return nil, fmt.Errorf("解析 gemini 流事件失败: %w", err)
 	}
-	var out [][]byte
+	var out []StreamEvent
 	if resp.UsageMetadata != nil {
 		// 每条 chunk 的 usageMetadata 均为累积值，最后一条生效。经 usageFromGemini
 		// 归一：扣缓存并记 CacheRead，与非流式口径一致——此前流式不扣缓存也不记
@@ -557,9 +557,9 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	// 也不丢序。role chunk 先行，保持 canonical 流以 role 开场的惯例。
 	if gm := geminiGroundingToCanonical(cand.GroundingMetadata); gm != nil {
 		if b := g.st.emitRole("assistant"); b != nil {
-			out = append(out, b)
+			out = append(out, *b)
 		}
-		out = append(out, g.st.emitChunk(ChunkDelta{GroundingMetadata: gm}, ""))
+		out = append(out, g.st.emitChunk(StreamEventDelta{GroundingMetadata: gm}, ""))
 	}
 	if cand.Content != nil {
 		for _, p := range cand.Content.Parts {
@@ -567,16 +567,16 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 				continue
 			}
 			if b := g.st.emitRole("assistant"); b != nil {
-				out = append(out, b)
+				out = append(out, *b)
 			}
 			if p.Thought {
 				// 思考摘要增量 → reasoning_content（与 DeepSeek 流式同形状），
 				// 不计入正文 text，下游转 thinking 块
-				out = append(out, g.st.emitChunk(ChunkDelta{ReasoningContent: p.Text}, ""))
+				out = append(out, g.st.emitChunk(StreamEventDelta{ReasoningContent: p.Text}, ""))
 				continue
 			}
 			g.st.text.WriteString(p.Text)
-			out = append(out, g.st.emitChunk(ChunkDelta{Content: p.Text}, ""))
+			out = append(out, g.st.emitChunk(StreamEventDelta{Content: p.Text}, ""))
 		}
 	}
 	if cand.FinishReason != "" {
@@ -585,9 +585,9 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	return out, nil
 }
 
-func (g *geminiToOpenAIStream) Finish() ([][]byte, error) {
+func (g *geminiToOpenAIStream) End() ([]StreamEvent, error) {
 	if b := g.st.emitFinal(); b != nil {
-		return [][]byte{b}, nil
+		return []StreamEvent{*b}, nil
 	}
 	return nil, nil
 }
@@ -647,4 +647,14 @@ func (g *geminiBlockSink) candidate(content GeminiContent) [][]byte {
 		Candidates: []GeminiCandidate{{Content: &content}},
 	})
 	return [][]byte{b}
+}
+
+// Convert/Finish 保留旧 OpenAI wire API；生产跨协议链直接使用 Decode/End。
+func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+	events, err := g.Decode(payload)
+	return encodeOpenAIEvents(events, err)
+}
+func (g *geminiToOpenAIStream) Finish() ([][]byte, error) {
+	events, err := g.End()
+	return encodeOpenAIEvents(events, err)
 }

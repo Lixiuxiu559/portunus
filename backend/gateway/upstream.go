@@ -33,9 +33,23 @@ func (s *relayServer) doRequest(ctx context.Context, url string, headers http.He
 		return nil, err
 	}
 	req.Header = headers
+	if err := requestControlError(ctx); err != nil {
+		return nil, err
+	}
+	if control := controlFrom(ctx); control != nil {
+		if err := control.waitForAttempt(ctx); err != nil {
+			return nil, err
+		}
+		if err := control.reserve(); err != nil {
+			return nil, err
+		}
+	}
 	trace.begin(body, reason)
 	resp, err := s.deps.Client.Do(req)
 	if err != nil {
+		if stopErr := requestControlError(ctx); stopErr != nil {
+			return nil, stopErr
+		}
 		var ne net.Error
 		if errors.As(err, &ne) && ne.Timeout() && strings.Contains(err.Error(), "timeout awaiting response headers") {
 			return nil, &upstreamHeaderTimeoutError{seconds: s.deps.Cfg.FirstByteTimeoutSeconds}
@@ -62,6 +76,9 @@ func (s *relayServer) doRequestWithChatBudgetFallback(ctx context.Context, url s
 	resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(errorBody))
 	if readErr != nil {
+		if stopErr := requestControlError(ctx); stopErr != nil {
+			return nil, stopErr
+		}
 		return resp, nil
 	}
 	retryBody, ok := protocol.ChatTokenBudgetFallback(body, resp.StatusCode, errorBody)

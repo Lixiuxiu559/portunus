@@ -79,6 +79,18 @@ func (s *fromOpenAISkeleton) Convert(payload []byte) ([][]byte, error) {
 	if err := json.Unmarshal(payload, &chunk); err != nil {
 		return nil, fmt.Errorf("解析 openai chunk 失败: %w", err)
 	}
+	return s.Encode(streamEventFromChat(chunk))
+}
+
+// Encode 直接消费语义帧；共享块生命周期不解析中间 JSON。
+func (s *fromOpenAISkeleton) Encode(chunk StreamEvent) ([][]byte, error) {
+	if len(chunk.Choices) > 0 {
+		if gs, ok := s.sink.(interface{ SetGrounding(*GroundingMetadata) }); ok {
+			if gm := chunk.Choices[0].Delta.GroundingMetadata; gm != nil {
+				gs.SetGrounding(gm)
+			}
+		}
+	}
 	s.id = firstNonEmpty(s.id, chunk.ID)
 	s.model = firstNonEmpty(s.model, chunk.Model)
 	if chunk.Usage != nil {

@@ -37,20 +37,42 @@ type Log struct {
 	// openai 上游时剔除的声明数，加上 canonical 无法承载、入站即丢弃的未知
 	// hosted 类型数（见 protocol.ComposeStats）。>0 说明该请求的搜索类能力在
 	// 上游侧静默降级，客户端收到的 server_tool_use 将无对应执行。
-	HostedToolsStripped int       `json:"hosted_tools_stripped"`
-	CreatedAt           time.Time `gorm:"index" json:"created_at"`
+	HostedToolsStripped int `json:"hosted_tools_stripped"`
+	// 仅保存请求侧协议兼容检查摘要，不保存原生扩展内容。Checked=false 表示未采集，非兼容失败。
+	ConversionPolicy     string `gorm:"size:16" json:"-"` // 退役策略列，仅保留历史值；新日志不写入、不输出
+	ConversionScope      string `gorm:"size:32" json:"conversion_scope,omitempty"`
+	ConversionChecked    bool   `json:"conversion_checked"`
+	ConversionCompatible bool   `json:"conversion_compatible"`
+	ConversionIssueCount int    `json:"conversion_issue_count"`
+	// 响应侧摘要独立于请求侧检查，不保存原生字段、响应引用或正文。
+	ResponseConversionChecked    bool      `json:"response_conversion_checked"`
+	ResponseConversionScope      string    `gorm:"size:32" json:"response_conversion_scope,omitempty"`
+	ResponseConversionCompatible bool      `json:"response_conversion_compatible"`
+	ResponseConversionIssueCount int       `json:"response_conversion_issue_count"`
+	StreamOutcome                string    `gorm:"size:16" json:"stream_outcome,omitempty"`
+	StreamReason                 string    `gorm:"size:48" json:"stream_reason,omitempty"`
+	StreamTerminalObserved       bool      `json:"stream_terminal_observed"`
+	StreamDeliveryStarted        bool      `json:"stream_delivery_started"`
+	StreamTerminalWritten        bool      `json:"stream_terminal_written"`
+	StreamTailLimited            bool      `json:"stream_tail_limited"`
+	StreamWriteFailed            bool      `json:"stream_write_failed"`
+	CreatedAt                    time.Time `gorm:"index" json:"created_at"`
 }
 
 // ── 失败归因词表（Log.ErrKind 取值），前端与排障按此过滤 ──────────────────
 // 只持有取值；错误 → 类别的判定归 gateway.failSpec（失败处置模块，唯一权威）。
 
 const (
-	ErrKindClientCancel    = "client_cancel"      // 客户端主动断开（Esc / 关窗口）
-	ErrKindUpstream        = "upstream_error"     // 上游返回非 2xx
-	ErrKindWatchdog        = "watchdog_timeout"   // 上游流静默超时被看门狗掐断
-	ErrKindStreamInterrupt = "stream_interrupted" // 流已提交后中途断掉，无法 failover
-	ErrKindConvert         = "convert_error"      // 协议转换 / 请求改写失败
-	ErrKindNetwork         = "network"            // 连接 / 超时等网络层失败
-	ErrKindInternal        = "internal"           // 其余未归类失败
-	ErrKindCircuitOpen     = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
+	ErrKindAttemptBudget        = "attempt_budget_exhausted"
+	ErrKindFirstContentDeadline = "first_content_deadline"
+	ErrKindNonStreamDeadline    = "non_stream_deadline"
+	ErrKindClientWrite          = "client_write"       // 客户端写入或 Flush 失败，不计渠道故障
+	ErrKindClientCancel         = "client_cancel"      // 客户端主动断开或其自身期限到达
+	ErrKindUpstream             = "upstream_error"     // 上游返回非 2xx
+	ErrKindWatchdog             = "watchdog_timeout"   // 上游流静默超时被看门狗掐断
+	ErrKindStreamInterrupt      = "stream_interrupted" // 流已提交后中途断掉，无法 failover
+	ErrKindConvert              = "convert_error"      // 协议转换 / 请求改写失败
+	ErrKindNetwork              = "network"            // 连接 / 超时等网络层失败
+	ErrKindInternal             = "internal"           // 其余未归类失败
+	ErrKindCircuitOpen          = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
 )

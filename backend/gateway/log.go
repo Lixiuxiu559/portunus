@@ -15,7 +15,7 @@ import (
 // 的流量，后者记录本次装配的桥接命中数与垫片改写数（见 protocol.ComposeStats）。
 // 暂为同步写入（单条 SQLite insert 开销极小）；后续若成为瓶颈可改为队列异步落库。
 // 写入动作由 Deps.LogWrite 注入（生产 LogDB.Create，测试内存收集）。
-func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, clientProto protocol.Provider, stats protocol.ComposeStats, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error) {
+func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, clientProto protocol.Provider, stats protocol.ComposeStats, status int, success, stream bool, usage *protocol.Usage, durationMs, firstTokenMs int64, requestID string, callErr error, reports ...*streamDeliveryReport) {
 	entry := shared.Log{
 		APIKeyID:     apiKeyID,
 		GroupName:    g.Name,
@@ -28,10 +28,28 @@ func (s *relayServer) logCall(apiKeyID int64, g *group.Group, t router.Target, c
 		DurationMs:   durationMs,
 		FirstTokenMs: firstTokenMs,
 		// 诊断遥测（见 shared.Log 同名字段注释）
-		ClientProtocol:      string(clientProto),
-		BridgeDecoded:       stats.BridgeDecoded,
-		ShimRewrites:        stats.ShimRewrites,
-		HostedToolsStripped: stats.HostedToolsStripped,
+		ClientProtocol:       string(clientProto),
+		BridgeDecoded:        stats.BridgeDecoded,
+		ShimRewrites:         stats.ShimRewrites,
+		HostedToolsStripped:  stats.HostedToolsStripped,
+		ConversionChecked:    stats.Compatibility.Checked,
+		ConversionScope:      stats.Compatibility.Scope,
+		ConversionCompatible: stats.Compatibility.Compatible,
+		ConversionIssueCount: len(stats.Compatibility.Issues),
+	}
+	if len(reports) > 0 && reports[0] != nil {
+		report := reports[0].ResponseCompatibility
+		entry.ResponseConversionChecked = report.Checked
+		entry.ResponseConversionScope = report.Scope
+		entry.ResponseConversionCompatible = report.Compatible
+		entry.ResponseConversionIssueCount = len(report.Issues)
+	}
+	if stream && len(reports) > 0 && reports[0] != nil {
+		r := reports[0]
+		entry.StreamTailLimited = r.TailLimited
+		entry.StreamOutcome, entry.StreamReason = r.Outcome.Status, r.Outcome.Reason
+		entry.StreamTerminalObserved = r.Outcome.TerminalObserved
+		entry.StreamDeliveryStarted, entry.StreamTerminalWritten, entry.StreamWriteFailed = r.Started, r.TerminalWritten, r.WriteFailed
 	}
 	if callErr != nil {
 		entry.ErrKind = failSpec(callErr).ErrKind

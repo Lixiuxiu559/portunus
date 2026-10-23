@@ -1,9 +1,9 @@
 package gateway
 
 import (
-	"bufio"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -14,7 +14,7 @@ import (
 )
 
 // streamWatchdog 挂在上游流式请求上的静默看门狗：首包前按首包时限、提交后按静默时限，
-// 每收到一段上游数据就重排续命；超时即取消请求 ctx 掐断 body 读阻塞。
+// 首内容期限不因元数据续期，交付后收到数据才续静默期限；超时取消上游 body 读。
 // 看门狗 ctx 同时传给 doRequest，因此触发时也能掐断头等待之外的整个读取链路；
 // 客户端断连（父 ctx 取消）不算看门狗触发，由 Fired 区分，避免误伤取消语义。
 type streamWatchdog struct {
@@ -68,6 +68,17 @@ func (w *streamWatchdog) UseIdle() {
 	}
 }
 
+// UseTerminalGrace 终态后的有界尾帧窗口不因心跳而延长。
+func (w *streamWatchdog) UseTerminalGrace(wait time.Duration) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.stall != nil {
+		return
+	}
+	w.stage, w.d = "收尾", wait
+	w.armLocked(wait)
+}
+
 // Fired 返回触发信息；未触发返回 nil。看门狗触发时 body 读会以 ctx 取消报错，
 // 调用方据此替换读错误，与客户端主动断连（同样报 context.Canceled）区分开。
 func (w *streamWatchdog) Fired() *streamStallError {
@@ -118,80 +129,87 @@ func (w *streamWatchdog) fire() {
 // 返回 first 为首个有效事件写出时刻（首包前失败或未产出事件时为零值），供上层计算客户端 TTFT。
 // SSE 帧的解帧 / 装帧 / [DONE] / 流内 error 形状由 protocol.StreamFramer 承担，
 // 本函数只管编排：看门狗、committed 状态、首包计时、错误时机与类别判定。
-func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *http.Response, conv protocol.StreamConverter, wd *streamWatchdog) (first time.Time, err error) {
-	scanner := bufio.NewScanner(upstreamResp.Body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 放大缓冲，避免长行截断
-
+func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *http.Response, conv protocol.StreamConverter, wd *streamWatchdog, options ...streamRelayOptions) (first time.Time, err error) {
+	opt := streamRelayOptions{Source: protocol.ProviderOpenAI}
+	if len(options) > 0 {
+		opt = options[0]
+	}
+	if opt.Source == "" {
+		opt.Source = protocol.ProviderOpenAI
+	}
+	if opt.TerminalGrace <= 0 {
+		opt.TerminalGrace = defaultTerminalGrace
+	}
+	gate := newDeliveryGate(c, opt)
+	session := protocol.NewStreamSession(opt.Source, clientProto, conv)
 	fr := protocol.NewStreamFramer(clientProto, conv)
-	wd.Arm() // 响应头已回，开始首包静默计时
-	committed := false
-	for scanner.Scan() {
-		wd.Reset() // 有数据，续命
-		payload, ok, done := fr.Unframe([]byte(scanner.Text()))
-		if done {
+	unsafe, tailing := opt.ReplayUnsafe, false
+	reader := protocol.NewSSEReader(&streamReadProgress{r: upstreamResp.Body, wd: wd, report: gate.report, tailing: &tailing}, 1<<20)
+	defer func() {
+		gate.report.ResponseCompatibility = session.Compatibility()
+		gate.report.Outcome = session.Outcome()
+		if err != nil && gate.report.Outcome.Status == "pending" {
+			gate.report.Outcome.Status, gate.report.Outcome.Reason = "truncated", "transport_interrupted"
+		}
+		first = gate.first
+	}()
+	fail := func(cause error, kind string) error { return finishStreamError(c, fr, gate, unsafe, cause, kind) }
+	wd.Arm()
+	for {
+		event, readErr := reader.ReadEvent()
+		if readErr != nil {
+			if stopErr := requestControlError(c.Request.Context()); stopErr != nil {
+				return first, fail(stopErr, "api_error")
+			}
+			if streamSucceeded(session.Outcome()) && !errors.Is(readErr, protocol.ErrSSEEventTooLarge) {
+				gate.report.TailLimited = readErr != io.EOF
+				break
+			}
+			if readErr == io.EOF {
+				break
+			}
+			if stall := wd.Fired(); stall != nil {
+				readErr = stall
+			}
+			return first, fail(readErr, "overloaded_error")
+		}
+		batch, processErr := session.Process(event)
+		unsafe = unsafe || batch.ReplayUnsafe
+		if processErr != nil {
+			// 已交付的同协议错误帧仍保留原生形状；未提交时整批丢弃。
+			if gate.report.Started && len(batch.Frames) > 0 {
+				if writeErr := gate.push(batch); writeErr != nil {
+					return first, fail(writeErr, "api_error")
+				}
+			}
+			return first, fail(processErr, "api_error")
+		}
+		started := gate.report.Started
+		if err := gate.push(batch, len(event.Raw)); err != nil {
+			return first, fail(err, "api_error")
+		}
+		if !started && gate.report.Started {
+			wd.UseIdle()
+		}
+		if batch.Done {
 			break
 		}
-		if !ok {
-			continue
+		if !tailing && streamSucceeded(session.Outcome()) {
+			tailing = true
+			wd.UseTerminalGrace(opt.TerminalGrace)
 		}
-		frames, err := fr.ConvertPayload(payload)
-		if err != nil {
-			return first, failCommittedStream(c, fr, committed, err, "api_error")
-		}
-		if !committed {
-			first = time.Now()
-			writeStreamHeaders(c)
-			committed = true
-			wd.UseIdle() // 已提交，切换静默时限
-		}
-		for _, frame := range frames {
-			c.Writer.Write(frame)
-		}
-		c.Writer.Flush()
 	}
-	if err := scanner.Err(); err != nil {
-		// 看门狗触发（上游静默超时）时底层是 ctx 取消错误，还原为可读的静默超时，
-		// 避免与客户端主动断连（同为 context.Canceled）混淆。
-		if stall := wd.Fired(); stall != nil {
-			err = stall
-		}
-		return first, failCommittedStream(c, fr, committed, err, "overloaded_error")
+	if stopErr := requestControlError(c.Request.Context()); stopErr != nil {
+		return first, fail(stopErr, "api_error")
 	}
-
-	finals, err := fr.FinishFrames()
-	if err != nil {
-		return first, failCommittedStream(c, fr, committed, err, "api_error")
+	final, finishErr := session.Finish()
+	if finishErr != nil {
+		return first, fail(finishErr, "api_error")
 	}
-	if !committed {
-		// 上游 200 但未产出有效事件（如空流）：提交头后再收尾，交给客户端结束。
-		// 未产出任何 token，first 保持零值（无首包语义），与「未产出事件时为零值」的注释约定一致。
-		writeStreamHeaders(c)
-		committed = true
+	if err := gate.push(final); err != nil {
+		return first, fail(err, "api_error")
 	}
-	for _, frame := range finals {
-		c.Writer.Write(frame)
-	}
-	c.Writer.Flush()
 	return first, nil
-}
-
-// failCommittedStream 提交后失败：向客户端发协议内错误事件（形状由帧器决定——
-// anthropic 为流内 error 终止事件，openai / responses 无标准形式保持截断）再包装
-// 为 streamCommittedError；未提交时原样返回错误（走 failover，客户端什么都还没收到）。
-// 时机与类别由本层决定：仅在 committed 后、且非客户端主动断连（连接已亡，写了
-// 无意义）时发；转换失败 api_error、静默掐断 / 上游断连 overloaded_error（过载
-// 重试语义，由调用方传入）。
-func failCommittedStream(c *gin.Context, fr *protocol.StreamFramer, committed bool, err error, kind string) error {
-	if !committed {
-		return err
-	}
-	if !errors.Is(err, context.Canceled) {
-		if frame := fr.ErrorFrame(kind, err.Error()); frame != nil {
-			c.Writer.Write(frame)
-			c.Writer.Flush()
-		}
-	}
-	return &streamCommittedError{err: err}
 }
 
 // writeStreamHeaders 提交 SSE 响应头与 200 状态码。仅调用一次（首个有效事件后）。

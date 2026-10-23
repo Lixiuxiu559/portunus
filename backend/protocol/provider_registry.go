@@ -9,12 +9,14 @@ import (
 // 两个方向的流式转换器、直通流的 usage 提取、上游接入器。convert.go / stream.go /
 // upstream.go 的分发统一查 providerImpls,不再各自按 Provider switch。
 type providerImpl struct {
-	parseRequest   func([]byte) (*ChatCompletionRequest, error)
-	renderRequest  func(*ChatCompletionRequest) ([]byte, error)
-	parseResponse  func([]byte) (*ChatCompletionResponse, error)
-	renderResponse func(*ChatCompletionResponse) ([]byte, error)
-	newToStream    func() StreamConverter // from 协议 → OpenAI chunk
-	newFromStream  func() StreamConverter // OpenAI chunk → to 协议
+	parseRequest     func([]byte) (*ChatCompletionRequest, error)
+	renderRequest    func(*ChatCompletionRequest) ([]byte, error)
+	parseResponse    func([]byte) (*ChatCompletionResponse, error)
+	renderResponse   func(*ChatCompletionResponse) ([]byte, error)
+	newStreamDecoder func() streamDecoder   // 源协议载荷 → 类型化帧
+	newStreamEncoder func() streamEncoder   // 类型化帧 → 目标协议载荷
+	newToStream      func() StreamConverter // from 协议 → OpenAI chunk
+	newFromStream    func() StreamConverter // OpenAI chunk → to 协议
 	// newUsageExtractor 返回同协议直通流的 usage 提取闭包（实现见 usage.go）。
 	// 编译期穷尽：新增协议必须实现，否则直通流式计费丢 token。
 	newUsageExtractor func() func([]byte) *Usage
@@ -43,6 +45,8 @@ func renderOpenAIRequest(req *ChatCompletionRequest) ([]byte, error) {
 // 加新协议 = 在此新增一个完整注册项,并实现对应的 8 个函数;合法性与分发都随之生效。
 var providerImpls = map[Provider]providerImpl{
 	ProviderOpenAI: {
+		newStreamDecoder: func() streamDecoder { return &openAIStreamDecoder{} },
+		newStreamEncoder: func() streamEncoder { return &openAIStreamEncoder{} },
 		parseRequest: func(body []byte) (*ChatCompletionRequest, error) {
 			var req ChatCompletionRequest
 			if err := json.Unmarshal(body, &req); err != nil {
@@ -65,6 +69,8 @@ var providerImpls = map[Provider]providerImpl{
 		newUpstream:       newBearerUpstream("/chat/completions"),
 	},
 	ProviderOpenAIResponses: {
+		newStreamDecoder:  func() streamDecoder { return &responsesToOpenAIStream{} },
+		newStreamEncoder:  func() streamEncoder { return &fromOpenAISkeleton{sink: &responsesBlockSink{}} },
 		parseRequest:      responsesRequestToOpenAI,
 		renderRequest:     responsesRequestFromOpenAI,
 		parseResponse:     responsesResponseToOpenAI,
@@ -75,6 +81,8 @@ var providerImpls = map[Provider]providerImpl{
 		newUpstream:       newBearerUpstream("/responses"),
 	},
 	ProviderAnthropic: {
+		newStreamDecoder:  func() streamDecoder { return &anthropicToOpenAIStream{} },
+		newStreamEncoder:  func() streamEncoder { return &fromOpenAISkeleton{sink: &anthropicBlockSink{}} },
 		parseRequest:      anthropicRequestToOpenAI,
 		renderRequest:     anthropicRequestFromOpenAI,
 		parseResponse:     anthropicResponseToOpenAI,
@@ -85,6 +93,8 @@ var providerImpls = map[Provider]providerImpl{
 		newUpstream:       newAnthropicUpstream,
 	},
 	ProviderGemini: {
+		newStreamDecoder:  func() streamDecoder { return &geminiToOpenAIStream{} },
+		newStreamEncoder:  func() streamEncoder { return &fromOpenAISkeleton{sink: &geminiBlockSink{}} },
 		parseRequest:      geminiRequestToOpenAI,
 		renderRequest:     geminiRequestFromOpenAI,
 		parseResponse:     geminiResponseToOpenAI,

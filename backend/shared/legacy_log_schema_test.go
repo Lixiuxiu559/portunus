@@ -68,13 +68,22 @@ func TestLegacyLogSchemaPreservesRetiredColumns(t *testing.T) {
 	if row.Currency != "CNY" || row.Cost != 18.75 || row.InputToken != 10 || row.OutputToken != 20 || row.CacheReadToken != 30 || row.CacheWriteToken != 40 {
 		t.Fatalf("旧DDL迁移改变历史费用/用量: %+v", row)
 	}
+	if row.ConversionChecked || row.ConversionPolicy != "" || row.ConversionIssueCount != 0 {
+		t.Fatalf("旧日志不应推断已检查兼容性: %+v", row)
+	}
+	if row.ResponseConversionChecked || row.ResponseConversionScope != "" || row.ResponseConversionCompatible || row.ResponseConversionIssueCount != 0 {
+		t.Fatalf("旧日志不应推断已检查响应扩展: %+v", row)
+	}
+	if row.StreamOutcome != "" || row.StreamReason != "" || row.StreamTerminalObserved || row.StreamDeliveryStarted || row.StreamTerminalWritten || row.StreamWriteFailed || row.StreamTailLimited {
+		t.Fatalf("旧日志不应推断流式终态或交付: %+v", row)
+	}
 	if row.APIKeyID != 3 || row.GroupName != "legacy-group" || row.ChannelID != 7 || row.ModelName != "legacy-model" || row.RequestID != "legacy-request" || row.Status != 429 || row.Success || !row.Stream || row.DurationMs != 120 || row.FirstTokenMs != 25 || row.ErrKind != "upstream_error" || row.ErrMsg != "historical failure" || row.ClientProtocol != "anthropic" {
 		t.Fatalf("旧调用诊断改变: %+v", row)
 	}
 	if row.CreatedAt.Format("2006-01-02 15:04:05") != "2026-09-01 12:00:00" {
 		t.Fatalf("旧时间戳改变: %v", row.CreatedAt)
 	}
-	for _, column := range []string{"currency", "cost", "bridge_decoded", "shim_rewrites", "hosted_tools_stripped"} {
+	for _, column := range []string{"currency", "cost", "bridge_decoded", "shim_rewrites", "hosted_tools_stripped", "stream_outcome", "stream_reason", "stream_terminal_observed", "stream_delivery_started", "stream_terminal_written", "stream_write_failed", "stream_tail_limited", "response_conversion_checked", "response_conversion_scope", "response_conversion_compatible", "response_conversion_issue_count"} {
 		if !LogDB.Migrator().HasColumn(&Log{}, column) {
 			t.Fatalf("旧列未保留或新增诊断列缺失: %s", column)
 		}

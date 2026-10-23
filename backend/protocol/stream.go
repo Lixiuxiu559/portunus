@@ -41,7 +41,7 @@ type inputEstimateSetter interface {
 	setInputEstimate(fn func() int)
 }
 
-// NewStreamConverter 构建 from→to 的流式转换器，经 OpenAI 规范格式中转。
+// NewStreamConverter 构建 from→to 的流式转换器，经类型化事件中转。
 func NewStreamConverter(from, to Provider, opts ...StreamOption) (StreamConverter, error) {
 	if !from.Valid() {
 		return nil, fmt.Errorf("未知的源协议: %s", from)
@@ -57,14 +57,16 @@ func NewStreamConverter(from, to Provider, opts ...StreamOption) (StreamConverte
 		// 同协议直通：仍按源协议提取 usage，否则流式日志的 token/费用丢失
 		return newProtocolAwarePassthrough(from), nil
 	}
-	first := newToOpenAIStream(from)
-	second := newFromOpenAIStream(to)
+	source, _ := implFor(from)
+	target, _ := implFor(to)
+	decoder := source.newStreamDecoder()
+	encoder := target.newStreamEncoder()
 	if o.inputEstimate != nil {
-		if es, ok := second.(inputEstimateSetter); ok {
+		if es, ok := encoder.(inputEstimateSetter); ok {
 			es.setInputEstimate(o.inputEstimate)
 		}
 	}
-	return &chainedStreamConverter{first: first, second: second}, nil
+	return &typedStreamConverter{from: from, decoder: decoder, encoder: encoder, legacyIntermediateUsage: from != ProviderOpenAI && to != ProviderOpenAI}, nil
 }
 
 // protocolAwarePassthrough 同协议直通：usage 提取委托给源协议注册的能力项
@@ -136,54 +138,9 @@ func (s *identityStream) Usage() *Usage {
 	return nil
 }
 
-// chainedStreamConverter 串联「from→openai」与「openai→to」两个转换器。
-type chainedStreamConverter struct {
-	first  StreamConverter
-	second StreamConverter
-}
-
-func (c *chainedStreamConverter) Convert(payload []byte) ([][]byte, error) {
-	mid, err := c.first.Convert(payload)
-	if err != nil {
-		return nil, err
-	}
-	var out [][]byte
-	for _, m := range mid {
-		parts, err := c.second.Convert(m)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, parts...)
-	}
-	return out, nil
-}
-
-func (c *chainedStreamConverter) Finish() ([][]byte, error) {
-	mid, err := c.first.Finish()
-	if err != nil {
-		return nil, err
-	}
-	var out [][]byte
-	for _, m := range mid {
-		parts, err := c.second.Convert(m)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, parts...)
-	}
-	tail, err := c.second.Finish()
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, tail...)
-	return out, nil
-}
-
-func (c *chainedStreamConverter) Usage() *Usage { return c.first.Usage() }
-
-// openAIStreamState 是「→OpenAI」方向各转换器共享的 chunk 元信息累积器，
+// sourceStreamState 是「→OpenAI」方向各转换器共享的 chunk 元信息累积器，
 // 借鉴 new-api 的 ResponseInfo：跨事件累积 id/model/usage/finish_reason/文本。
-type openAIStreamState struct {
+type sourceStreamState struct {
 	id         string
 	model      string
 	usage      *Usage
@@ -195,7 +152,7 @@ type openAIStreamState struct {
 }
 
 // setMeta 一次性写入 id / model。
-func (s *openAIStreamState) setMeta(id, model string) {
+func (s *sourceStreamState) setMeta(id, model string) {
 	if s.id == "" {
 		s.id = id
 	}
@@ -204,53 +161,31 @@ func (s *openAIStreamState) setMeta(id, model string) {
 	}
 }
 
-// emitChunk 构造一个 OpenAI chunk 并序列化。
-func (s *openAIStreamState) emitChunk(delta ChunkDelta, finish string) []byte {
-	c := &ChatCompletionChunk{
-		ID:     s.id,
-		Object: "chat.completion.chunk",
-		Model:  s.model,
-		Choices: []ChunkChoice{{
-			Index:        0,
-			Delta:        delta,
-			FinishReason: finish,
-		}},
-	}
-	b, _ := json.Marshal(c)
-	return b
+// emitChunk 构造内部类型化帧，不序列化为 OpenAI JSON。
+func (s *sourceStreamState) emitChunk(delta StreamEventDelta, finish string) StreamEvent {
+	return StreamEvent{ID: s.id, Model: s.model, Choices: []StreamChoice{{Index: 0, Delta: delta, FinishReason: finish}}}
 }
 
-// emitRole 发出 role chunk（仅在首个内容前一次）。
-func (s *openAIStreamState) emitRole(role string) []byte {
+func (s *sourceStreamState) emitRole(role string) *StreamEvent {
 	if s.roleSent || role == "" {
 		return nil
 	}
 	s.roleSent = true
-	return s.emitChunk(ChunkDelta{Role: role}, "")
+	event := s.emitChunk(StreamEventDelta{Role: role}, "")
+	return &event
 }
 
-// emitFinal 发出收尾 chunk（含 finish_reason 与 usage）。
-func (s *openAIStreamState) emitFinal() []byte {
+func (s *sourceStreamState) emitFinal() *StreamEvent {
 	if s.finishSent {
 		return nil
 	}
 	s.finishSent = true
-	c := &ChatCompletionChunk{
-		ID:     s.id,
-		Object: "chat.completion.chunk",
-		Model:  s.model,
-		Choices: []ChunkChoice{{
-			Index:        0,
-			Delta:        ChunkDelta{},
-			FinishReason: s.finish,
-		}},
-		Usage: s.usage,
-	}
-	b, _ := json.Marshal(c)
-	return b
+	event := s.emitChunk(StreamEventDelta{}, s.finish)
+	event.Usage = s.usage
+	return &event
 }
 
-// firstNonEmpty 返回第一个非空字符串，用于跨 chunk 累积 id / model。
+// firstNonEmpty 返回第一个非空字符串，用于跨事件累积 id / model。
 func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a

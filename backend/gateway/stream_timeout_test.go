@@ -215,7 +215,7 @@ func TestRelayStreamIdleTimeoutBreaksStreamAndTripsBreaker(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt32(&calls, 1) > 1 {
 			// 熔断开路后不应再进来；真进来了立刻成功，避免拖慢测试
-			w.Write([]byte(testChunkLine + "data: [DONE]\n\n"))
+			w.Write([]byte(testChunkLine + deliveryFinish + "data: [DONE]\n\n"))
 			return
 		}
 		writeStalledSSE(t, w, r, true)
@@ -255,6 +255,7 @@ func TestRelayStreamIdleTimeoutNoFalsePositive(t *testing.T) {
 			fl.Flush()
 			time.Sleep(200 * time.Millisecond) // 间隔 < 1s 静默时限
 		}
+		w.Write([]byte(deliveryFinish))
 		w.Write([]byte("data: [DONE]\n\n"))
 		fl.Flush()
 	})

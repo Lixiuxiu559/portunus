@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -72,6 +71,10 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 			return
 		}
 
+		control := newRelayRequestControl(c.Request.Context(), s.deps.Cfg, meta.Stream)
+		defer control.close()
+		c.Request = c.Request.WithContext(control.ctx)
+
 		// -thinking 后缀：剥掉后解析分组（后缀判定、分组名解析是分组 / 模型名知识，
 		// 留在 gateway）；「thinking 落在哪个形状」是协议知识，交 protocol——
 		// ThinkingEnabledIntent 复用 anthropic 客户端自带的 budget_tokens
@@ -102,13 +105,22 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 		var lastErr error
 		anyAttempted := false
 		var skipped []string // 被熔断挡掉的目标描述，全跳过时用于日志
+	targetsLoop:
 		for _, t := range targets {
+			if stopErr := control.check(); stopErr != nil {
+				lastErr = stopErr
+				break targetsLoop
+			}
 			if allow, reason := s.deps.Breakers.Allow(t.Model.ID); !allow {
 				skipped = append(skipped, fmt.Sprintf("%s(id=%d) %s", t.Model.Name, t.Model.ID, reason))
 				continue // 熔断开路，跳过该模型
 			}
 			budgetRetry := &chatBudgetRetry{} // 当前目标内记住字段切换，普通重试不重新触发兼容重试
 			for attempt := 0; attempt <= s.deps.Cfg.RetryCount; attempt++ {
+				if stopErr := control.available(); stopErr != nil {
+					lastErr = stopErr
+					break targetsLoop
+				}
 				anyAttempted = true
 				reason := "initial"
 				if relaySequence > 0 {
@@ -135,13 +147,16 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 				}
 				lastErr = err
 				d := failSpec(err)
+				if d.StopRequest {
+					break targetsLoop
+				}
 				if !d.Retryable || d.StallNoHeader {
 					break // 不可重试，或等头假死不重试：再等一轮超时大概率还是超时，直接换下一家
 				}
 			}
 		}
 
-		if !anyAttempted {
+		if !anyAttempted && lastErr == nil {
 			// 503 的唯一出口必须留痕：stdout + 日志库（err_kind=circuit_open）。
 			// 此前只写 stdout，管理端日志页零痕迹，用户报障只能登服务器翻容器日志。
 			detail := "所有目标熔断开路: " + strings.Join(skipped, "; ")
@@ -188,6 +203,13 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 		// 上游有回话的失败取其错误原文，跨协议按客户端形状重组（原始体已落库不丢）；
 		// 网关自身故障（超时 / 网络）用通用文案，不向客户端暴露内部细节。
 		message := "上游调用失败"
+		var budgetErr *attemptBudgetError
+		var deadlineErr *firstContentDeadlineError
+		var nonStreamDeadline *nonStreamDeadlineError
+		var clientDeadline *clientDeadlineError
+		if errors.As(lastErr, &clientDeadline) || errors.As(lastErr, &budgetErr) || errors.As(lastErr, &deadlineErr) || errors.As(lastErr, &nonStreamDeadline) {
+			message = lastErr.Error()
+		}
 		var se *upstreamStatusError
 		if errors.As(lastErr, &se) {
 			if m := upstreamErrorMessage(se.body); m != "" {
@@ -206,6 +228,12 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 // 非流式：返回转换后的响应体（由调用方写入，以支持 failover 缓冲）；
 // 流式：直接写客户端；首包前失败仍返回错误触发重试/换家，首包后（已提交）失败不再报错。
 func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provider, stream bool, g *group.Group, t router.Target, originalBody []byte, apiKeyID int64, requestID string, upThinking *protocol.ThinkingConfig, budgetRetry *chatBudgetRetry, trace *relayAttemptTrace) (out []byte, status int, err error) {
+	if controlFrom(c.Request.Context()) == nil {
+		control := newRelayRequestControl(c.Request.Context(), s.deps.Cfg, stream)
+		originalRequest := c.Request
+		c.Request = c.Request.WithContext(control.ctx)
+		defer func() { c.Request = originalRequest; control.close() }()
+	}
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
@@ -213,6 +241,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	var failReason error // committed 分支对外返回 nil 错误，真实失败原因暂存于此供日志归因
 	// stats 是装配上游请求时产生的诊断遥测。在 defer 之前声明，供下面的日志闭包捕获。
 	var stats protocol.ComposeStats
+	var deliveryReport streamDeliveryReport
 	defer func() {
 		firstTokenMs := int64(0)
 		if !first.IsZero() {
@@ -225,7 +254,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		durationMs := time.Since(start).Milliseconds() // 采样先于新增记录写库，保持旧日志耗时边界
 		s.finishAttempt(trace, status, success, logErr)
 		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
-		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, durationMs, firstTokenMs, requestID, logErr)
+		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, durationMs, firstTokenMs, requestID, logErr, &deliveryReport)
 		if !success && !s.quiet {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
@@ -253,6 +282,8 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		return nil, 0, &convertError{err}
 	}
 
+	replaySafe := protocol.StreamRequestReplaySafe(clientProto, originalBody)
+
 	connection, err := upstream.Open(t.Channel.ConnectionConfig())
 	if err != nil {
 		return nil, 0, err
@@ -260,11 +291,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	var wd *streamWatchdog
 	reqCtx := c.Request.Context()
-	if !stream {
-		var cancel context.CancelFunc
-		reqCtx, cancel = context.WithTimeout(reqCtx, time.Duration(s.deps.Cfg.NonStreamTimeoutSeconds)*time.Second)
-		defer cancel()
-	} else {
+	if stream {
 		// 流式：看门狗 ctx 贯穿请求与 body 读，触发时掐断读阻塞。
 		// 首包计时在 relayStream 拿到响应头后才开始；等响应头由 Transport 兜底。
 		reqCtx, wd = newStreamWatchdog(reqCtx,
@@ -278,6 +305,9 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	allowBudgetRetry := clientProto != protocol.ProviderOpenAI && t.Channel.Type == protocol.ProviderOpenAI
 	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, connection.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry, trace)
 	if err != nil {
+		if !replaySafe && !failSpec(err).StopRequest {
+			err = &streamReplayUnsafeError{err: err}
+		}
 		return nil, 0, err
 	}
 	defer resp.Body.Close()
@@ -285,10 +315,17 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		errBody, _ := io.ReadAll(resp.Body)
+		if stopErr := requestControlError(reqCtx); stopErr != nil {
+			return nil, status, stopErr
+		}
 		if !s.quiet {
 			log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
 		}
-		return nil, status, &upstreamStatusError{status: status, body: errBody, retryAfter: resp.Header.Get("Retry-After")}
+		statusErr := &upstreamStatusError{status: status, body: errBody, retryAfter: resp.Header.Get("Retry-After")}
+		if (status >= 500 || status == http.StatusTooManyRequests) && !replaySafe {
+			return nil, status, &streamReplayUnsafeError{err: statusErr}
+		}
+		return nil, status, statusErr
 	}
 
 	if stream {
@@ -303,7 +340,8 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			return nil, status, &convertError{convErr}
 		}
 		var streamErr error
-		first, streamErr = relayStream(c, clientProto, resp, conv, wd)
+		first, streamErr = relayStream(c, clientProto, resp, conv, wd, streamRelayOptions{Source: t.Channel.Type, ReplayUnsafe: !replaySafe, Report: &deliveryReport})
+		usage = conv.Usage()
 		if streamErr != nil {
 			var committed *streamCommittedError
 			if errors.As(streamErr, &committed) {
@@ -326,13 +364,32 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		usage = conv.Usage()
 	} else {
 		upRespBody, readErr := io.ReadAll(resp.Body)
+		if stopErr := requestControlError(reqCtx); stopErr != nil {
+			return nil, status, stopErr
+		}
 		if readErr != nil {
+			if !replaySafe {
+				return nil, status, &streamReplayUnsafeError{err: readErr}
+			}
 			return nil, status, readErr
 		}
 		usage = protocol.UsageFromResponse(t.Channel.Type, upRespBody)
-		out, err = protocol.ConvertResponse(t.Channel.Type, clientProto, upRespBody)
+		out, deliveryReport.ResponseCompatibility, err = protocol.ConvertResponseWithReport(t.Channel.Type, clientProto, upRespBody)
+		if stopErr := requestControlError(reqCtx); stopErr != nil {
+			return nil, status, stopErr
+		}
 		if err != nil {
-			return nil, status, &convertError{err}
+			conversionErr := &convertError{err}
+			if !replaySafe {
+				return nil, status, &streamReplayUnsafeError{err: conversionErr}
+			}
+			return nil, status, conversionErr
+		}
+		// 完整响应与转换均在请求累计期限内完成，之后交给调用方写客户端。
+		if control := controlFrom(c.Request.Context()); control != nil {
+			if stopErr := control.commit(); stopErr != nil {
+				return nil, status, stopErr
+			}
 		}
 	}
 

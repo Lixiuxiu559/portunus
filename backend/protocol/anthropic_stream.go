@@ -72,19 +72,19 @@ func indexOrZero(p *int) int {
 
 // anthropicToOpenAIStream 把 Anthropic 流事件逐条映射为 OpenAI chunk。
 type anthropicToOpenAIStream struct {
-	st openAIStreamState
+	st sourceStreamState
 }
 
 func newAnthropicToOpenAIStream() StreamConverter {
 	return &anthropicToOpenAIStream{}
 }
 
-func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+func (a *anthropicToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
 	var ev MessagesStreamEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return nil, fmt.Errorf("解析 anthropic 流事件失败: %w", err)
 	}
-	var out [][]byte
+	var out []StreamEvent
 	switch ev.Type {
 	case "message_start":
 		if ev.Message != nil {
@@ -96,12 +96,12 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 				a.st.usage = &x
 			}
 			if b := a.st.emitRole("assistant"); b != nil {
-				out = append(out, b)
+				out = append(out, *b)
 			}
 		}
 	case "content_block_start":
 		if ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
-			out = append(out, a.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+			out = append(out, a.st.emitChunk(StreamEventDelta{ToolCalls: []ChunkToolCall{{
 				Index:    indexOrZero(ev.Index),
 				ID:       ev.ContentBlock.ID,
 				Type:     "function",
@@ -115,11 +115,11 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		switch ev.Delta.Type {
 		case "text_delta":
 			a.st.text.WriteString(ev.Delta.Text)
-			out = append(out, a.st.emitChunk(ChunkDelta{Content: ev.Delta.Text}, ""))
+			out = append(out, a.st.emitChunk(StreamEventDelta{Content: ev.Delta.Text}, ""))
 		case "thinking_delta":
-			out = append(out, a.st.emitChunk(ChunkDelta{ReasoningContent: ev.Delta.Thinking}, ""))
+			out = append(out, a.st.emitChunk(StreamEventDelta{ReasoningContent: ev.Delta.Thinking}, ""))
 		case "input_json_delta":
-			out = append(out, a.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+			out = append(out, a.st.emitChunk(StreamEventDelta{ToolCalls: []ChunkToolCall{{
 				Index:    indexOrZero(ev.Index),
 				Function: ChunkFunctionCall{Arguments: ev.Delta.PartialJSON},
 			}}}, ""))
@@ -143,9 +143,9 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 	return out, nil
 }
 
-func (a *anthropicToOpenAIStream) Finish() ([][]byte, error) {
+func (a *anthropicToOpenAIStream) End() ([]StreamEvent, error) {
 	if b := a.st.emitFinal(); b != nil {
-		return [][]byte{b}, nil
+		return []StreamEvent{*b}, nil
 	}
 	return nil, nil
 }
@@ -208,39 +208,7 @@ func (a *anthropicBlockSink) estimatedInput() int {
 }
 
 func newAnthropicFromOpenAI() StreamConverter {
-	sink := &anthropicBlockSink{}
-	// 同包直接构造骨架并内嵌，而非经 newFromOpenAISkeleton 工厂 + 类型断言：
-	// 工厂返回 StreamConverter 接口，断言 *(fromOpenAISkeleton) 一旦工厂改返回
-	// 其他实现即运行时 panic。直接构造免去断言，骨架的 Finish/Usage/
-	// setInputEstimate 经内嵌自动提升，无需手工转发。
-	return &anthropicFromOpenAI{
-		fromOpenAISkeleton: &fromOpenAISkeleton{sink: sink},
-		sink:               sink,
-	}
-}
-
-// anthropicFromOpenAI 内嵌 fromOpenAISkeleton 并只 override Convert：在共享骨架之外
-// 旁路解析 canonical chunk 的 GroundingMetadata——骨架的 blockSink 契约只覆盖块生命
-// 周期，不透传该字段。选择在 anthropic 一侧包装（而非改 from_openai.go 的骨架）是
-// 权衡后的最小侵入——接地是 anthropic 出向独有的旁路载荷，包一层既能拿到原始 chunk，
-// 又不惊动 gemini / responses 两个骨架消费者。内嵌保证新增的可选接口（如
-// setInputEstimate 这类鸭子类型能力）自动承接，不会因包装层静默失效。
-type anthropicFromOpenAI struct {
-	*fromOpenAISkeleton
-	sink *anthropicBlockSink
-}
-
-func (c *anthropicFromOpenAI) Convert(payload []byte) ([][]byte, error) {
-	// 旁路解析：骨架随后按块生命周期消费同一 payload，此处只负责把接地数据
-	// 缓存进 sink，等首个 text 块打开时补发。
-	var chunk ChatCompletionChunk
-	if json.Unmarshal(payload, &chunk) == nil && len(chunk.Choices) > 0 {
-		if gm := chunk.Choices[0].Delta.GroundingMetadata; gm != nil {
-			c.sink.SetGrounding(gm)
-		}
-	}
-	// 经嵌入字段名调用被 override 的骨架方法（直接 c.Convert 会递归）。
-	return c.fromOpenAISkeleton.Convert(payload)
+	return &fromOpenAISkeleton{sink: &anthropicBlockSink{}}
 }
 
 // evBlock 构造一个 content_block_* 事件（显式指定 index）并序列化。
@@ -290,8 +258,7 @@ func (a *anthropicBlockSink) ReasoningDelta(s string) [][]byte {
 }
 
 // SetGrounding 缓存 canonical chunk 携带的托管搜索接地数据（首个非 nil 者胜出：
-// 同一响应里接地通常只在开场帧出现，取先到的即可确定性重建）。调用方是包装层
-// anthropicFromOpenAI 的旁路解析。
+// 同一响应里接地通常只在开场帧出现，取先到的即可确定性重建）。调用方是共享类型化 encoder。
 func (a *anthropicBlockSink) SetGrounding(meta *GroundingMetadata) {
 	if a.grounding == nil {
 		a.grounding = meta
@@ -456,4 +423,14 @@ func (a *anthropicBlockSink) Finish(finishReason string, u *Usage) [][]byte {
 		deltaEvent,
 		a.evMessage("message_stop", nil),
 	)
+}
+
+// Convert/Finish 保留旧 OpenAI wire API；生产跨协议链直接使用 Decode/End。
+func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+	events, err := a.Decode(payload)
+	return encodeOpenAIEvents(events, err)
+}
+func (a *anthropicToOpenAIStream) Finish() ([][]byte, error) {
+	events, err := a.End()
+	return encodeOpenAIEvents(events, err)
 }

@@ -31,9 +31,9 @@ func TestFailSpec(t *testing.T) {
 	}{
 		{"nil", nil, failDecision{}},
 		{"客户端取消", context.Canceled,
-			failDecision{ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
+			failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
 		{"url.Error 包装取消（net.Error 形态仍归取消）", &url.Error{Op: "Post", Err: context.Canceled},
-			failDecision{ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
+			failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
 		{"已提交+取消（归用户行为不计熔断）", &streamCommittedError{err: context.Canceled},
 			failDecision{ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
 		{"已提交+断连", &streamCommittedError{err: io.ErrUnexpectedEOF},

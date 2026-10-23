@@ -576,18 +576,18 @@ func responsesResponseFromOpenAI(resp *ChatCompletionResponse) ([]byte, error) {
 
 // responsesToOpenAIStream 把 Responses 流事件逐条映射为 OpenAI chunk。
 type responsesToOpenAIStream struct {
-	st      openAIStreamState
+	st      sourceStreamState
 	sawTool bool // 流式过程中是否出现过 function_call，用于决定 finish_reason
 }
 
 func newResponsesToOpenAIStream() StreamConverter { return &responsesToOpenAIStream{} }
 
-func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+func (r *responsesToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
 	var ev ResponsesStreamEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return nil, fmt.Errorf("解析 responses 流事件失败: %w", err)
 	}
-	var out [][]byte
+	var out []StreamEvent
 	switch ev.Type {
 	case "response.created", "response.in_progress":
 		if ev.Response != nil {
@@ -595,28 +595,28 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 		}
 	case "response.output_text.delta":
 		if b := r.st.emitRole("assistant"); b != nil {
-			out = append(out, b)
+			out = append(out, *b)
 		}
 		r.st.text.WriteString(ev.Delta)
-		out = append(out, r.st.emitChunk(ChunkDelta{Content: ev.Delta}, ""))
+		out = append(out, r.st.emitChunk(StreamEventDelta{Content: ev.Delta}, ""))
 	case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
 		// 思考摘要 / 思考正文增量 → reasoning_content（DeepSeek 同款形状），先于正文流出
 		if ev.Delta == "" {
 			break
 		}
 		if b := r.st.emitRole("assistant"); b != nil {
-			out = append(out, b)
+			out = append(out, *b)
 		}
-		out = append(out, r.st.emitChunk(ChunkDelta{ReasoningContent: ev.Delta}, ""))
+		out = append(out, r.st.emitChunk(StreamEventDelta{ReasoningContent: ev.Delta}, ""))
 	case "response.output_item.added":
 		// Responses 的工具调用以 function_call item 形式流式给出：开场即带 call_id / name，
 		// 后续参数增量走 function_call_arguments.delta。映射为 OpenAI tool_calls 开场 chunk。
 		if ev.Item != nil && ev.Item.Type == "function_call" {
 			r.sawTool = true
 			if b := r.st.emitRole("assistant"); b != nil {
-				out = append(out, b)
+				out = append(out, *b)
 			}
-			out = append(out, r.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+			out = append(out, r.st.emitChunk(StreamEventDelta{ToolCalls: []ChunkToolCall{{
 				Index:    ev.OutputIndex,
 				ID:       ev.Item.CallID,
 				Type:     "function",
@@ -624,7 +624,7 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 			}}}, ""))
 		}
 	case "response.function_call_arguments.delta":
-		out = append(out, r.st.emitChunk(ChunkDelta{ToolCalls: []ChunkToolCall{{
+		out = append(out, r.st.emitChunk(StreamEventDelta{ToolCalls: []ChunkToolCall{{
 			Index:    ev.OutputIndex,
 			Function: ChunkFunctionCall{Arguments: ev.Delta},
 		}}}, ""))
@@ -661,9 +661,9 @@ func hasFunctionCallItem(output []OutputItem) bool {
 	return false
 }
 
-func (r *responsesToOpenAIStream) Finish() ([][]byte, error) {
+func (r *responsesToOpenAIStream) End() ([]StreamEvent, error) {
 	if b := r.st.emitFinal(); b != nil {
-		return [][]byte{b}, nil
+		return []StreamEvent{*b}, nil
 	}
 	return nil, nil
 }
@@ -844,4 +844,14 @@ func (r *responsesBlockSink) Finish(reason string, u *Usage) [][]byte {
 	}
 	resp := &ResponsesResponse{ID: r.id, Object: "response", Model: r.model, Status: status, IncompleteDetails: details, Output: r.items, Usage: toResponsesUsage(u)}
 	return append(out, r.ev(ResponsesStreamEvent{Type: "response." + status, Response: resp}))
+}
+
+// Convert/Finish 保留旧 OpenAI wire API；生产跨协议链直接使用 Decode/End。
+func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
+	events, err := r.Decode(payload)
+	return encodeOpenAIEvents(events, err)
+}
+func (r *responsesToOpenAIStream) Finish() ([][]byte, error) {
+	events, err := r.End()
+	return encodeOpenAIEvents(events, err)
 }

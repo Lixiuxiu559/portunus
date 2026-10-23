@@ -27,6 +27,10 @@
 
 依赖方向：`api` / `gateway` / `cron` → `router` / `channel` / `model` / `group` / `protocol` → `shared`。模块之间用外键 ID 关联，避免包级循环依赖。
 
+请求侧协议装配经 `RequestEnvelope` 保留原始数据和片段，目标检查随 `ComposeStats.Compatibility` 返回。兼容检查只记录选定原生构造的诊断，不据此排除目标或拒绝来源未验证的原生续接；已删除 strict/legacy 策略配置及拒绝分支，统一沿用既有调用行为。原生正文不入日志；摘要带 `request_native_v1` 范围，不能视为所有字段无损或供应商模型能力保证，详见[请求侧实施说明](docs/research/2026-10-23-protocol-native-s1.md)和[诊断模式说明](docs/research/2026-10-23-protocol-diagnostics-only.md)。
+
+跨协议流式转换已采用 `streamDecoder → StreamEvent → streamEncoder`，内部不再经过 Chat JSON 中转；目标 encoder 复用既有块生命周期。保留同帧组合、原有优先级和非 Chat 间用量兼容投影，同协议继续原生 payload 透传。S3 已增加完整 SSE 原始帧保留、源终态观察和客户端交付门；元数据有界预缓存，交付开始或原生操作可能执行后禁止自动重放，缺终态不伪造成功，跨协议有界收集 usage 后编码唯一终态。S4 已将所有显式 Do（含兼容重试）纳入请求总预算（默认 4 次），并增加从选路前累计至首次交付的流式首内容期限（默认 120 秒）；交付后撤销该期限，保留 idle 控制。S6 将非流式 600 秒默认期限改为跨目标累计，统一在实际 Do 前安排可取消指数退避（200ms 起步、2 秒封顶，含兼容重试），详见[累计期限与退避说明](docs/research/2026-10-23-nonstream-deadline-backoff-s6.md)。S5 已增加响应原始信封、类型化事件的原生快照及独立响应诊断摘要；同协议原样返回，跨协议仍仅按已有语义映射输出，完整跨协议扩展恢复仍未承诺。详见[响应原生保留说明](docs/research/2026-10-23-response-native-s5.md)。详见[类型化流实施说明](docs/research/2026-10-23-protocol-typed-stream-s2.md)、[SSE/交付实施说明](docs/research/2026-10-23-protocol-sse-delivery-s3.md)和[请求控制说明](docs/research/2026-10-23-request-control-s4.md)。
+
 上游连接依赖为 `channel → upstream → protocol`；`model` 和 `gateway` 从渠道取得连接 DTO 后经 `upstream.Open` 建立连接。`upstream` 不引用渠道、模型或网关，厂商预设与消息语义保持分离。管理 API 的主动调用验证通过 `gateway.ProbeConnection` 复用正式转发能力，网关不反向依赖管理 API。
 
 ## 核心概念

@@ -214,6 +214,7 @@ func TestRelayStreamRetryBeforeFirstByte(t *testing.T) {
 		fl := w.(http.Flusher)
 		w.Write([]byte("data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"model\":\"upstream-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n"))
 		fl.Flush()
+		w.Write([]byte(deliveryFinish))
 		w.Write([]byte("data: [DONE]\n\n"))
 		fl.Flush()
 	})

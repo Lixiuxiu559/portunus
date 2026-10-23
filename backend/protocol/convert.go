@@ -28,20 +28,8 @@ func ConvertRequest(from, to Provider, body []byte) ([]byte, error) {
 
 // ConvertResponse 将 from 协议的响应体转换为 to 协议的响应体。
 func ConvertResponse(from, to Provider, body []byte) ([]byte, error) {
-	if !from.Valid() {
-		return nil, fmt.Errorf("未知的源协议: %s", from)
-	}
-	if !to.Valid() {
-		return nil, fmt.Errorf("未知的目标协议: %s", to)
-	}
-	if from == to {
-		return body, nil
-	}
-	resp, err := parseResponseToOpenAI(from, body)
-	if err != nil {
-		return nil, err
-	}
-	return renderResponseFromOpenAI(to, resp)
+	out, _, err := ConvertResponseWithReport(from, to, body)
+	return out, err
 }
 
 // UpstreamRequest 是装配上游请求时的覆盖项。零值字段表示「不覆盖」。
@@ -58,6 +46,8 @@ type UpstreamRequest struct {
 // 它不参与请求体、不影响转换语义，只为让「reasoning 桥是否生效」「垫片改写了多少
 // 历史」这两件此前只能靠猜的事变得可测量（写入方 gateway，读法见 shared.Log）。
 type ComposeStats struct {
+	Compatibility ConversionReport
+
 	// BridgeDecoded 是从 thinking / redacted_thinking 块签名里成功还原原始
 	// reasoning_content 的次数。跨协议入向（anthropic → openai）才有意义；
 	// 恒为 0 而请求里确有思考块 → 客户端没回传本网关的桥载荷，桥接未生效
@@ -86,25 +76,11 @@ type ComposeStats struct {
 // thinking 曾导致部分上游 400（见 9a8e785）。
 // 第二个返回值是本次装配的诊断遥测（ComposeStats），与请求体一同交给调用方。
 func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) ([]byte, ComposeStats, error) {
-	var stats ComposeStats
-	if !from.Valid() {
-		return nil, stats, fmt.Errorf("未知的源协议: %s", from)
-	}
-	if !to.Valid() {
-		return nil, stats, fmt.Errorf("未知的目标协议: %s", to)
-	}
-	out, stats, err := composeUpstream(from, to, body, up)
+	envelope, err := CaptureRequest(from, body)
 	if err != nil {
-		return nil, stats, err
+		return nil, ComposeStats{}, err
 	}
-	// 垫片只作用于 openai 兼容上游：其他协议没有 reasoning_content 形状
-	if up.ThinkingCompat && to == ProviderOpenAI {
-		out, stats.ShimRewrites, err = InjectReasoningPlaceholders(out)
-		if err != nil {
-			return nil, stats, err
-		}
-	}
-	return out, stats, nil
+	return envelope.PrepareTarget(to, up)
 }
 
 func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte, ComposeStats, error) {
@@ -117,6 +93,11 @@ func composeUpstream(from, to Provider, body []byte, up UpstreamRequest) ([]byte
 	if err != nil {
 		return nil, stats, err
 	}
+	return composeParsedUpstream(to, req, up)
+}
+
+func composeParsedUpstream(to Provider, req *ChatCompletionRequest, up UpstreamRequest) ([]byte, ComposeStats, error) {
+	var stats ComposeStats
 	stats.BridgeDecoded = req.bridgeDecoded
 	stats.HostedToolsStripped = req.hostedToolsStripped
 	if up.Model != "" {
@@ -160,19 +141,22 @@ func rewriteSameProtocol(p Provider, body []byte, up UpstreamRequest) ([]byte, e
 	if p == ProviderGemini {
 		return body, nil
 	}
-	var m map[string]any
+	var m map[string]json.RawMessage
 	if err := json.Unmarshal(body, &m); err != nil {
 		return nil, fmt.Errorf("解析 %s 请求失败: %w", p, err)
 	}
-	if up.Model != "" {
-		m["model"] = up.Model
+	if m == nil {
+		return nil, fmt.Errorf("解析 %s 请求失败: 请求必须为对象", p)
 	}
-	if up.Thinking != nil && p == ProviderOpenAI && !hasExplicitThinking(m) {
+	if up.Model != "" {
+		m["model"], _ = json.Marshal(up.Model)
+	}
+	if up.Thinking != nil && p == ProviderOpenAI && !hasExplicitThinkingRaw(m) {
 		thinking := map[string]any{"type": up.Thinking.Type}
 		if up.Thinking.BudgetTokens > 0 {
 			thinking["budget_tokens"] = up.Thinking.BudgetTokens
 		}
-		m["thinking"] = thinking
+		m["thinking"], _ = json.Marshal(thinking)
 	}
 	return json.Marshal(m)
 }

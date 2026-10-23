@@ -23,21 +23,29 @@ type Config struct {
 
 // ProxyConfig 是网关转发层的失败处理配置。
 type ProxyConfig struct {
-	RetryCount               int `json:"retry_count"`                 // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
-	ConnectTimeoutSeconds    int `json:"connect_timeout_seconds"`     // 连接超时
-	FirstByteTimeoutSeconds  int `json:"first_byte_timeout_seconds"`  // 等响应头 / 流式首包（首个数据事件）超时
-	StreamIdleTimeoutSeconds int `json:"stream_idle_timeout_seconds"` // 流式首包后，上游静默多久掐断（0 禁用）
-	NonStreamTimeoutSeconds  int `json:"non_stream_timeout_seconds"`  // 非流式读完整响应体的总超时
-	CircuitFailureThreshold  int `json:"circuit_failure_threshold"`   // 熔断：连续失败 N 次开路
-	CircuitSuccessThreshold  int `json:"circuit_success_threshold"`   // 熔断：半开后连续成功 N 次转关闭
-	CircuitResetSeconds      int `json:"circuit_reset_seconds"`       // 熔断：开路冷却时长
+	RetryCount                 int `json:"retry_count"`                   // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
+	RetryBackoffBaseMs         int `json:"retry_backoff_base_ms"`         // 请求重试退避基数；0 使用默认值 200 毫秒
+	RetryBackoffMaxMs          int `json:"retry_backoff_max_ms"`          // 请求重试退避上限；0 使用默认值 2000 毫秒
+	MaxHTTPAttempts            int `json:"max_http_attempts"`             // 单个请求的 HTTP 总尝试预算，包含兼容重试；0 使用默认值 4
+	FirstContentTimeoutSeconds int `json:"first_content_timeout_seconds"` // 跨目标累计首内容期限；0 使用默认值 120 秒
+	ConnectTimeoutSeconds      int `json:"connect_timeout_seconds"`       // 连接超时
+	FirstByteTimeoutSeconds    int `json:"first_byte_timeout_seconds"`    // 等响应头 / 流式首包（首个数据事件）超时
+	StreamIdleTimeoutSeconds   int `json:"stream_idle_timeout_seconds"`   // 流式首包后，上游静默多久掐断（0 禁用）
+	NonStreamTimeoutSeconds    int `json:"non_stream_timeout_seconds"`    // 非流式请求跨目标累计期限；0 使用默认值 600 秒
+	CircuitFailureThreshold    int `json:"circuit_failure_threshold"`     // 熔断：连续失败 N 次开路
+	CircuitSuccessThreshold    int `json:"circuit_success_threshold"`     // 熔断：半开后连续成功 N 次转关闭
+	CircuitResetSeconds        int `json:"circuit_reset_seconds"`         // 熔断：开路冷却时长
 }
 
 // DefaultProxyConfig 返回网关转发的默认配置。
 func DefaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
-		RetryCount:               2,
-		ConnectTimeoutSeconds:    30,
+		RetryCount:                 2,
+		RetryBackoffBaseMs:         200,
+		RetryBackoffMaxMs:          2000,
+		MaxHTTPAttempts:            4,
+		FirstContentTimeoutSeconds: 120,
+		ConnectTimeoutSeconds:      30,
 		// 等响应头 / 流式首包时限。曾试过 20s：高峰期中转上游排队时正常请求的
 		// 首包也会超 20s（30s~2min 的成功 200 大量存在），20s 误杀慢而正常的请求，
 		// 反而制造额外失败与客户端指数退避，故定 60s（见 gateway/client_wait_test.go
@@ -75,6 +83,40 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(c)
+	if c.Proxy.MaxHTTPAttempts < 0 {
+		return nil, fmt.Errorf("proxy.max_http_attempts 不能为负数")
+	}
+	if c.Proxy.FirstContentTimeoutSeconds < 0 {
+		return nil, fmt.Errorf("proxy.first_content_timeout_seconds 不能为负数")
+	}
+	if c.Proxy.NonStreamTimeoutSeconds < 0 {
+		return nil, fmt.Errorf("proxy.non_stream_timeout_seconds 不能为负数")
+	}
+	if c.Proxy.RetryBackoffBaseMs < 0 {
+		return nil, fmt.Errorf("proxy.retry_backoff_base_ms 不能为负数")
+	}
+	if c.Proxy.RetryBackoffMaxMs < 0 {
+		return nil, fmt.Errorf("proxy.retry_backoff_max_ms 不能为负数")
+	}
+	defaults := DefaultProxyConfig()
+	if c.Proxy.MaxHTTPAttempts == 0 {
+		c.Proxy.MaxHTTPAttempts = DefaultProxyConfig().MaxHTTPAttempts
+	}
+	if c.Proxy.FirstContentTimeoutSeconds == 0 {
+		c.Proxy.FirstContentTimeoutSeconds = DefaultProxyConfig().FirstContentTimeoutSeconds
+	}
+	if c.Proxy.NonStreamTimeoutSeconds == 0 {
+		c.Proxy.NonStreamTimeoutSeconds = defaults.NonStreamTimeoutSeconds
+	}
+	if c.Proxy.RetryBackoffBaseMs == 0 {
+		c.Proxy.RetryBackoffBaseMs = defaults.RetryBackoffBaseMs
+	}
+	if c.Proxy.RetryBackoffMaxMs == 0 {
+		c.Proxy.RetryBackoffMaxMs = defaults.RetryBackoffMaxMs
+	}
+	if c.Proxy.RetryBackoffMaxMs < c.Proxy.RetryBackoffBaseMs {
+		return nil, fmt.Errorf("proxy.retry_backoff_max_ms 不能小于 proxy.retry_backoff_base_ms")
+	}
 	return c, nil
 }
 
@@ -102,6 +144,26 @@ func applyEnv(c *Config) {
 
 // applyProxyEnv 用 PORTUNUS_PROXY_* 环境变量覆盖网关转发配置。
 func applyProxyEnv(c *Config) {
+	if v := os.Getenv("PORTUNUS_PROXY_RETRY_BACKOFF_BASE_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Proxy.RetryBackoffBaseMs = n
+		}
+	}
+	if v := os.Getenv("PORTUNUS_PROXY_RETRY_BACKOFF_MAX_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Proxy.RetryBackoffMaxMs = n
+		}
+	}
+	if v := os.Getenv("PORTUNUS_PROXY_MAX_HTTP_ATTEMPTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Proxy.MaxHTTPAttempts = n
+		}
+	}
+	if v := os.Getenv("PORTUNUS_PROXY_FIRST_CONTENT_TIMEOUT_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Proxy.FirstContentTimeoutSeconds = n
+		}
+	}
 	if v := os.Getenv("PORTUNUS_PROXY_RETRY_COUNT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.Proxy.RetryCount = n
