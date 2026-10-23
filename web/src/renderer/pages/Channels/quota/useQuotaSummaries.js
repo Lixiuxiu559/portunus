@@ -19,6 +19,10 @@ export default function useQuotaSummaries(channels) {
   const commands = useRef(new Map());
   const lifecycle = useRef({ active: false, epoch: 0 });
   const current = useRef({});
+  // 只有首次成功读取前的全局 loading 才代表"余额尚未载入"。
+  // 刷新后的静默重读不能把其他没有查询来源的卡片切到"正在读取余额"，
+  // 否则点击一个卡片的刷新会让相邻卡片文字闪动。
+  const loaded = useRef(false);
   const ids = channels.map((channel) => channel.id).join(',');
   const cancelCommands = useCallback(() => {
     lifecycle.current.epoch += 1;
@@ -31,12 +35,14 @@ export default function useQuotaSummaries(channels) {
       cancelCommands();
       gate.current.cancel();
       current.current = {}; setSummaries({}); setPending({}); setRefreshErrors({});
+      loaded.current = false;
     }
     // POST 结束前的缓存可能仍是旧值；结束后统一重读，轮询不触发上游查询。
     if (commands.current.size) return;
     if (!ids) { setLoading(false); return; }
     const task = gate.current.start();
-    setLoading(true);
+    // 静默重读只更新数据，不改变全局载入态（见 loaded 注释）。
+    if (!loaded.current) setLoading(true);
     try {
       const channelIds = ids.split(',');
       const batches = [];
@@ -45,6 +51,7 @@ export default function useQuotaSummaries(channels) {
       if (!task.current() || !lifecycle.current.active) return;
       const next = Object.fromEntries(results.flat().map((entry) => [entry.channel_id, entry.sources || []]));
       current.current = next; setSummaries(next); setError(false);
+      loaded.current = true;
     } catch { if (task.current() && lifecycle.current.active) setError(true); }
     finally { if (task.current() && lifecycle.current.active) setLoading(false); }
   }, [ids, cancelCommands]);
