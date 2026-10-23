@@ -12,7 +12,7 @@
 | LAN 服务接口保留 | `TestManagementBoundaryDoesNotAffectGatewayAuth`，远端 `/v1/chat/completions` | 无令牌 401；原有效令牌通过鉴权，非法请求体进入业务校验 400；不发真实生成请求，通过 |
 | 开发代理不能代远端获取管理权限 | Node `dev-management-access.test.js` | 代理前拒绝远端 `/api`，服务路径不受管理 guard 影响，2 项通过 |
 | Electron 管理兼容 | 独立隐藏 BrowserWindow，加载临时 file:// 页面，自定义管理头，请求临时 Go API | GET ping 200；POST 模型预览缺参数返回业务校验 400，无 CORS 网络错误，通过 |
-| 分组配置状态不冒充健康 | `groupService.test.js`，空组、手动项失效、有效手动项、轮询和故障转移 | 配置完整仍显示未验证，缺失项显示配置不完整，通过 |
+| 分组配置状态不冒充健康 | `groupService.test.js`，空组、手动项失效、有效手动项、故障转移及废弃/未知策略 | 配置完整仍显示未验证，缺失项显示配置不完整，通过 |
 | 分组跨页不丢标识 | `groupService.test.js` 与 `logQuery.test.js`，中文、空格、&、?、# 等 | 接入/记录链接和 group_name 筛选保留完整名称，通过 |
 | 不存在分组不自动换服务 | `serviceAccess.test.js`，显式 deleted / 空名 / 原选择失效 | 显式无效链接保持未选；无显式链接时才允许默认分组，通过 |
 | 三类 API 示例 | `serviceAccess.test.js`，stream true/false、特殊引号密钥/分组 | Chat/Messages=max_tokens，Responses=max_output_tokens，预算 128，保留流式及认证，4 项通过 |

@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -25,6 +26,7 @@ type StreamOption func(*streamOptions)
 
 type streamOptions struct {
 	inputEstimate func() int
+	limits        resource.Limits
 }
 
 // WithInputEstimate 提供客户端输入 token 的惰性估算 thunk。仅 OpenAI→Anthropic
@@ -33,6 +35,10 @@ type streamOptions struct {
 // body 全量解析的开销只在需要时发生。
 func WithInputEstimate(fn func() int) StreamOption {
 	return func(o *streamOptions) { o.inputEstimate = fn }
+}
+
+func WithResourceLimits(limits resource.Limits) StreamOption {
+	return func(o *streamOptions) { o.limits = limits.Normalize() }
 }
 
 // inputEstimateSetter 是接受惰性估算 thunk 的转换器内部能力（仅 anthropic
@@ -55,18 +61,22 @@ func NewStreamConverter(from, to Provider, opts ...StreamOption) (StreamConverte
 	}
 	if from == to {
 		// 同协议直通：仍按源协议提取 usage，否则流式日志的 token/费用丢失
-		return newProtocolAwarePassthrough(from), nil
+		p := newProtocolAwarePassthrough(from)
+		p.setResourceLimits(o.limits)
+		return p, nil
 	}
 	source, _ := implFor(from)
 	target, _ := implFor(to)
 	decoder := source.newStreamDecoder()
 	encoder := target.newStreamEncoder()
+	setStreamLimits(decoder, o.limits)
+	setStreamLimits(encoder, o.limits)
 	if o.inputEstimate != nil {
 		if es, ok := encoder.(inputEstimateSetter); ok {
 			es.setInputEstimate(o.inputEstimate)
 		}
 	}
-	return &typedStreamConverter{from: from, decoder: decoder, encoder: encoder, legacyIntermediateUsage: from != ProviderOpenAI && to != ProviderOpenAI}, nil
+	return &typedStreamConverter{from: from, limits: o.limits.Normalize(), decoder: decoder, encoder: encoder, legacyIntermediateUsage: from != ProviderOpenAI && to != ProviderOpenAI}, nil
 }
 
 // protocolAwarePassthrough 同协议直通：usage 提取委托给源协议注册的能力项
@@ -74,23 +84,32 @@ func NewStreamConverter(from, to Provider, opts ...StreamOption) (StreamConverte
 // 新协议漏提取的问题在注册表编译期就会暴露，而不是流式日志静默丢 token。
 type protocolAwarePassthrough struct {
 	extract func(payload []byte) *Usage
+	source  Provider
+	budget  streamResourceBudget
 	usage   *Usage
 }
 
 func newProtocolAwarePassthrough(p Provider) *protocolAwarePassthrough {
 	if impl, ok := implFor(p); ok {
-		return &protocolAwarePassthrough{extract: impl.newUsageExtractor()}
+		return &protocolAwarePassthrough{source: p, extract: impl.newUsageExtractor()}
 	}
 	return &protocolAwarePassthrough{}
 }
 
 func (p *protocolAwarePassthrough) Convert(payload []byte) ([][]byte, error) {
+	if err := p.budget.payload(p.source, payload, false); err != nil {
+		return nil, err
+	}
 	if u := p.extract(payload); u != nil {
 		p.usage = u
 	}
 	return [][]byte{payload}, nil
 }
-func (*protocolAwarePassthrough) Finish() ([][]byte, error) { return nil, nil }
+func (p *protocolAwarePassthrough) Finish() ([][]byte, error) { return nil, p.budget.err }
+func (p *protocolAwarePassthrough) setResourceLimits(l resource.Limits) {
+	p.budget.limits = l.Normalize()
+}
+func (p *protocolAwarePassthrough) resourceLimits() resource.Limits { return p.budget.normalized() }
 func (p *protocolAwarePassthrough) Usage() *Usage {
 	if p.usage != nil {
 		return p.usage
@@ -118,19 +137,23 @@ func newFromOpenAIStream(to Provider) StreamConverter {
 // （from==to 的同协议直通走 protocolAwarePassthrough）。仍解析每一个 chunk 累积
 // usage：否则 OpenAI 端点返回的 usage 会在日志落库时丢失（chain 的 Usage() 只取第一段）。
 type identityStream struct {
-	usage *Usage
+	budget streamResourceBudget
+	usage  *Usage
 }
 
 func newIdentityStream() StreamConverter { return &identityStream{} }
 
 func (s *identityStream) Convert(payload []byte) ([][]byte, error) {
+	if err := s.budget.payload(ProviderOpenAI, payload, false); err != nil {
+		return nil, err
+	}
 	var chunk ChatCompletionChunk
 	if json.Unmarshal(payload, &chunk) == nil && chunk.Usage != nil {
 		s.usage = chunk.Usage
 	}
 	return [][]byte{payload}, nil
 }
-func (*identityStream) Finish() ([][]byte, error) { return nil, nil }
+func (s *identityStream) Finish() ([][]byte, error) { return nil, s.budget.err }
 func (s *identityStream) Usage() *Usage {
 	if s.usage != nil {
 		return s.usage
@@ -141,6 +164,7 @@ func (s *identityStream) Usage() *Usage {
 // sourceStreamState 是「→OpenAI」方向各转换器共享的 chunk 元信息累积器，
 // 借鉴 new-api 的 ResponseInfo：跨事件累积 id/model/usage/finish_reason/文本。
 type sourceStreamState struct {
+	budget     streamResourceBudget
 	id         string
 	model      string
 	usage      *Usage

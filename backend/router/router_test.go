@@ -102,42 +102,55 @@ func TestResolveManual(t *testing.T) {
 	}
 }
 
-func TestResolveRoundRobin(t *testing.T) {
+func TestResolveMigratedFailoverStableOrder(t *testing.T) {
 	g := setupRouter(t)
-	g.Strategy = group.StrategyRoundRobin
-	g.ID = 88888 // 独立游标，避免测试间污染
-
-	// 返回自游标起的完整环形：首个目标轮流分布，其余目标殿后供失败顺延
-	seen := map[string]bool{}
-	for i := 0; i < 4; i++ {
-		targets, err := Resolve(g)
-		if err != nil {
-			t.Fatalf("Resolve 失败: %v", err)
-		}
-		if len(targets) != 2 {
-			t.Fatalf("round_robin 应返回完整环形 2 个 target, got %d", len(targets))
-		}
-		if targets[0].Model.Name == targets[1].Model.Name {
-			t.Errorf("环形目标不应重复: %s, %s", targets[0].Model.Name, targets[1].Model.Name)
-		}
-		seen[targets[0].Model.Name] = true
+	if err := shared.DB.Model(&group.Group{}).Where("id = ?", g.ID).UpdateColumn("strategy", "round_robin").Error; err != nil {
+		t.Fatal(err)
 	}
-	if !seen["m1"] || !seen["m2"] {
-		t.Errorf("round_robin 首个目标应轮流命中 m1/m2: %v", seen)
+	// 相同优先级时明确按成员 ID；输入逆序不改变路由顺序。
+	if err := shared.DB.Model(&group.GroupItem{}).Where("group_id = ?", g.ID).Update("priority", 0).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := group.MigrateLegacyStrategies(shared.DB); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := group.GetByName(g.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Strategy != group.StrategyFailover || loaded.Items[0].ID >= loaded.Items[1].ID {
+		t.Fatalf("迁移加载顺序错误: %+v", loaded)
+	}
+	loaded.Items[0], loaded.Items[1] = loaded.Items[1], loaded.Items[0]
+	for i := 0; i < 5; i++ {
+		targets, err := Resolve(loaded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(targets) != 2 || targets[0].Model.Name != "m1" || targets[1].Model.Name != "m2" {
+			t.Fatalf("故障转移应保持主备顺序: %+v", targets)
+		}
+	}
+	if loaded.Items[0].ModelName != "m2" {
+		t.Fatal("路由不应修改调用方的成员切片")
+	}
+	// 优先级高于 ID 决胜规则，即使切片本身未按优先级排序也应正确。
+	loaded.Items[0].Priority = -1
+	targets, err := Resolve(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 2 || targets[0].Model.Name != "m2" || targets[1].Model.Name != "m1" {
+		t.Fatalf("priority 必须先于成员 ID 决定顺序: %+v", targets)
+	}
+	loaded.Strategy = group.Strategy("round_robin")
+	if _, err := Resolve(loaded); err == nil {
+		t.Fatal("废弃策略不应继续轮询")
 	}
 }
 
 func TestResolveEmptyGroup(t *testing.T) {
 	if _, err := Resolve(&group.Group{Strategy: group.StrategyManual}); err != ErrEmptyGroup {
 		t.Errorf("空分组应返回 ErrEmptyGroup, got %v", err)
-	}
-}
-
-func TestNextRoundRobin(t *testing.T) {
-	const groupID = 99999
-	for i := 0; i < 5; i++ {
-		if got := nextRoundRobin(groupID, 3); got != i%3 {
-			t.Errorf("第 %d 次轮询 = %d, want %d", i, got, i%3)
-		}
 	}
 }

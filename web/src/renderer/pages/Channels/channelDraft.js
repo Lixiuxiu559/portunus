@@ -1,6 +1,8 @@
 // 渠道草稿规则独立于 React 和网络，创建与编辑复用。
 export function createDraft(channel) {
   return {
+    rate_limit_scope: channel?.rate_limit_scope || 'model',
+    max_concurrent_requests: String(channel?.max_concurrent_requests ?? 0),
     name: channel?.name || '', icon: channel?.icon || '', type: channel?.type || '',
     provider_id: channel?.provider_id || 'generic', profile_id: channel?.profile_id || '',
     adapter_id: channel?.adapter_id || 'generic', base_url: channel?.base_url || '', key: '',
@@ -48,10 +50,20 @@ export function connectionPayload(draft, channelId) {
 }
 
 export function savePayload(draft, selected) {
+  const capacityError = validateChannelCapacity(draft.max_concurrent_requests ?? '0');
+  if (capacityError) throw new Error(capacityError);
   return {
+    rate_limit_scope: draft.rate_limit_scope || 'model',
+    max_concurrent_requests: Number(draft.max_concurrent_requests ?? 0),
     ...connectionPayload(draft), icon: draft.icon || '', name: draft.name.trim(), models: normalizeModels(selected),
     auto_sync: draft.connection_options.model_discovery === 'api' && draft.auto_sync,
   };
+}
+
+export function validateChannelCapacity(value) {
+  const text = String(value ?? '');
+  return /^\d+$/.test(text) && Number.isSafeInteger(Number(text))
+    ? null : '请填写非负整数，0 表示不限制';
 }
 
 // generation 在同步修改草稿时递增，而非等待 effect 才使旧请求失效。

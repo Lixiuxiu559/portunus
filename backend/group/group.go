@@ -6,15 +6,14 @@ import "time"
 type Strategy string
 
 const (
-	StrategyManual     Strategy = "manual"      // 手动指定：只打激活项
-	StrategyRoundRobin Strategy = "round_robin" // 轮询：组内轮流，失败顺延下一家
-	StrategyFailover   Strategy = "failover"    // 故障转移：按 priority 顺序，失败换下一个
+	StrategyManual   Strategy = "manual"   // 手动指定：只打激活项
+	StrategyFailover Strategy = "failover" // 故障转移：按 priority 顺序，失败换下一个
 )
 
 // Valid 校验策略枚举。
 func (s Strategy) Valid() bool {
 	switch s {
-	case StrategyManual, StrategyRoundRobin, StrategyFailover:
+	case StrategyManual, StrategyFailover:
 		return true
 	default:
 		return false
@@ -37,7 +36,7 @@ type GroupItem struct {
 	ID       int64 `gorm:"primaryKey" json:"id"`
 	GroupID  int64 `gorm:"not null;uniqueIndex:idx_group_model" json:"group_id"`
 	ModelID  int64 `gorm:"not null;uniqueIndex:idx_group_model" json:"model_id"` // 指向 model.Model
-	Priority int   `json:"priority"`                                             // failover 按升序尝试；round_robin 无意义
+	Priority int   `json:"priority"`                                             // failover 按升序尝试，同 priority 按分组项 ID 排序
 	// 元数据由关联查询读取，不写入分组项，也不参与数据库迁移。
 	ModelName string `gorm:"->;-:migration" json:"-"`
 	ChannelID int64  `gorm:"->;-:migration" json:"-"`

@@ -1,7 +1,8 @@
 export const errKindLabels = {
   client_cancel: '用户取消', upstream_error: '上游错误', watchdog_timeout: '流静默超时',
   stream_interrupted: '流中断', convert_error: '转换失败', network: '网络错误',
-  internal: '内部错误', circuit_open: '熔断开路',
+  internal: '内部错误', circuit_open: '熔断开路', rate_limit_cooldown: '限流冷却',
+  channel_capacity: '渠道并发已满',
 };
 
 // 名称来自当前渠道目录，历史日志只保存 ID；已删除渠道仍可定位。

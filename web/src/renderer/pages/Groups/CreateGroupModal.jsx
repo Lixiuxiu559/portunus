@@ -3,9 +3,7 @@ import { Button, Modal, Label, Input, TextField, FieldError, Form, Select, ListB
 import { createGroup } from '../../api';
 import { groupCreatePayload, moveGroupModel, toggleGroupModel } from '../../utils/groupModelSelection';
 import GroupModelPicker from './GroupModelPicker';
-import { strategyDescriptions } from '../../utils/groupService';
-
-const strategies = [{ id: 'manual', label: '手动选择' }, { id: 'round_robin', label: '轮询' }, { id: 'failover', label: '故障转移' }];
+import { strategyDescriptions, strategyOptions } from '../../utils/groupService';
 
 export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, channels }) {
   const [saving, setSaving] = useState(false);
@@ -52,7 +50,7 @@ export default function CreateGroupModal({ isOpen, onOpenChange, onCreated, chan
         </TextField>
         <Select aria-label="路由策略" name="strategy" selectedKey={strategy} onSelectionChange={setStrategy} isDisabled={saving}>
           <Label>路由策略</Label><Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-          <Select.Popover className="dialog-options"><ListBox>{strategies.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label}>{option.label}<ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover>
+          <Select.Popover className="dialog-options"><ListBox>{strategyOptions.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label}>{option.label}<ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover>
         </Select>
         <p className="text-xs text-muted">{strategyDescriptions[strategy]}</p>
         {isOpen && <GroupModelPicker channels={channels} selected={selected} onSelect={selectModel} multiple enabled={isOpen} disabled={saving} />}

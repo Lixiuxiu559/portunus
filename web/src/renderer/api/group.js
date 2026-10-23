@@ -2,7 +2,7 @@ import request from './request';
 
 /**
  * 分组：对外模型名，聚合多个渠道模型，必配路由策略
- * strategy: manual | round_robin | failover
+ * strategy: manual | failover
  * 列表/详情中的分组项：{ id, group_id, model_id, model_name, channel_id, priority }
  */
 

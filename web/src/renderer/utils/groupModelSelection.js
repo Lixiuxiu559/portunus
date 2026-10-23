@@ -1,3 +1,5 @@
+import { isSupportedGroupStrategy } from './groupService.js';
+
 /** 分组选择保留完整模型快照，翻页、搜索与切渠道不丢失已选成员。 */
 export function toggleGroupModel(selected, model) {
   const id = Number(model.id);
@@ -17,7 +19,7 @@ export function moveGroupModel(selected, modelId, offset) {
 
 export function groupCreatePayload({ name, strategy, selected, activeModelId }) {
   const ids = selected.map((model) => Number(model.id));
-  if (!name.trim() || !['manual', 'round_robin', 'failover'].includes(strategy)
+  if (!name.trim() || !isSupportedGroupStrategy(strategy)
     || ids.length === 0 || ids.some((id) => !Number.isSafeInteger(id) || id <= 0)
     || new Set(ids).size !== ids.length) throw new Error('请填写分组名称并选择有效成员');
   const result = { name: name.trim(), strategy, items: ids.map((model_id, priority) => ({ model_id, priority })) };

@@ -14,6 +14,7 @@ import (
 // relayAttemptTrace 独占于一轮 relay；sequence 由同一客户端请求内串行执行的
 // relay 共用。不记录正文、URL 或鉴权头，也不将 HTTP 200 等同于模型 completed。
 type relayAttemptTrace struct {
+	routing  *routingTargetTrace
 	sequence *int
 	template shared.UpstreamAttempt
 	active   *shared.UpstreamAttempt

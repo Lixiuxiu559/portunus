@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
-import { groupConfiguration, groupServicePath, strategyDescriptions } from '../../utils/groupService';
+import { groupConfiguration, groupServicePath, strategyDescriptions, strategyLabels } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button, Typography, Chip, Card, ScrollShadow, Spinner, TextField, Input, toast } from '@heroui/react';
 import { Plus, Trash2, Pencil, RotateCw, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
@@ -15,12 +15,6 @@ import EditGroupEditor from './EditGroupEditor';
 import DeleteGroupModal from './DeleteGroupModal';
 import AddGroupItemModal from './AddGroupItemModal';
 import './groups.css';
-
-const STRATEGIES = [
-  { key: 'manual', label: '手动选择' },
-  { key: 'round_robin', label: '轮询' },
-  { key: 'failover', label: '故障转移' },
-];
 
 function MemberRow({ provided, dragging, name, channelName, active, manual, sortable, index, onActivate, onRemove }) {
   const content = <><span className="group-member-name" title={name}>{name}</span><span className="group-member-channel">{channelName || '渠道信息未加载'}</span></>;
@@ -214,7 +208,7 @@ export default function Groups() {
                   <div className="flex items-center gap-3 min-w-0">
                     <Typography className="font-medium text-lg truncate" title={g.name}>{g.name}</Typography>
                     <Chip size="sm" variant="soft" className="shrink-0" title={strategyDescriptions[g.strategy]}>
-                      {STRATEGIES.find((strategy) => strategy.key === g.strategy)?.label || g.strategy}
+                      {strategyLabels[g.strategy] || g.strategy}
                     </Chip>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -285,7 +279,7 @@ export default function Groups() {
           }
           status={
             <Chip size="sm" variant="soft">
-              {STRATEGIES.find((s) => s.key === editTarget.strategy)?.label || editTarget.strategy}
+              {strategyLabels[editTarget.strategy] || editTarget.strategy}
             </Chip>
           }
         >

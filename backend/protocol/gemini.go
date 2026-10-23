@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -534,6 +535,9 @@ type geminiToOpenAIStream struct {
 func newGeminiToOpenAIStream() StreamConverter { return &geminiToOpenAIStream{} }
 
 func (g *geminiToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
+	if err := g.st.budget.payload(ProviderGemini, payload, true); err != nil {
+		return nil, err
+	}
 	var resp GenerateContentResponse
 	if err := json.Unmarshal(payload, &resp); err != nil {
 		return nil, fmt.Errorf("解析 gemini 流事件失败: %w", err)
@@ -586,6 +590,9 @@ func (g *geminiToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
 }
 
 func (g *geminiToOpenAIStream) End() ([]StreamEvent, error) {
+	if g.st.budget.err != nil {
+		return nil, g.st.budget.err
+	}
 	if b := g.st.emitFinal(); b != nil {
 		return []StreamEvent{*b}, nil
 	}
@@ -657,4 +664,8 @@ func (g *geminiToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 func (g *geminiToOpenAIStream) Finish() ([][]byte, error) {
 	events, err := g.End()
 	return encodeOpenAIEvents(events, err)
+}
+
+func (g *geminiToOpenAIStream) setResourceLimits(l resource.Limits) {
+	g.st.budget.limits = l.Normalize()
 }

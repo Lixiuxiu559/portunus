@@ -63,16 +63,19 @@ type Log struct {
 // 只持有取值；错误 → 类别的判定归 gateway.failSpec（失败处置模块，唯一权威）。
 
 const (
+	ErrKindResourceLimit        = "resource_limit"
+	ErrKindChannelCapacity      = "channel_capacity"
 	ErrKindAttemptBudget        = "attempt_budget_exhausted"
 	ErrKindFirstContentDeadline = "first_content_deadline"
 	ErrKindNonStreamDeadline    = "non_stream_deadline"
-	ErrKindClientWrite          = "client_write"       // 客户端写入或 Flush 失败，不计渠道故障
-	ErrKindClientCancel         = "client_cancel"      // 客户端主动断开或其自身期限到达
-	ErrKindUpstream             = "upstream_error"     // 上游返回非 2xx
-	ErrKindWatchdog             = "watchdog_timeout"   // 上游流静默超时被看门狗掐断
-	ErrKindStreamInterrupt      = "stream_interrupted" // 流已提交后中途断掉，无法 failover
-	ErrKindConvert              = "convert_error"      // 协议转换 / 请求改写失败
-	ErrKindNetwork              = "network"            // 连接 / 超时等网络层失败
-	ErrKindInternal             = "internal"           // 其余未归类失败
-	ErrKindCircuitOpen          = "circuit_open"       // 分组全部目标熔断开路，未打上游直接 503
+	ErrKindClientWrite          = "client_write"        // 客户端写入或 Flush 失败，不计渠道故障
+	ErrKindClientCancel         = "client_cancel"       // 客户端主动断开或其自身期限到达
+	ErrKindUpstream             = "upstream_error"      // 上游返回非 2xx
+	ErrKindWatchdog             = "watchdog_timeout"    // 上游流静默超时被看门狗掐断
+	ErrKindStreamInterrupt      = "stream_interrupted"  // 流已提交后中途断掉，无法 failover
+	ErrKindConvert              = "convert_error"       // 协议转换 / 请求改写失败
+	ErrKindNetwork              = "network"             // 连接 / 超时等网络层失败
+	ErrKindInternal             = "internal"            // 其余未归类失败
+	ErrKindCircuitOpen          = "circuit_open"        // 分组全部目标熔断开路，未打上游直接 503
+	ErrKindRateLimitCooldown    = "rate_limit_cooldown" // 本地限流冷却跳过，未发送HTTP
 )

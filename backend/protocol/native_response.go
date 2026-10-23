@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 const (
@@ -20,20 +22,35 @@ const (
 // extensions into another protocol. Private fields keep source data out of JSON logs.
 type ResponseEnvelope struct {
 	native NativeEnvelope
+	limits resource.Limits
+	scope  resource.Scope
 	wire   *SSEEvent
 }
 
-func CaptureResponse(from Provider, body []byte) (*ResponseEnvelope, error) {
+func CaptureResponse(from Provider, body []byte, options ...resource.Limits) (*ResponseEnvelope, error) {
+	return captureResponse(from, body, nativeLimits(options), resource.Response)
+}
+func captureResponse(from Provider, body []byte, limits resource.Limits, scope resource.Scope) (*ResponseEnvelope, error) {
 	if !from.Valid() {
 		return nil, fmt.Errorf("未知的源协议: %s", from)
 	}
-	e := &ResponseEnvelope{native: NativeEnvelope{Source: SourceDescriptor{Protocol: from, Trust: SourceUnverified}, Original: bytes.Clone(body)}}
-	e.captureFragments()
+	if err := inspectNativeResources(from, body, limits, scope); err != nil {
+		return nil, err
+	}
+	e := &ResponseEnvelope{limits: limits, scope: scope, native: NativeEnvelope{Source: SourceDescriptor{Protocol: from, Trust: SourceUnverified}, Original: bytes.Clone(body)}}
+	if err := e.captureFragments(); err != nil {
+		return nil, err
+	}
 	return e, nil
 }
-
-func CaptureResponseEvent(from Provider, ev SSEEvent) (*ResponseEnvelope, error) {
-	e, err := CaptureResponse(from, ev.Data)
+func CaptureResponseEvent(from Provider, ev SSEEvent, options ...resource.Limits) (*ResponseEnvelope, error) {
+	if err := resource.CheckSize(int64(len(ev.Raw)), 1<<20, resource.Stream, "sse_event_bytes"); err != nil {
+		return nil, err
+	}
+	if err := resource.CheckSize(int64(len(ev.Data)), 1<<20, resource.Stream, "sse_event_bytes"); err != nil {
+		return nil, err
+	}
+	e, err := captureResponse(from, ev.Data, nativeLimits(options), resource.Stream)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +75,11 @@ func (e *ResponseEnvelope) clone() *ResponseEnvelope {
 	if e == nil {
 		return nil
 	}
-	return &ResponseEnvelope{native: e.Native(), wire: e.Wire()}
+	// Captured buffers are private and immutable. Share their backing storage across
+	// semantic events; cloning the whole frame per part multiplies large native data.
+	// Public accessors still return deep copies, and each event owns its envelope.
+	out := *e
+	return &out
 }
 
 func (e *ResponseEnvelope) Wire() *SSEEvent  { return cloneResponseWire(e.wire) }
@@ -73,14 +94,22 @@ func (e *ResponseEnvelope) Native() NativeEnvelope {
 	return n
 }
 
-func (e *ResponseEnvelope) captureFragments() {
+func (e *ResponseEnvelope) captureFragments() error {
+	var captureErr error
 	add := func(owner OwnerRef, pos int, raw json.RawMessage) {
+		if captureErr != nil {
+			return
+		}
+		captureErr = resource.CheckSize(int64(len(e.native.Fragments)+1), int64(e.limits.MaxNativeFragments), e.scope, "native_fragments")
+		if captureErr != nil {
+			return
+		}
 		e.native.Fragments = append(e.native.Fragments, NativeFragment{Owner: owner, Position: pos, Kind: NativeOpaque, Raw: bytes.Clone(raw)})
 	}
 	root := rawObject(e.native.Original)
 	if root == nil {
 		add(OwnerRef{Kind: OwnerResponse, Item: -1}, 0, e.native.Original)
-		return
+		return captureErr
 	}
 	keys := make([]string, 0, len(root))
 	for k := range root {
@@ -131,6 +160,7 @@ func (e *ResponseEnvelope) captureFragments() {
 			visit(obj, array, -1)
 		}
 	}
+	return captureErr
 }
 
 // responseShape inspects only explicitly known structural levels. User-defined
@@ -333,11 +363,17 @@ func (e *ResponseEnvelope) Render(to Provider) ([]byte, ConversionReport, error)
 		return nil, report, err
 	}
 	out, err := renderResponseFromOpenAI(to, resp)
-	return out, report, err
+	if err == nil {
+		err = inspectNativeResources(to, out, e.limits, e.scope)
+	}
+	if err != nil {
+		return nil, report, err
+	}
+	return out, report, nil
 }
 
-func ConvertResponseWithReport(from, to Provider, body []byte) ([]byte, ConversionReport, error) {
-	e, err := CaptureResponse(from, body)
+func ConvertResponseWithReport(from, to Provider, body []byte, options ...resource.Limits) ([]byte, ConversionReport, error) {
+	e, err := CaptureResponse(from, body, options...)
 	if err != nil {
 		return nil, ConversionReport{}, err
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 // streamWatchdog 挂在上游流式请求上的静默看门狗：首包前按首包时限、提交后按静默时限，
@@ -161,7 +162,8 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 			if stopErr := requestControlError(c.Request.Context()); stopErr != nil {
 				return first, fail(stopErr, "api_error")
 			}
-			if streamSucceeded(session.Outcome()) && !errors.Is(readErr, protocol.ErrSSEEventTooLarge) {
+			var limitErr *resource.LimitError
+			if streamSucceeded(session.Outcome()) && !errors.Is(readErr, protocol.ErrSSEEventTooLarge) && !errors.As(readErr, &limitErr) {
 				gate.report.TailLimited = readErr != io.EOF
 				break
 			}
@@ -176,6 +178,9 @@ func relayStream(c *gin.Context, clientProto protocol.Provider, upstreamResp *ht
 		batch, processErr := session.Process(event)
 		unsafe = unsafe || batch.ReplayUnsafe
 		if processErr != nil {
+			if opt.OnRateLimit != nil && failSpec(processErr).RateLimited {
+				opt.OnRateLimit()
+			}
 			// 已交付的同协议错误帧仍保留原生形状；未提交时整批丢弃。
 			if gate.report.Started && len(batch.Frames) > 0 {
 				if writeErr := gate.push(batch); writeErr != nil {

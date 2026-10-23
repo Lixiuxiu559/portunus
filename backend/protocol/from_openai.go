@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -46,7 +47,8 @@ type toolAccum struct {
 // fromOpenAISkeleton 解析 canonical chunk 的块生命周期并驱动 blockSink。
 // 实现 StreamConverter；newFromStream 工厂用它包装各协议的 sink。
 type fromOpenAISkeleton struct {
-	sink blockSink
+	sink   blockSink
+	budget streamResourceBudget
 
 	id    string
 	model string
@@ -75,6 +77,16 @@ func (s *fromOpenAISkeleton) setInputEstimate(fn func() int) {
 }
 
 func (s *fromOpenAISkeleton) Convert(payload []byte) ([][]byte, error) {
+	if s.budget.err != nil {
+		return nil, s.budget.err
+	}
+	if len(payload) > 1<<20 {
+		return nil, s.budget.fail("sse_event_bytes", 1<<20)
+	}
+	if err := resource.CheckDepth(payload, s.budget.normalized().MaxJSONDepth, resource.Stream); err != nil {
+		s.budget.err = err
+		return nil, err
+	}
 	var chunk ChatCompletionChunk
 	if err := json.Unmarshal(payload, &chunk); err != nil {
 		return nil, fmt.Errorf("解析 openai chunk 失败: %w", err)
@@ -84,6 +96,9 @@ func (s *fromOpenAISkeleton) Convert(payload []byte) ([][]byte, error) {
 
 // Encode 直接消费语义帧；共享块生命周期不解析中间 JSON。
 func (s *fromOpenAISkeleton) Encode(chunk StreamEvent) ([][]byte, error) {
+	if err := s.checkResources(chunk); err != nil {
+		return nil, err
+	}
 	if len(chunk.Choices) > 0 {
 		if gs, ok := s.sink.(interface{ SetGrounding(*GroundingMetadata) }); ok {
 			if gm := chunk.Choices[0].Delta.GroundingMetadata; gm != nil {
@@ -171,6 +186,9 @@ func (s *fromOpenAISkeleton) Encode(chunk StreamEvent) ([][]byte, error) {
 }
 
 func (s *fromOpenAISkeleton) Finish() ([][]byte, error) {
+	if s.budget.err != nil {
+		return nil, s.budget.err
+	}
 	var out [][]byte
 	out = append(out, s.closeSingle()...)
 	out = append(out, s.completeTools()...)
@@ -224,4 +242,51 @@ func (s *fromOpenAISkeleton) completeTools() [][]byte {
 	s.tools = nil
 	s.toolOrder = nil
 	return out
+}
+
+func (s *fromOpenAISkeleton) setResourceLimits(l resource.Limits) { s.budget.limits = l.Normalize() }
+func (s *fromOpenAISkeleton) checkResources(e StreamEvent) error {
+	if s.budget.err != nil {
+		return s.budget.err
+	}
+	if len(e.Choices) == 0 {
+		return nil
+	}
+	d := e.Choices[0].Delta
+	if len(d.ToolCalls) > 0 {
+		seen := map[int]bool{}
+		for _, t := range d.ToolCalls {
+			idx := t.Index
+			if idx < 0 {
+				idx = 0
+			}
+			key := fmt.Sprint(idx)
+			if s.tools[idx] == nil && !seen[idx] {
+				delete(s.budget.args, key)
+			}
+			seen[idx] = true
+			if err := s.budget.tool(key, t.Function.Arguments, false); err != nil {
+				return err
+			}
+			if err := s.budget.add(len(t.ID) + len(t.Function.Name)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	kind := "text"
+	text := d.Content
+	if d.ReasoningContent != "" {
+		kind = "thinking"
+		text = d.ReasoningContent
+	}
+	if text != "" {
+		if !s.singleOpen || s.singleType != kind {
+			if err := s.budget.item(); err != nil {
+				return err
+			}
+		}
+		return s.budget.add(len(text))
+	}
+	return nil
 }

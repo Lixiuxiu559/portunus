@@ -2,8 +2,7 @@ package router
 
 import (
 	"errors"
-	"sync"
-	"sync/atomic"
+	"sort"
 
 	"github.com/Lixiuxiu559/portunus/backend/channel"
 	"github.com/Lixiuxiu559/portunus/backend/group"
@@ -22,12 +21,8 @@ var ErrNoActiveItem = errors.New("分组未指定激活项")
 // ErrEmptyGroup 表示分组没有可用模型。
 var ErrEmptyGroup = errors.New("分组没有可用模型")
 
-// roundRobinCounters 记录每个分组的轮询游标（内存态，重启归零）。
-var roundRobinCounters sync.Map // groupID(int64) -> *atomic.Uint64
-
 // Resolve 按分组策略返回有序目标列表。
-// manual 返回单个目标；round_robin 返回自轮询游标起的完整环形（失败顺延下一家）；
-// failover 返回全部目标（按 priority 升序）。
+// manual 返回单个目标；failover 返回全部目标（按 priority、分组项 ID 升序）。
 func Resolve(g *group.Group) ([]Target, error) {
 	if len(g.Items) == 0 {
 		return nil, ErrEmptyGroup
@@ -44,22 +39,16 @@ func Resolve(g *group.Group) ([]Target, error) {
 			}
 		}
 		return nil, ErrNoActiveItem
-	case group.StrategyRoundRobin:
-		// 从本轮游标开始返回完整环形目标：首个仍是轮询选中项（轮流分布不变），
-		// 其余按序殿后——选中项失败 / 熔断时顺延下一家，而不是整请求失败。
-		idx := nextRoundRobin(g.ID, len(g.Items))
-		targets := make([]Target, 0, len(g.Items))
-		for k := 0; k < len(g.Items); k++ {
-			t, err := resolveTarget(g.Items[(idx+k)%len(g.Items)])
-			if err != nil {
-				return nil, err
-			}
-			targets = append(targets, t)
-		}
-		return targets, nil
 	case group.StrategyFailover:
+		items := append([]group.GroupItem(nil), g.Items...)
+		sort.SliceStable(items, func(i, j int) bool {
+			if items[i].Priority != items[j].Priority {
+				return items[i].Priority < items[j].Priority
+			}
+			return items[i].ID < items[j].ID
+		})
 		targets := make([]Target, 0, len(g.Items))
-		for _, it := range g.Items {
+		for _, it := range items {
 			t, err := resolveTarget(it)
 			if err != nil {
 				return nil, err
@@ -82,11 +71,4 @@ func resolveTarget(it group.GroupItem) (Target, error) {
 		return Target{}, err
 	}
 	return Target{Model: *m, Channel: *ch}, nil
-}
-
-// nextRoundRobin 返回下一个轮询下标（原子自增，取模）。
-func nextRoundRobin(groupID int64, n int) int {
-	c, _ := roundRobinCounters.LoadOrStore(groupID, &atomic.Uint64{})
-	counter := c.(*atomic.Uint64)
-	return int(counter.Add(1)-1) % n
 }

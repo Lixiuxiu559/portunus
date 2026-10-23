@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Select, ListBox } from '@heroui/react';
 import { findClientGuide } from './tools';
+import { strategyLabels } from '../../utils/groupService';
 import { buildServiceExamples } from '../../utils/serviceAccess';
 import { CodeSample, CopyValue, DocLink, GuideStep, Note, Parameters } from './shared';
 
-const STRATEGY_LABELS = { manual: '手动选择', round_robin: '轮询', failover: '故障转移' };
 
 /** 接入示例：模型分组 + API / 各客户端的手动配置指南。 */
 export default function ExamplesPane({
@@ -73,7 +73,7 @@ export default function ExamplesPane({
               <Select.Popover className="service-group-popover">
                 <ListBox aria-label="可接入的模型分组">
                   {groups.map((group) => <ListBox.Item key={group.name} id={group.name} textValue={group.name} className="min-w-0 py-2.5">
-                    <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{STRATEGY_LABELS[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
+                    <div className="min-w-0 flex-1"><span className="block truncate text-sm font-medium" title={group.name}>{group.name}</span><span className="mt-0.5 block text-xs text-muted">{strategyLabels[group.strategy] || group.strategy} · {group.items?.length || 0} 个成员</span></div>
                     <ListBox.ItemIndicator />
                   </ListBox.Item>)}
                 </ListBox>

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -115,7 +117,8 @@ func relayErrorKindByStatus(status int) relayErrorKind {
 // 归因落库读 ErrKind；状态码裁决与错误体渲染读 Status / RelayKind / RetryAfter。
 type failDecision struct {
 	StopRequest    bool           // 请求级终止（取消、重放不安全、资源/转换失败等），禁止继续候选
-	Retryable      bool           // 值得对同一 / 下一上游重试（内层循环继续）
+	Retryable      bool           // 是否继续同目标重试；换目标还需服从 StopRequest
+	RateLimited    bool           // 已观察到真实 HTTP/流内429；记录冷却，不计故障熔断
 	StallNoHeader  bool           // 等头假死：跳过同目标重试直接换下一家；熔断按快速阈值（2 次）开路
 	StallMidStream bool           // 流静默假死：保留同目标重试；熔断按普通阈值计数
 	BreakerFail    bool           // 计入熔断健康度（可重试失败 / 已提交的流中断）；false 时按成功清零语义之外的「不记」处理
@@ -141,16 +144,23 @@ func failSpec(err error) failDecision {
 	var committed *streamCommittedError
 	if errors.As(err, &committed) {
 		d := failDecision{ErrKind: shared.ErrKindStreamInterrupt, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
+		var limitErr *resource.LimitError
 		var writeErr *deliveryWriteError
 		var clientDeadline *clientDeadlineError
+		var streamRateLimit *protocol.StreamFailureError
+		var httpRateLimit *upstreamStatusError
 		if errors.As(err, &clientDeadline) {
 			d.ErrKind, d.Status = shared.ErrKindClientCancel, http.StatusGatewayTimeout
+		} else if errors.As(err, &limitErr) {
+			d.ErrKind = shared.ErrKindResourceLimit
 		} else if errors.As(err, &writeErr) {
 			d.ErrKind = shared.ErrKindClientWrite
 		} else if errors.Is(err, context.Canceled) {
 			d.ErrKind = shared.ErrKindClientCancel // 包装的用户取消仍归用户行为
 		} else if errors.Is(err, protocol.ErrSSEEventTooLarge) || errors.Is(err, protocol.ErrStreamInvalid) {
 			// 本地资源/解析限制不因已开始交付而变成渠道故障。
+		} else if (errors.As(err, &streamRateLimit) && streamRateLimit.Status == http.StatusTooManyRequests) || (errors.As(err, &httpRateLimit) && httpRateLimit.status == http.StatusTooManyRequests) {
+			d.RateLimited = true
 		} else {
 			// 半途失败仍是模型不健康（假流 / 静默超时 / 断连），普通阈值计入熔断，
 			// 否则持续假死的模型永远开不了路。
@@ -161,6 +171,14 @@ func failSpec(err error) failDecision {
 	var clientDeadline *clientDeadlineError
 	if errors.As(err, &clientDeadline) {
 		return failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusGatewayTimeout, RelayKind: relayErrAPI}
+	}
+	var limitErr *resource.LimitError
+	if errors.As(err, &limitErr) {
+		status, kind := http.StatusBadGateway, relayErrAPI
+		if limitErr.Scope == resource.Request {
+			status, kind = http.StatusRequestEntityTooLarge, relayErrInvalidRequest
+		}
+		return failDecision{StopRequest: true, ErrKind: shared.ErrKindResourceLimit, Status: status, RelayKind: kind}
 	}
 	var budgetErr *attemptBudgetError
 	if errors.As(err, &budgetErr) {
@@ -186,6 +204,18 @@ func failSpec(err error) failDecision {
 		d.Retryable, d.StopRequest = false, true
 		return d
 	}
+	var cooling *rateLimitCooldownError
+	if errors.As(err, &cooling) {
+		return failDecision{ErrKind: shared.ErrKindRateLimitCooldown, Status: http.StatusTooManyRequests, RelayKind: relayErrRateLimit, RetryAfter: strconv.Itoa(cooling.RetryAfter)}
+	}
+	var unavailable *circuitUnavailableError
+	var capacity *channelCapacityError
+	if errors.As(err, &capacity) {
+		return failDecision{ErrKind: shared.ErrKindChannelCapacity, Status: http.StatusServiceUnavailable, RelayKind: relayErrOverloaded, RetryAfter: "1"}
+	}
+	if errors.As(err, &unavailable) {
+		return failDecision{ErrKind: shared.ErrKindCircuitOpen, Status: http.StatusServiceUnavailable, RelayKind: relayErrOverloaded, RetryAfter: strconv.Itoa(unavailable.RetryAfter)}
+	}
 	var bufferErr *precommitBufferError
 	if errors.As(err, &bufferErr) || errors.Is(err, protocol.ErrSSEEventTooLarge) || errors.Is(err, protocol.ErrStreamInvalid) {
 		return failDecision{StopRequest: true, ErrKind: shared.ErrKindConvert, Status: http.StatusBadGateway, RelayKind: relayErrAPI}
@@ -195,8 +225,8 @@ func failSpec(err error) failDecision {
 	}
 	var streamFailure *protocol.StreamFailureError
 	if errors.As(err, &streamFailure) {
-		retryable := streamFailure.Status >= 500 || streamFailure.Status == 429
-		return failDecision{Retryable: retryable, BreakerFail: retryable, ErrKind: shared.ErrKindUpstream, Status: streamFailure.Status, RelayKind: relayErrorKindByStatus(streamFailure.Status)}
+		retryable := streamFailure.Status >= 500
+		return failDecision{Retryable: retryable, BreakerFail: retryable, RateLimited: streamFailure.Status == http.StatusTooManyRequests, ErrKind: shared.ErrKindUpstream, Status: streamFailure.Status, RelayKind: relayErrorKindByStatus(streamFailure.Status)}
 	}
 	// 等头假死：连响应头都不吐的目标在一个超时窗口内自愈概率极低，
 	// 同目标重试只会再等满一轮超时——换下一家 + 熔断快速开路 + 504。
@@ -220,16 +250,17 @@ func failSpec(err error) failDecision {
 			RelayKind: relayErrAPI,
 		}
 	}
-	// 上游有回话：状态码即裁决，5xx / 429 可重试并计入熔断，其余 4xx 是请求问题。
+	// 429 跳过同目标并记录独立冷却；5xx 可重试并计入熔断。
 	var se *upstreamStatusError
 	if errors.As(err, &se) {
-		retryable := se.status >= 500 || se.status == 429
+		retryable := se.status >= 500
 		return failDecision{
 			Retryable: retryable, BreakerFail: retryable,
-			ErrKind:    shared.ErrKindUpstream,
-			Status:     se.status,
-			RelayKind:  relayErrorKindByStatus(se.status),
-			RetryAfter: se.retryAfter,
+			RateLimited: se.status == http.StatusTooManyRequests,
+			ErrKind:     shared.ErrKindUpstream,
+			Status:      se.status,
+			RelayKind:   relayErrorKindByStatus(se.status),
+			RetryAfter:  se.retryAfter,
 		}
 	}
 	// 无对应字段的显式思考设置是参数错误，不是上游故障。

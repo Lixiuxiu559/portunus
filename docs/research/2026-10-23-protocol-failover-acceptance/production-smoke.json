@@ -1,0 +1,132 @@
+{
+  "group": "deepseek-v4-flash",
+  "checks": [
+    {
+      "case": "ordinary-plain",
+      "status": 200,
+      "request_id": "7ff6ca0c3c857f4f",
+      "elapsed_ms": 669,
+      "first_data_ms": null,
+      "text": "OK",
+      "terminal": true,
+      "verified": true,
+      "attempts": [
+        {
+          "sequence": 1,
+          "channel_id": 1,
+          "model_id": 53,
+          "status": 200,
+          "success": true,
+          "err_kind": null,
+          "client_protocol": "openai",
+          "upstream_protocol": "openai"
+        }
+      ]
+    },
+    {
+      "case": "ordinary-stream",
+      "status": 200,
+      "request_id": "43310fb3e129dcd7",
+      "elapsed_ms": 640,
+      "first_data_ms": 634,
+      "text": "OK",
+      "terminal": true,
+      "verified": true,
+      "attempts": [
+        {
+          "sequence": 1,
+          "channel_id": 1,
+          "model_id": 53,
+          "status": 200,
+          "success": true,
+          "err_kind": null,
+          "client_protocol": "openai",
+          "upstream_protocol": "openai"
+        }
+      ]
+    },
+    {
+      "case": "responses-forced-tool-plain",
+      "status": 200,
+      "request_id": "79239ddf3bff3c0e",
+      "elapsed_ms": 1019,
+      "first_data_ms": null,
+      "tool_name": "sum_numbers",
+      "arguments": {
+        "a": 2,
+        "b": 3
+      },
+      "call_id_present": true,
+      "terminal": true,
+      "verified": true,
+      "attempts": [
+        {
+          "sequence": 1,
+          "channel_id": 1,
+          "model_id": 53,
+          "status": 200,
+          "success": true,
+          "err_kind": null,
+          "client_protocol": "openai_responses",
+          "upstream_protocol": "openai"
+        }
+      ]
+    },
+    {
+      "case": "responses-forced-tool-stream",
+      "status": 200,
+      "request_id": "0ab7308705a754ae",
+      "elapsed_ms": 859,
+      "first_data_ms": 753,
+      "tool_name": "sum_numbers",
+      "arguments": {
+        "a": 2,
+        "b": 3
+      },
+      "call_id_present": true,
+      "terminal": true,
+      "verified": true,
+      "attempts": [
+        {
+          "sequence": 1,
+          "channel_id": 1,
+          "model_id": 53,
+          "status": 200,
+          "success": true,
+          "err_kind": null,
+          "client_protocol": "openai_responses",
+          "upstream_protocol": "openai"
+        }
+      ]
+    },
+    {
+      "case": "tool-result-roundtrip",
+      "status": 200,
+      "request_id": "d7074146ff70ac99",
+      "elapsed_ms": 800,
+      "first_data_ms": null,
+      "text": "5",
+      "verified": true,
+      "attempts": [
+        {
+          "sequence": 1,
+          "channel_id": 1,
+          "model_id": 53,
+          "status": 200,
+          "success": true,
+          "err_kind": null,
+          "client_protocol": "openai_responses",
+          "upstream_protocol": "openai"
+        }
+      ]
+    }
+  ],
+  "configuration_unchanged": {
+    "channels": true,
+    "groups": true,
+    "group_items": true,
+    "api_keys": true,
+    "settings": true,
+    "config.json": true
+  }
+}

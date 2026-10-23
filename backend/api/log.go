@@ -18,7 +18,22 @@ func registerLogRoutes(r *gin.RouterGroup) {
 	g.GET("/stat", getLogStats)
 	g.GET("/attempts", listUpstreamAttempts)
 	g.GET("/requests", listLogRequests)
+	g.GET("/routing", getRoutingTrace)
 	g.DELETE("", deleteOldLogs)
+}
+
+func getRoutingTrace(c *gin.Context) {
+	requestID := c.Query("request_id")
+	if strings.TrimSpace(requestID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 request_id 参数"})
+		return
+	}
+	row, err := shared.GetRoutingTrace(requestID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": row})
 }
 
 func listLogRequests(c *gin.Context) {

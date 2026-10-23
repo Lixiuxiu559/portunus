@@ -7,7 +7,7 @@ Portunus 的领域语言，给架构审视与后续设计提供命名。Go 类�
 | 渠道 Channel | `channel.Channel` | 连接一个上游供应商的配置单元（type / base_url / key）。协议类型 ∈ openai / openai_responses / anthropic / gemini。1:N 模型。 |
 | 模型 Model | `model.Model` | 归属某渠道的上游模型资源，支持发现与手动添加，供分组引用。产品不配置价格；历史价格列仅保留存储兼容，不进入活跃接口。 |
 | 分组 Group | `group.Group` | 对外暴露的模型名，跨渠道聚合模型。每个分组必配一个路由策略。 |
-| 路由策略 Strategy | `group.Strategy` | manual（打激活项）/ round_robin（组内轮流）/ failover（按 priority 顺序失败换下一个）。 |
+| 路由策略 Strategy | `group.Strategy` | 仅 manual（打激活项）/ failover（按 priority、成员ID顺序，允许切换的失败换下一项）；旧round_robin启动时迁为failover，API不再接受。 |
 | 路由解析 router | `router.Resolve` | 按分组策略决定「实际该调用哪个/哪些上游」，返回 `router.Target`（模型 + 渠道）。策略语义与 ModelID→Model→Channel 解析都归它。 |
 | 协议 Provider | `protocol.Provider` | openai / openai_responses / anthropic / gemini。协议转换以 OpenAI Chat Completions 为内部规范格式。 |
 | 上游接入器 Upstream | `protocol.Upstream` | 拿协议 + base_url + key 产出上游端点 / 鉴权头 / 模型集（ChatURL / ChatHeaders / FetchModels）。上游装配知识收敛于此，gateway 与 model 复用。 |
@@ -51,3 +51,32 @@ protocol.ResponseEnvelope / CaptureResponse / ConvertResponseWithReport 保存�
 ## 累计期限与退避（S6）
 
 非流式 NonStreamTimeoutSeconds 默认600秒，从选路前累计至完整body和转换准备好，所有target/retry/compat/backoff共用；commit裁决后交调用方写客户端。doRequest 在 reserve/trace/Do 前统一 waitForAttempt，首次实际发送免等待，后续按已发次数指数equal-jitter，base200ms/max2000ms配置，取消/过期/预算耗尽均停止且不造HTTP attempt。非流式deadline归 non_stream_deadline/504，不计渠道熔断；原生操作/状态续接的失败重放保护覆盖非流式。安全与诊断不变，见[S6说明](docs/research/2026-10-23-nonstream-deadline-backoff-s6.md)。
+
+## 转换资源限额（S7）
+
+proxy.resource_limits 定义请求/非流式响应各32MiB、原生片段8192、单工具参数4MiB、每个有状态转换阶段累计64MiB、JSON深度128；零值回退默认，Load拒绝负值，支持对应PORTUNUS_PROXY_MAX_*环境变量。资源错误统一resource_limit：请求413、响应/流502，StopRequest且不计熔断；交付后只失败结束、不重放或伪成功。错误体及兼容重试也有界读取，真实上游status仍留在attempt；预检查不造Do。源和目标分别计量，公开原生读取深拷贝、内部快照存储共享；同协议SSE不累计未保留的全文。不引入strict，详见[S7实施记录](docs/research/2026-10-23-conversion-resource-limits-s7.md)。
+
+## 路由策略收敛
+
+当前仅保留manual/failover。创建/更新拒绝round_robin，启动表迁移后group.MigrateLegacyStrategies仅改历史策略值，保留配置及时间戳，错误则启动失败；同优先级按成员ID稳定排序。前端创建/编辑/分组与接入页统一两种策略，默认manual。429作用域冷却和半开探测租约已实施；详见[说明](docs/research/2026-10-23-two-strategies-and-failover.md)。
+
+## 429有作用域冷却
+
+RateLimitStore由Deps注入，与BreakerStore分开；真实HTTP/流内429通过failSpec.RateLimited标记，不同目标内重试，不计故障熔断，记录冷却。渠道rate_limit_scope=model默认（同连接同上游模型名跨分组共享）或channel（该连接所有模型），不猜错误正文。默认proxy.rate_limit_cooldown_seconds=30、rate_limit_max_cooldown_seconds=300，支持env，Retry-After内部饱和解析。选路先跳过、doRequest退避前后复查，冷却不扣Do预算/不造attempt；全冷却/混合不可用且无实际relay返回429+有效剩余Retry-After，纯熔断仍503。本地归因rate_limit_cooldown。连接/凭据/scope变动隔离旧状态；缓存最多16384条、满时淘汰最早到期、重启清空，不是硬RPM配额。详见[说明](docs/research/2026-10-23-scoped-rate-limit-cooldown.md)。半开探测租约已实施；可选渠道并发准入已实施，见[说明](docs/research/2026-10-23-channel-concurrency.md)。
+
+## 半开恢复探测租约
+
+BreakerStore按模型ID共享半开单名额，Allow仅预览不变状态；doRequest在资源/控制/冷却/退避之后、reserve及trace.begin/Do之前Acquire，整个relay及顺序兼容Do共用lease，body关闭和watchdog停止后Finish、先于最终AttemptWrite/LogWrite。正常closed调用也携带代次；open/half-open/恢复closed推进代次，迟到健康结果与重复Finish不污染新状态。半开健康失败立即重开，成功按既有阈值默认2逐步恢复，中性429/取消/本地错误仅释放、不计恢复。活跃租约不因固定TTL允许重叠，继续由既有累计deadline、idle和取消控制结束；busy返回Retry-After:1只是重试提示。手动仍只用激活成员，故障转移固定顺序，跳过不扣预算/不造attempt，安全边界保持强制。见[说明](docs/research/2026-10-23-half-open-probe-leases.md)。
+
+## 固定主备切换诊断
+
+shared.RoutingTrace独立于Log和UpstreamAttempt，handler defer每请求保存一行，覆盖candidate_skipped/selected、admission_blocked、probe_acquired/finished、http_attempt、relay_finished、target_exhausted。固定candidate序号判定备用，不把首个真实Do的initial改成failover；已提交流失败读取实际failReason，不因err=nil变成成功。仅元数据事件，最多256条+DroppedEvents，最终停止原因/错误分类/显式Do数/最后候选独立保留。Finish返回结果是否应用用于标记迟到租约；不改变熔断条件。RoutingWrite可nil，失败不影响上游动作，日志详情通过GET /api/logs/routing精确查询；未采集/进行中/失败/清理不能解释为无跳过。不提供完整客户端接收凭证，见[说明](docs/research/2026-10-23-routing-diagnostics.md)。
+
+## 可选渠道并发准入
+
+channel.max_concurrent_requests非负，0不限，旧行默认0，更新缺失保留/显式0关闭。gateway.ChannelConcurrencyStore由Deps.Concurrency注入、main进程共享，按channelID跨模型分组计数，包含默认不限的在途relay，最后Release删除桶。Do前在退避/控制/冷却后Acquire再取breaker令牌并reserve，整个body/stream/兼容重试占一个槽；结束关闭body后、writers前释放，重复Release幂等。满载不排队，failover固定顺延、manual503不切换，channel_capacity不健康失败、不扣预算/不造attempt；未发出的容量拒绝不冒充原生操作重放。配置是选路快照，变更不清计数也不强制结束旧调用。管理probe/发现/余额及多进程全局配额不在范围，见[说明](docs/research/2026-10-23-channel-concurrency.md)。
+
+
+## 协议与故障转移验收收口（2026-10-23）
+
+暂停新增功能，当前main构建已完成独立Dev真实上游普通对话、流式、工具闭环，以及本机故障主渠道切真实备用验收。本轮只修复Responses/Chat指定函数tool_choice的flat/nested请求格式转换；同协议透传不变。DeepSeek默认思考模式不支持强制工具选择仍是上游约束，auto或显式关闭思考的路径已实测。正式版未替换，SDK/CLI及打包桌面不在本轮范围。见[实际验收](docs/research/2026-10-23-protocol-failover-acceptance/README.md)和[集中待办](docs/research/2026-10-23-protocol-failover-backlog.md)，后续按实际问题修复，不继续堆加能力。

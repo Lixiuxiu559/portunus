@@ -122,7 +122,7 @@ func normalizePage(page, size int) (int, int) {
 }
 
 // DeleteOldLogs 分批删除 created_at 早于 target 的日志，避免一次性删除锁住大表。
-// 同时按 started_at 清理过期上游尝试；返回值仍仅为旧调用日志删除总数。
+// 同时按 started_at 清理过期上游尝试和路由诊断；返回值仍仅为旧调用日志删除总数。
 // limit 为每批删除条数。
 // GORM 的 Delete 会忽略 Limit，故先分页查出待删 id，再按 id 删除。
 func DeleteOldLogs(target time.Time, limit int) (int64, error) {
@@ -151,5 +151,8 @@ func DeleteOldLogs(target time.Time, limit int) (int64, error) {
 			break
 		}
 	}
-	return total, deleteOldUpstreamAttempts(target, limit)
+	if err := deleteOldUpstreamAttempts(target, limit); err != nil {
+		return total, err
+	}
+	return total, deleteOldRoutingTraces(target, limit)
 }

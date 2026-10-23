@@ -1,12 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"github.com/Lixiuxiu559/portunus/backend/router"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 	"github.com/Lixiuxiu559/portunus/backend/upstream"
@@ -55,22 +56,45 @@ const thinkingSuffix = "-thinking"
 func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := newRequestID()
+		diagnostics := newRoutingDiagnostics(c, requestID, clientProto)
+		defer diagnostics.flush(s, c)
 		// 随响应头带给客户端：报障时把界面/客户端里的 req id 报上来即可精确定位。
 		// 放在最早处，让 400 参数错这类失败也带得上 request id。
 		c.Writer.Header().Set("X-Request-Id", requestID)
 
-		body, err := io.ReadAll(c.Request.Body)
+		limits := s.deps.Cfg.ResourceLimits.Normalize()
+		if err := resource.CheckSize(c.Request.ContentLength, limits.MaxRequestBytes, resource.Request, "body_bytes"); err != nil {
+			diagnostics.stop("resource_limit", err, "rejected")
+			writeRelayError(c, clientProto, http.StatusRequestEntityTooLarge, relayErrInvalidRequest, "请求体超过资源上限")
+			return
+		}
+		body, err := resource.ReadAll(c.Request.Body, limits.MaxRequestBytes, resource.Request)
 		if err != nil {
+			var limitErr *resource.LimitError
+			if errors.As(err, &limitErr) {
+				diagnostics.stop("resource_limit", err, "rejected")
+				writeRelayError(c, clientProto, http.StatusRequestEntityTooLarge, relayErrInvalidRequest, "请求体超过资源上限")
+				return
+			}
+			diagnostics.stop("request_read_failed", nil, "rejected")
 			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, "读取请求体失败")
 			return
 		}
 
+		// Bound nesting before even the lightweight routing metadata decode.
+		if err := resource.CheckDepth(body, limits.MaxJSONDepth, resource.Request); err != nil {
+			diagnostics.stop("resource_limit", err, "rejected")
+			writeRelayError(c, clientProto, http.StatusRequestEntityTooLarge, relayErrInvalidRequest, "请求结构超过资源上限")
+			return
+		}
 		var meta relayMeta
 		if err := json.Unmarshal(body, &meta); err != nil || meta.Model == "" {
+			diagnostics.stop("request_invalid", nil, "rejected")
 			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, "缺少 model 字段")
 			return
 		}
 
+		diagnostics.row.Stream = meta.Stream
 		control := newRelayRequestControl(c.Request.Context(), s.deps.Cfg, meta.Stream)
 		defer control.close()
 		c.Request = c.Request.WithContext(control.ctx)
@@ -89,37 +113,71 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 
 		g, err := group.GetByName(groupName)
 		if err != nil {
+			diagnostics.stop("group_not_found", nil, "rejected")
 			writeRelayError(c, clientProto, http.StatusNotFound, relayErrNotFound, "分组不存在: "+groupName)
 			return
 		}
 
+		diagnostics.row.GroupID, diagnostics.row.Strategy = g.ID, string(g.Strategy)
 		targets, err := router.Resolve(g)
 		if err != nil {
+			diagnostics.stop("route_unresolved", nil, "rejected")
 			writeRelayError(c, clientProto, http.StatusBadRequest, relayErrInvalidRequest, err.Error())
 			return
 		}
 
+		diagnostics.row.CandidateCount = len(targets)
 		apiKeyID := c.GetInt64("api_key_id")
 
 		sequence, relaySequence := 0, 0
 		var lastErr error
 		anyAttempted := false
 		var skipped []string // 被熔断挡掉的目标描述，全跳过时用于日志
+		var cooling *rateLimitCooldownError
+		var capacityBlocked *channelCapacityError
 	targetsLoop:
-		for _, t := range targets {
+		for candidateIndex, t := range targets {
+			candidate := diagnostics.target(t, candidateIndex+1, 0)
 			if stopErr := control.check(); stopErr != nil {
 				lastErr = stopErr
 				break targetsLoop
 			}
-			if allow, reason := s.deps.Breakers.Allow(t.Model.ID); !allow {
+			if s.deps.Cooldowns != nil {
+				if blocked := s.deps.Cooldowns.Check(t); blocked != nil {
+					if cooling == nil || blocked.RetryAfter < cooling.RetryAfter {
+						cooling = blocked
+					}
+					candidate.event("candidate_skipped", "rate_limit_cooldown", blocked)
+					skipped = append(skipped, fmt.Sprintf("%s(id=%d) 限流冷却中", t.Model.Name, t.Model.ID))
+					continue
+				}
+			}
+			if blocked := s.deps.Breakers.unavailable(t.Model.ID); blocked != nil {
+				reason := blocked.Error()
+				candidate.event("candidate_skipped", blocked.Reason, blocked)
 				skipped = append(skipped, fmt.Sprintf("%s(id=%d) %s", t.Model.Name, t.Model.ID, reason))
 				continue // 熔断开路，跳过该模型
 			}
+
+			if blocked := s.deps.Concurrency.Check(t.Channel.ID, t.Channel.MaxConcurrentRequests); blocked != nil {
+				capacityBlocked = blocked
+				candidate.event("candidate_skipped", "channel_capacity", blocked)
+				skipped = append(skipped, fmt.Sprintf("%s(id=%d) 渠道并发已满", t.Model.Name, t.Model.ID))
+				continue
+			}
+			targetEndReason := "retry_exhausted"
 			budgetRetry := &chatBudgetRetry{} // 当前目标内记住字段切换，普通重试不重新触发兼容重试
 			for attempt := 0; attempt <= s.deps.Cfg.RetryCount; attempt++ {
 				if stopErr := control.available(); stopErr != nil {
 					lastErr = stopErr
 					break targetsLoop
+				}
+				if attempt > 0 {
+					if blocked := s.deps.Breakers.unavailable(t.Model.ID); blocked != nil {
+						candidate.event("candidate_skipped", blocked.Reason, blocked)
+						targetEndReason = blocked.Reason
+						break
+					}
 				}
 				anyAttempted = true
 				reason := "initial"
@@ -130,7 +188,17 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 					reason = "retry"
 				}
 				relaySequence++
-				trace := &relayAttemptTrace{sequence: &sequence, template: shared.UpstreamAttempt{
+				selected := diagnostics.target(t, candidateIndex+1, relaySequence)
+				selectReason := "primary"
+				if candidateIndex > 0 {
+					selectReason = "backup"
+				}
+				if attempt > 0 {
+					selectReason = "retry"
+				}
+				selected.event("candidate_selected", selectReason, nil)
+				diagnostics.row.FinalCandidate, diagnostics.row.FinalChannelID, diagnostics.row.FinalModelID = candidateIndex+1, t.Channel.ID, t.Model.ID
+				trace := &relayAttemptTrace{routing: selected, sequence: &sequence, template: shared.UpstreamAttempt{
 					RequestID: requestID, RelayAttempt: relaySequence, Reason: reason,
 					APIKeyID: apiKeyID, GroupName: g.Name, ChannelID: t.Channel.ID,
 					ModelID: t.Model.ID, ModelName: t.Model.Name,
@@ -138,27 +206,67 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 				}}
 				out, status, err := s.relayToTarget(c, clientProto, meta.Stream, g, t, body, apiKeyID, requestID, upThinking, budgetRetry, trace)
 				if err == nil {
+					if diagnostics.lastSuccess {
+						diagnostics.stop("relay_succeeded", nil, "relay_succeeded")
+					} else {
+						diagnostics.stop("committed_failure", diagnostics.lastErr, "relay_failed")
+					}
 					if !meta.Stream {
 						c.Writer.Header().Set("Content-Type", "application/json")
 						c.Writer.WriteHeader(status)
-						c.Writer.Write(out)
+						diagnostics.row.DeliveryStarted = true
+						if _, writeErr := c.Writer.Write(out); writeErr != nil {
+							diagnostics.stop("client_write", nil, "relay_failed")
+							diagnostics.row.StopErrKind = shared.ErrKindClientWrite
+						}
 					}
 					return
 				}
 				lastErr = err
 				d := failSpec(err)
+				if d.RateLimited && s.deps.Cooldowns != nil {
+					if blocked := s.deps.Cooldowns.Check(t); blocked != nil {
+						cooling = blocked
+					}
+				}
 				if d.StopRequest {
 					break targetsLoop
 				}
 				if !d.Retryable || d.StallNoHeader {
+					targetEndReason = "not_retryable"
+					if d.StallNoHeader {
+						targetEndReason = "header_stall"
+					}
 					break // 不可重试，或等头假死不重试：再等一轮超时大概率还是超时，直接换下一家
 				}
 			}
+			candidate.event("target_exhausted", targetEndReason, lastErr)
 		}
 
+		if stopErr := control.check(); stopErr != nil {
+			lastErr = stopErr
+		}
+		if !anyAttempted && lastErr == nil && cooling != nil {
+			diagnostics.stop("no_available_target", cooling, "rejected")
+			d := failSpec(cooling)
+			s.deps.LogWrite(&shared.Log{APIKeyID: apiKeyID, GroupName: g.Name, Status: d.Status, Stream: meta.Stream, RequestID: requestID, ErrKind: d.ErrKind, ErrMsg: cooling.Error()})
+			c.Writer.Header().Set("Retry-After", d.RetryAfter)
+			writeRelayError(c, clientProto, d.Status, d.RelayKind, "目标正在限流冷却，请稍后重试")
+			return
+		}
+
+		if !anyAttempted && lastErr == nil && capacityBlocked != nil {
+			d := failSpec(capacityBlocked)
+			diagnostics.stop("no_available_target", capacityBlocked, "rejected")
+			s.deps.LogWrite(&shared.Log{APIKeyID: apiKeyID, GroupName: g.Name, Status: d.Status, Stream: meta.Stream, RequestID: requestID, ErrKind: d.ErrKind, ErrMsg: capacityBlocked.Error()})
+			c.Writer.Header().Set("Retry-After", d.RetryAfter)
+			writeRelayError(c, clientProto, d.Status, d.RelayKind, "渠道并发已满，请稍后重试")
+			return
+		}
 		if !anyAttempted && lastErr == nil {
 			// 503 的唯一出口必须留痕：stdout + 日志库（err_kind=circuit_open）。
 			// 此前只写 stdout，管理端日志页零痕迹，用户报障只能登服务器翻容器日志。
+			diagnostics.stop("no_available_target", &circuitUnavailableError{Reason: "circuit_open"}, "rejected")
 			detail := "所有目标熔断开路: " + strings.Join(skipped, "; ")
 			log.Printf("relay 拒绝: model=%s %s", meta.Model, detail)
 			s.deps.LogWrite(&shared.Log{
@@ -189,10 +297,17 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 		// 失败语义统一出自 failSpec：状态码、错误类别、上游 Retry-After 透传。
 		// （等响应头 / 首包 / 非流式总超时是「上游超时未就绪」，failSpec 已裁为 504，
 		// 与上游明确拒绝、网关侧连不上的 502 区分。）
+		stopReason := routingStopReason(lastErr)
+		if sequence == 0 && stopReason == "candidates_exhausted" {
+			stopReason = "no_available_target"
+		}
+		diagnostics.stop(stopReason, lastErr, "relay_failed")
 		d := failSpec(lastErr)
 		if d.RetryAfter != "" {
 			// 上游限流 / 过载给出的重试节奏原样透传
 			c.Writer.Header().Set("Retry-After", d.RetryAfter)
+		} else if d.RateLimited && cooling != nil {
+			c.Writer.Header().Set("Retry-After", strconv.Itoa(cooling.RetryAfter))
 		}
 		log.Printf("relay 失败: model=%s err=%v", meta.Model, lastErr)
 		if len(skipped) > 0 {
@@ -209,6 +324,10 @@ func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc
 		var clientDeadline *clientDeadlineError
 		if errors.As(lastErr, &clientDeadline) || errors.As(lastErr, &budgetErr) || errors.As(lastErr, &deadlineErr) || errors.As(lastErr, &nonStreamDeadline) {
 			message = lastErr.Error()
+		}
+		var resourceErr *resource.LimitError
+		if errors.As(lastErr, &resourceErr) {
+			message = "调用数据超过转换资源上限"
 		}
 		var se *upstreamStatusError
 		if errors.As(lastErr, &se) {
@@ -234,14 +353,23 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		c.Request = c.Request.WithContext(control.ctx)
 		defer func() { c.Request = originalRequest; control.close() }()
 	}
+	limits := s.deps.Cfg.ResourceLimits.Normalize()
 	start := time.Now()
 	success := false
 	var usage *protocol.Usage
-	var first time.Time  // 流式首包写出时刻，非流式 / 首包前失败为零值
+	var first time.Time // 流式首包写出时刻，非流式 / 首包前失败为零值
+	var rateLimitRetryAfter string
+	rateLimitRecorded := false
 	var failReason error // committed 分支对外返回 nil 错误，真实失败原因暂存于此供日志归因
 	// stats 是装配上游请求时产生的诊断遥测。在 defer 之前声明，供下面的日志闭包捕获。
 	var stats protocol.ComposeStats
 	var deliveryReport streamDeliveryReport
+	permit := &breakerAttempt{store: s.deps.Breakers, modelID: t.Model.ID}
+	capacity := &channelCapacityAttempt{store: s.deps.Concurrency, channelID: t.Channel.ID, limit: t.Channel.MaxConcurrentRequests}
+	if trace != nil {
+		permit.routing = trace.routing
+		capacity.routing = trace.routing
+	}
 	defer func() {
 		firstTokenMs := int64(0)
 		if !first.IsZero() {
@@ -252,23 +380,24 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			logErr = failReason
 		}
 		durationMs := time.Since(start).Milliseconds() // 采样先于新增记录写库，保持旧日志耗时边界
+		d := failSpec(logErr)                          // 失败语义唯一出口：归因、熔断喂法都读这份决定
+		// Body/stream defers run before this point. Release health admission before
+		// observability writers, which may block or fail independently of the upstream.
+		permit.finish(success, d)
+		capacity.release()
+		if trace != nil {
+			trace.routing.finished(success, logErr, deliveryReport.Started)
+		}
 		s.finishAttempt(trace, status, success, logErr)
-		d := failSpec(logErr) // 失败语义唯一出口：归因、熔断喂法都读这份决定
+		if s.deps.Cooldowns != nil && !rateLimitRecorded && d.RateLimited {
+			s.deps.Cooldowns.Record(t, rateLimitRetryAfter)
+		}
 		s.logCall(apiKeyID, g, t, clientProto, stats, status, success, stream, usage, durationMs, firstTokenMs, requestID, logErr, &deliveryReport)
 		if !success && !s.quiet {
 			// 请求各阶段的失败都要留痕：dial 失败 / 看门狗超时 / 用户取消此前
 			// 在 stdout 零日志，只能靠 DB 里的 status=0 反推。
 			log.Printf("relay 尝试失败: group=%s model=%s channel=%s kind=%s err=%v",
 				g.Name, t.Model.Name, t.Channel.Name, d.ErrKind, logErr)
-		}
-		if success {
-			s.deps.Breakers.Record(t.Model.ID, false)
-		} else if d.BreakerFail {
-			if d.StallNoHeader {
-				s.deps.Breakers.RecordStall(t.Model.ID) // 等头假死按更低阈值快速开路，别让死模型拖垮每一轮请求
-			} else {
-				s.deps.Breakers.Record(t.Model.ID, true)
-			}
 		}
 	}()
 
@@ -277,7 +406,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	// 第三个返回值是装配遥测（桥接命中 / 垫片改写），交给 defer 里的日志闭包。
 	var upBody []byte
 	upBody, stats, err = protocol.ComposeUpstreamRequest(clientProto, t.Channel.Type, originalBody,
-		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking, ThinkingCompat: t.Channel.ThinkingCompat})
+		protocol.UpstreamRequest{Model: t.Model.Name, Thinking: upThinking, ThinkingCompat: t.Channel.ThinkingCompat, Limits: limits})
 	if err != nil {
 		return nil, 0, &convertError{err}
 	}
@@ -291,6 +420,9 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 
 	var wd *streamWatchdog
 	reqCtx := c.Request.Context()
+	reqCtx = context.WithValue(reqCtx, rateLimitTargetContextKey{}, t)
+	reqCtx = context.WithValue(reqCtx, breakerAttemptContextKey{}, permit)
+	reqCtx = context.WithValue(reqCtx, channelCapacityContextKey{}, capacity)
 	if stream {
 		// 流式：看门狗 ctx 贯穿请求与 body 读，触发时掐断读阻塞。
 		// 首包计时在 relayStream 拿到响应头后才开始；等响应头由 Transport 兜底。
@@ -305,18 +437,36 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 	allowBudgetRetry := clientProto != protocol.ProviderOpenAI && t.Channel.Type == protocol.ProviderOpenAI
 	resp, err := s.doRequestWithChatBudgetFallback(reqCtx, connection.ChatURL(t.Model.Name, stream), headers, upBody, allowBudgetRetry, budgetRetry, trace)
 	if err != nil {
-		if !replaySafe && !failSpec(err).StopRequest {
+		if resp != nil {
+			status = resp.StatusCode
+			resp.Body.Close()
+		}
+		// Capacity rejection before acquiring a slot proves this relay never sent.
+		// Choosing another target here is initial admission, not replay of an operation.
+		var capacityErr *channelCapacityError
+		unsentCapacity := errors.As(err, &capacityErr) && capacity.lease == nil
+		if !unsentCapacity && !replaySafe && !failSpec(err).StopRequest {
 			err = &streamReplayUnsafeError{err: err}
 		}
-		return nil, 0, err
+		return nil, status, err
 	}
 	defer resp.Body.Close()
 	status = resp.StatusCode
+	rateLimitRetryAfter = resp.Header.Get("Retry-After")
+	if status == http.StatusTooManyRequests && s.deps.Cooldowns != nil {
+		// A slow/error body must not postpone an already observed rate limit.
+		s.deps.Cooldowns.Record(t, rateLimitRetryAfter)
+		rateLimitRecorded = true
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		errBody, _ := io.ReadAll(resp.Body)
+		errBody, readErr := readUpstreamBody(resp, limits.MaxResponseBytes)
 		if stopErr := requestControlError(reqCtx); stopErr != nil {
 			return nil, status, stopErr
+		}
+		var limitErr *resource.LimitError
+		if errors.As(readErr, &limitErr) {
+			return nil, status, readErr
 		}
 		if !s.quiet {
 			log.Printf("上游返回 %d: %s", resp.StatusCode, string(errBody))
@@ -332,7 +482,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		// message_start 需要 input_tokens 才能显示上下文占用（anthropic 客户端）；
 		// 上游流式可能不返回 usage，惰性估算兜底——thunk 仅 anthropic 转换器调用，
 		// 其他协议不付 body 解析开销，gateway 无须判断客户端协议。
-		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto,
+		conv, convErr := protocol.NewStreamConverter(t.Channel.Type, clientProto, protocol.WithResourceLimits(limits),
 			protocol.WithInputEstimate(func() int {
 				return protocol.EstimateRequestTokens(clientProto, originalBody)
 			}))
@@ -340,7 +490,12 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			return nil, status, &convertError{convErr}
 		}
 		var streamErr error
-		first, streamErr = relayStream(c, clientProto, resp, conv, wd, streamRelayOptions{Source: t.Channel.Type, ReplayUnsafe: !replaySafe, Report: &deliveryReport})
+		first, streamErr = relayStream(c, clientProto, resp, conv, wd, streamRelayOptions{Source: t.Channel.Type, ReplayUnsafe: !replaySafe, Report: &deliveryReport, OnRateLimit: func() {
+			if s.deps.Cooldowns != nil && !rateLimitRecorded {
+				s.deps.Cooldowns.Record(t, rateLimitRetryAfter)
+				rateLimitRecorded = true
+			}
+		}})
 		usage = conv.Usage()
 		if streamErr != nil {
 			var committed *streamCommittedError
@@ -363,7 +518,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 		}
 		usage = conv.Usage()
 	} else {
-		upRespBody, readErr := io.ReadAll(resp.Body)
+		upRespBody, readErr := readUpstreamBody(resp, limits.MaxResponseBytes)
 		if stopErr := requestControlError(reqCtx); stopErr != nil {
 			return nil, status, stopErr
 		}
@@ -373,8 +528,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			}
 			return nil, status, readErr
 		}
-		usage = protocol.UsageFromResponse(t.Channel.Type, upRespBody)
-		out, deliveryReport.ResponseCompatibility, err = protocol.ConvertResponseWithReport(t.Channel.Type, clientProto, upRespBody)
+		out, deliveryReport.ResponseCompatibility, err = protocol.ConvertResponseWithReport(t.Channel.Type, clientProto, upRespBody, limits)
 		if stopErr := requestControlError(reqCtx); stopErr != nil {
 			return nil, status, stopErr
 		}
@@ -385,6 +539,7 @@ func (s *relayServer) relayToTarget(c *gin.Context, clientProto protocol.Provide
 			}
 			return nil, status, conversionErr
 		}
+		usage = protocol.UsageFromResponse(t.Channel.Type, upRespBody)
 		// 完整响应与转换均在请求累计期限内完成，之后交给调用方写客户端。
 		if control := controlFrom(c.Request.Context()); control != nil {
 			if stopErr := control.commit(); stopErr != nil {

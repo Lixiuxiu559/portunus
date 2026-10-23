@@ -2,13 +2,7 @@ import { useState, useRef } from 'react';
 import { Button, Label, Input, TextField, FieldError, Form, Select, ListBox, toast } from '@heroui/react';
 import { updateGroup } from '../../api';
 import ConfirmModal from '../../components/ConfirmModal';
-import { strategyDescriptions } from '../../utils/groupService';
-
-const strategyOptions = [
-  { id: 'manual', label: '手动选择' },
-  { id: 'round_robin', label: '轮询' },
-  { id: 'failover', label: '故障转移' },
-];
+import { strategyDescriptions, strategyOptions } from '../../utils/groupService';
 
 // 编辑表单：由 ExpandEditor 挂载，group 恒非空；onClose 走反向收起动画，onUpdated 通知父组件刷新
 export default function EditGroupEditor({ group, onClose, onUpdated }) {

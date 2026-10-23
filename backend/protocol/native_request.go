@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 type SourceTrust string
@@ -53,7 +55,10 @@ type NativeEnvelope struct {
 	Original  json.RawMessage  `json:"-"`
 	Fragments []NativeFragment `json:"-"`
 }
-type RequestEnvelope struct{ native NativeEnvelope }
+type RequestEnvelope struct {
+	native NativeEnvelope
+	limits resource.Limits
+}
 
 // Native returns a deep copy so callers and target attempts cannot mutate captured data.
 func (e *RequestEnvelope) Native() NativeEnvelope {
@@ -96,7 +101,11 @@ type ConversionReport struct {
 
 // CaptureRequest snapshots raw fragments without forcing same-protocol traffic through
 // canonical parsing. Semantic validation remains in the existing cross-protocol parser.
-func CaptureRequest(from Provider, body []byte) (*RequestEnvelope, error) {
+func CaptureRequest(from Provider, body []byte, options ...resource.Limits) (*RequestEnvelope, error) {
+	limits := nativeLimits(options)
+	if err := inspectNativeResources(from, body, limits, resource.Request); err != nil {
+		return nil, err
+	}
 	if !from.Valid() {
 		return nil, fmt.Errorf("未知的源协议: %s", from)
 	}
@@ -107,8 +116,16 @@ func CaptureRequest(from Provider, body []byte) (*RequestEnvelope, error) {
 	if root == nil {
 		return nil, fmt.Errorf("解析 %s 请求失败: 请求必须为对象", from)
 	}
-	e := &RequestEnvelope{native: NativeEnvelope{Source: SourceDescriptor{Protocol: from, Trust: SourceUnverified}, Original: bytes.Clone(body)}}
+	e := &RequestEnvelope{limits: limits, native: NativeEnvelope{Source: SourceDescriptor{Protocol: from, Trust: SourceUnverified}, Original: bytes.Clone(body)}}
+	var captureErr error
 	add := func(owner OwnerRef, pos int, kind NativeKind, raw json.RawMessage) {
+		if captureErr != nil {
+			return
+		}
+		captureErr = resource.CheckSize(int64(len(e.native.Fragments)+1), int64(limits.MaxNativeFragments), resource.Request, "native_fragments")
+		if captureErr != nil {
+			return
+		}
 		e.native.Fragments = append(e.native.Fragments, NativeFragment{Owner: owner, Position: pos, Kind: kind, Raw: bytes.Clone(raw)})
 	}
 	known := requestFieldNames(from)
@@ -141,6 +158,9 @@ func CaptureRequest(from Provider, body []byte) (*RequestEnvelope, error) {
 		for j, block := range rawArray(obj[blocks]) {
 			add(OwnerRef{Kind: OwnerBlock, Item: i, Field: blocks}, j, NativeKnown, block)
 		}
+	}
+	if captureErr != nil {
+		return nil, captureErr
 	}
 	return e, nil
 }
@@ -178,7 +198,13 @@ func (e *RequestEnvelope) PrepareTarget(to Provider, up UpstreamRequest) ([]byte
 	if up.ThinkingCompat && to == ProviderOpenAI {
 		out, base.ShimRewrites, err = InjectReasoningPlaceholders(out)
 	}
-	return out, base, err
+	if err == nil {
+		err = inspectNativeResources(to, out, e.limits, resource.Request)
+	}
+	if err != nil {
+		return nil, base, err
+	}
+	return out, base, nil
 }
 func rawArray(raw json.RawMessage) []json.RawMessage {
 	var a []json.RawMessage

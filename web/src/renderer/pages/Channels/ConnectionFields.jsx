@@ -1,4 +1,5 @@
 import ChannelIconPicker from '../../components/ChannelIconPicker';
+import { validateChannelCapacity } from './channelDraft';
 
 import { Button, FieldError, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 
@@ -54,6 +55,14 @@ export default function ConnectionFields({ state, editing = false }) {
           autoComplete="new-password" validate={(value) => !editing && !value?.trim() ? '请填写 API Key' : null}>
           <Label>API Key</Label><Input placeholder={editing ? '留空保留已保存的密钥' : '填写上游密钥'} /><FieldError />
         </TextField>
+        <Choice label="限流范围" value={draft.rate_limit_scope}
+          options={[{ id: 'model', name: '按模型（默认）' }, { id: 'channel', name: '整条渠道' }]}
+          onChange={(rate_limit_scope) => patch({ rate_limit_scope })} />
+        <TextField isRequired name="max_concurrent_requests" value={draft.max_concurrent_requests}
+          onChange={(max_concurrent_requests) => patch({ max_concurrent_requests })}
+          validate={validateChannelCapacity}>
+          <Label>渠道并发上限</Label><Input inputMode="numeric" placeholder="0 表示不限制" /><FieldError />
+        </TextField>
         <Choice label="模型发现方式" value={discovery}
           options={[{ id: 'api', name: '从上游获取' }, { id: 'manual', name: '手动填写' }]}
           disabled={profile?.model_discovery === 'manual'} onChange={(model_discovery) => patch({
@@ -63,6 +72,8 @@ export default function ConnectionFields({ state, editing = false }) {
       </div>
       <div className="flex flex-col gap-2 text-xs text-muted">
         <span>出站协议：{draft.type || '请先选择配置档'}。地址需包含服务要求的版本或路径前缀，Portunus 只追加操作路径。</span>
+        <span>收到 429 后，按模型仅冷却当前模型；整条渠道会冷却此渠道的全部模型。</span>
+        <span>并发上限 0 表示不限制；满载时故障转移使用备用，手动不自动切换。仅统计当前进程 /v1 生成中的调用，包含流式和兼容重试。</span>
         {profile?.help && <span>{profile.help}</span>}
         {profile?.base_url && draft.base_url !== profile.base_url && <div className="flex flex-wrap items-center gap-2">
           <span>当前地址已保留。点击后才替换为此配置档默认地址。</span>

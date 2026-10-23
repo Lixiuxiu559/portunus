@@ -4,6 +4,7 @@ import { Button, toast } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
 import { listGroups } from '../../api/group';
 import { getAPIKey, regenerateAPIKey } from '../../api/apikey';
+import { strategyLabels } from '../../utils/groupService';
 import { buildConnectionGuide } from '../../utils/connectionGuide';
 import { selectServiceGroup } from '../../utils/serviceAccess';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -14,7 +15,6 @@ import ClaudeConfigPanel from './ClaudeConfigPanel';
 import { normalizeSearch, parseSelection, selectionSearch } from './sectionState';
 import '../service-access.css';
 
-const STRATEGY_LABELS = { manual: '手动选择', round_robin: '轮询', failover: '故障转移' };
 // 工作区顶部对齐视口顶部时留一点余量，和滚动目标共用同一个值
 const WORKSPACE_TOP_GAP = 8;
 
@@ -163,7 +163,7 @@ export default function Clients() {
   const preview = buildConnectionGuide({ serverUrl, apiKey: showKey ? apiKey : '', model: selectedGroup });
   const ready = !loading && !loadError && !!apiKey && !!selectedGroup;
   const selected = groups.find((g) => g.name === selectedGroup);
-  const selectedDescription = selected ? `${STRATEGY_LABELS[selected.strategy] || selected.strategy} · ${selected.items?.length || 0} 个成员` : '';
+  const selectedDescription = selected ? `${strategyLabels[selected.strategy] || selected.strategy} · ${selected.items?.length || 0} 个成员` : '';
   const missingRequestedGroup = requestedGroup !== null && !groups.some((g) => g.name === requestedGroup) ? requestedGroup : null;
   const logsPath = selectedGroup ? `/logs?group=${encodeURIComponent(selectedGroup)}` : '/logs';
   const onDirtyChange = useCallback((dirty) => setConfigDirty(dirty), []);

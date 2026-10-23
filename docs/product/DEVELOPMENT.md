@@ -68,17 +68,22 @@ CI 配置交付时，本地已通过工作流 actionlint 检查、Go 全量测�
 | `/api/logs/stat` | 同一筛选条件的日志行统计与 token/缓存用量，不按请求归并 |
 | `/api/logs/requests` | 服务端归并分页；任一行命中即选中关联项，摘要取该关联项全部日志 |
 | `/api/logs/attempts` | `request_id` 必填且精确匹配，按 sequence、id 升序返回独立尝试 |
+| `/api/logs/routing` | `request_id` 必填且精确匹配，返回独立RoutingTrace；缺记录data:null，不从旧日志回填 |
 
 前三个接口共用筛选：`api_key_id`、`channel_id`、`group_name`、`model_name`、`request_id`（精确）、`client_protocol`、`success`、`start_time` / `end_time`（RFC3339）。分页接口接受 `page` / `page_size`，默认 1 / 20，每页最多 100；stat 不受分页影响。归并返回 `{total,data:[{key,request_id,log_count,latest_log,first_at,last_at}]}`，latest_log 按最大写入 ID 选取，first_at/last_at 是时间范围。
 
 `shared.Log` 保存一轮 relay 日志，`shared.UpstreamAttempt` 单独保存每次显式 `http.Client.Do` 尝试，包含预算兼容重试；不重复计 token。主进程注入的 `Deps.LogWrite` / `Deps.AttemptWrite` 当前同步写入 LogDB，支持独立日志库；cron 负责同步模型与过期清理，不负责日志落库。尝试记录写入失败会告警，不因此额外调用上游。
 
-自动保留期由 `log_retention_days` 控制（0 禁用），每小时清理。`DELETE /api/logs?target_timestamp=<Unix秒>` 使用相同截止时间清理旧日志（created_at）和尝试（started_at），返回的 `deleted` 仅计旧日志行，不包含尝试行数。
+自动保留期由 `log_retention_days` 控制（0 禁用），每小时清理。`DELETE /api/logs?target_timestamp=<Unix秒>` 使用相同截止时间清理旧日志（created_at）、尝试（started_at）和切换诊断（started_at），返回的 `deleted` 仅计旧日志行，不包含尝试与诊断行数。
 
-当前没有请求终态或完整性凭证，不把关联项数、日志行数和已采集 Do 数称为准确客户端请求数，也不据此推断最终成功率。
+RoutingTrace已提供网关路由结束摘要，但不是客户端完整接收或跨表采集完整性凭证；不把关联项数、日志行数和已采集Do数称为准确客户端请求数，也不据此推断最终成功率。
 
 ## 隔离复现与验证边界
 
 日志详情、上游尝试与归并的历史验证分别见[详情报告](../research/2026-10-21-log-details/README.md)、[尝试报告](../research/2026-10-21-upstream-attempts/README.md)和[归并报告](../research/2026-10-21-request-associations/README.md)。本地合成上游、真实浏览器、实际 main 进程、外部真实上游与打包桌面应用是不同验证范围，不能相互替代。
 
 复现报告中的 fixture 时，先确认其独立回环端口未被占用；使用临时合成数据，不读取或复制正式/Dev 数据，不覆盖 HOME，不接管已有端口进程。验证结束只关闭自己启动的服务。桌面 `pnpm test:e2e` 则按上文先退出已有 Dev，不停止正式版。历史报告记录的测试数量和结果保留在原提交基线上。
+
+## 协议转换与故障转移实际验收
+
+本轮停止新增能力，使用当前构建、独立Dev数据及Dev中已配置渠道验证普通对话、流式输出、函数工具闭环和主失败切备用。故障注入只使用临时本机渠道/分组，原Dev分组顺序不改，正式版不重启也不替换。执行结果和未覆盖范围见[实际验收记录](../research/2026-10-23-protocol-failover-acceptance/README.md)，可延期项见[集中待办](../research/2026-10-23-protocol-failover-backlog.md)。

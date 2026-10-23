@@ -15,6 +15,10 @@ type Deps struct {
 	Client *http.Client
 	// Breakers 是熔断状态 store：进程内唯一实例跨请求共享健康度。
 	Breakers *BreakerStore
+	// Cooldowns 按模型或渠道共享限流冷却，独立于故障熔断。
+	Cooldowns *RateLimitStore
+	// Concurrency 按渠道ID跨模型/分组共享在途调用数；0上限不限制。
+	Concurrency *ChannelConcurrencyStore
 	// Auth 校验 API Key，通过返回 api_key_id。生产实现查 shared.DB 的 api_keys 表。
 	Auth func(key string) (apiKeyID int64, ok bool)
 	// LogWrite 写一条调用日志。生产实现写 shared.LogDB；测试收集到内存断言。
@@ -22,6 +26,9 @@ type Deps struct {
 	// AttemptWrite 独立保存每次显式 Client.Do 尝试；写入失败不重试上游。
 	// nil 用于不需要记录尝试的测试/嵌入调用方；生产由 main 显式装配。
 	AttemptWrite func(*shared.UpstreamAttempt) error
+	// RoutingWrite 保存独立的请求级路由诊断，不参与调用/HTTP尝试统计。
+	// nil 保持测试与嵌入调用兼容；写入失败不影响转发或触发重试。
+	RoutingWrite func(*shared.RoutingTrace) error
 }
 
 // relayServer 持有依赖，承载 /v1 转发的全部编排（鉴权 / 路由 / 重试 / 熔断 / 归因）。
@@ -33,5 +40,11 @@ type relayServer struct {
 
 // NewRelayServer 用给定依赖构建 relayServer。
 func NewRelayServer(deps Deps) *relayServer {
+	if deps.Concurrency == nil {
+		deps.Concurrency = NewChannelConcurrencyStore()
+	}
+	if deps.Cooldowns == nil {
+		deps.Cooldowns = NewRateLimitStore(deps.Cfg)
+	}
 	return &relayServer{deps: deps}
 }

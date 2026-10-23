@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -80,6 +81,9 @@ func newAnthropicToOpenAIStream() StreamConverter {
 }
 
 func (a *anthropicToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
+	if err := a.st.budget.payload(ProviderAnthropic, payload, true); err != nil {
+		return nil, err
+	}
 	var ev MessagesStreamEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return nil, fmt.Errorf("解析 anthropic 流事件失败: %w", err)
@@ -144,6 +148,9 @@ func (a *anthropicToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) 
 }
 
 func (a *anthropicToOpenAIStream) End() ([]StreamEvent, error) {
+	if a.st.budget.err != nil {
+		return nil, a.st.budget.err
+	}
 	if b := a.st.emitFinal(); b != nil {
 		return []StreamEvent{*b}, nil
 	}
@@ -433,4 +440,8 @@ func (a *anthropicToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 func (a *anthropicToOpenAIStream) Finish() ([][]byte, error) {
 	events, err := a.End()
 	return encodeOpenAIEvents(events, err)
+}
+
+func (a *anthropicToOpenAIStream) setResourceLimits(l resource.Limits) {
+	a.st.budget.limits = l.Normalize()
 }

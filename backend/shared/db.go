@@ -59,7 +59,7 @@ func InitLogDB(cfg *Config) error {
 	} else {
 		LogDB = DB
 	}
-	return LogDB.AutoMigrate(&Log{}, &UpstreamAttempt{})
+	return LogDB.AutoMigrate(&Log{}, &UpstreamAttempt{}, &RoutingTrace{})
 }
 
 // AutoMigrate 迁移所有实体，由各模块注册自己的模型。

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 // Config 是服务的全局配置，来源为 JSON 文件 + 环境变量覆盖。
@@ -23,29 +25,35 @@ type Config struct {
 
 // ProxyConfig 是网关转发层的失败处理配置。
 type ProxyConfig struct {
-	RetryCount                 int `json:"retry_count"`                   // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
-	RetryBackoffBaseMs         int `json:"retry_backoff_base_ms"`         // 请求重试退避基数；0 使用默认值 200 毫秒
-	RetryBackoffMaxMs          int `json:"retry_backoff_max_ms"`          // 请求重试退避上限；0 使用默认值 2000 毫秒
-	MaxHTTPAttempts            int `json:"max_http_attempts"`             // 单个请求的 HTTP 总尝试预算，包含兼容重试；0 使用默认值 4
-	FirstContentTimeoutSeconds int `json:"first_content_timeout_seconds"` // 跨目标累计首内容期限；0 使用默认值 120 秒
-	ConnectTimeoutSeconds      int `json:"connect_timeout_seconds"`       // 连接超时
-	FirstByteTimeoutSeconds    int `json:"first_byte_timeout_seconds"`    // 等响应头 / 流式首包（首个数据事件）超时
-	StreamIdleTimeoutSeconds   int `json:"stream_idle_timeout_seconds"`   // 流式首包后，上游静默多久掐断（0 禁用）
-	NonStreamTimeoutSeconds    int `json:"non_stream_timeout_seconds"`    // 非流式请求跨目标累计期限；0 使用默认值 600 秒
-	CircuitFailureThreshold    int `json:"circuit_failure_threshold"`     // 熔断：连续失败 N 次开路
-	CircuitSuccessThreshold    int `json:"circuit_success_threshold"`     // 熔断：半开后连续成功 N 次转关闭
-	CircuitResetSeconds        int `json:"circuit_reset_seconds"`         // 熔断：开路冷却时长
+	RateLimitCooldownSeconds    int             `json:"rate_limit_cooldown_seconds"`     // 429 无有效 Retry-After 时的冷却秒数；0 使用 30 秒
+	RateLimitMaxCooldownSeconds int             `json:"rate_limit_max_cooldown_seconds"` // 429 冷却秒数上限；0 使用 300 秒
+	ResourceLimits              resource.Limits `json:"resource_limits"`                 // 转换链资源上限；0 使用默认值
+	RetryCount                  int             `json:"retry_count"`                     // 每个上游失败后重试次数（即最多尝试 retry_count+1 次）
+	RetryBackoffBaseMs          int             `json:"retry_backoff_base_ms"`           // 请求重试退避基数；0 使用默认值 200 毫秒
+	RetryBackoffMaxMs           int             `json:"retry_backoff_max_ms"`            // 请求重试退避上限；0 使用默认值 2000 毫秒
+	MaxHTTPAttempts             int             `json:"max_http_attempts"`               // 单个请求的 HTTP 总尝试预算，包含兼容重试；0 使用默认值 4
+	FirstContentTimeoutSeconds  int             `json:"first_content_timeout_seconds"`   // 跨目标累计首内容期限；0 使用默认值 120 秒
+	ConnectTimeoutSeconds       int             `json:"connect_timeout_seconds"`         // 连接超时
+	FirstByteTimeoutSeconds     int             `json:"first_byte_timeout_seconds"`      // 等响应头 / 流式首包（首个数据事件）超时
+	StreamIdleTimeoutSeconds    int             `json:"stream_idle_timeout_seconds"`     // 流式首包后，上游静默多久掐断（0 禁用）
+	NonStreamTimeoutSeconds     int             `json:"non_stream_timeout_seconds"`      // 非流式请求跨目标累计期限；0 使用默认值 600 秒
+	CircuitFailureThreshold     int             `json:"circuit_failure_threshold"`       // 熔断：连续失败 N 次开路
+	CircuitSuccessThreshold     int             `json:"circuit_success_threshold"`       // 熔断：半开后连续成功 N 次转关闭
+	CircuitResetSeconds         int             `json:"circuit_reset_seconds"`           // 熔断：开路冷却时长
 }
 
 // DefaultProxyConfig 返回网关转发的默认配置。
 func DefaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
-		RetryCount:                 2,
-		RetryBackoffBaseMs:         200,
-		RetryBackoffMaxMs:          2000,
-		MaxHTTPAttempts:            4,
-		FirstContentTimeoutSeconds: 120,
-		ConnectTimeoutSeconds:      30,
+		RateLimitCooldownSeconds:    30,
+		RateLimitMaxCooldownSeconds: 300,
+		ResourceLimits:              resource.Defaults(),
+		RetryCount:                  2,
+		RetryBackoffBaseMs:          200,
+		RetryBackoffMaxMs:           2000,
+		MaxHTTPAttempts:             4,
+		FirstContentTimeoutSeconds:  120,
+		ConnectTimeoutSeconds:       30,
 		// 等响应头 / 流式首包时限。曾试过 20s：高峰期中转上游排队时正常请求的
 		// 首包也会超 20s（30s~2min 的成功 200 大量存在），20s 误杀慢而正常的请求，
 		// 反而制造额外失败与客户端指数退避，故定 60s（见 gateway/client_wait_test.go
@@ -83,6 +91,10 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(c)
+	if err := validateResourceLimits(c.Proxy.ResourceLimits); err != nil {
+		return nil, err
+	}
+	c.Proxy.ResourceLimits = c.Proxy.ResourceLimits.Normalize()
 	if c.Proxy.MaxHTTPAttempts < 0 {
 		return nil, fmt.Errorf("proxy.max_http_attempts 不能为负数")
 	}
@@ -98,7 +110,22 @@ func Load(path string) (*Config, error) {
 	if c.Proxy.RetryBackoffMaxMs < 0 {
 		return nil, fmt.Errorf("proxy.retry_backoff_max_ms 不能为负数")
 	}
+	if c.Proxy.RateLimitCooldownSeconds < 0 {
+		return nil, fmt.Errorf("proxy.rate_limit_cooldown_seconds 不能为负数")
+	}
+	if c.Proxy.RateLimitMaxCooldownSeconds < 0 {
+		return nil, fmt.Errorf("proxy.rate_limit_max_cooldown_seconds 不能为负数")
+	}
 	defaults := DefaultProxyConfig()
+	if c.Proxy.RateLimitCooldownSeconds == 0 {
+		c.Proxy.RateLimitCooldownSeconds = defaults.RateLimitCooldownSeconds
+	}
+	if c.Proxy.RateLimitMaxCooldownSeconds == 0 {
+		c.Proxy.RateLimitMaxCooldownSeconds = defaults.RateLimitMaxCooldownSeconds
+	}
+	if c.Proxy.RateLimitMaxCooldownSeconds < c.Proxy.RateLimitCooldownSeconds {
+		return nil, fmt.Errorf("proxy.rate_limit_max_cooldown_seconds 不能小于 proxy.rate_limit_cooldown_seconds")
+	}
 	if c.Proxy.MaxHTTPAttempts == 0 {
 		c.Proxy.MaxHTTPAttempts = DefaultProxyConfig().MaxHTTPAttempts
 	}
@@ -144,6 +171,13 @@ func applyEnv(c *Config) {
 
 // applyProxyEnv 用 PORTUNUS_PROXY_* 环境变量覆盖网关转发配置。
 func applyProxyEnv(c *Config) {
+	if n, err := strconv.Atoi(os.Getenv("PORTUNUS_PROXY_RATE_LIMIT_COOLDOWN_SECONDS")); err == nil {
+		c.Proxy.RateLimitCooldownSeconds = n
+	}
+	if n, err := strconv.Atoi(os.Getenv("PORTUNUS_PROXY_RATE_LIMIT_MAX_COOLDOWN_SECONDS")); err == nil {
+		c.Proxy.RateLimitMaxCooldownSeconds = n
+	}
+	applyResourceEnv(&c.Proxy.ResourceLimits)
 	if v := os.Getenv("PORTUNUS_PROXY_RETRY_BACKOFF_BASE_MS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.Proxy.RetryBackoffBaseMs = n
@@ -202,6 +236,59 @@ func applyProxyEnv(c *Config) {
 	if v := os.Getenv("PORTUNUS_PROXY_CIRCUIT_RESET_SECONDS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.Proxy.CircuitResetSeconds = n
+		}
+	}
+}
+
+func validateResourceLimits(l resource.Limits) error {
+	fields := []struct {
+		name  string
+		value int64
+	}{
+		{"max_request_bytes", l.MaxRequestBytes},
+		{"max_response_bytes", l.MaxResponseBytes},
+		{"max_native_fragments", int64(l.MaxNativeFragments)},
+		{"max_tool_arguments_bytes", l.MaxToolArgumentsBytes},
+		{"max_accumulated_bytes", l.MaxAccumulatedBytes},
+		{"max_json_depth", int64(l.MaxJSONDepth)},
+	}
+	for _, field := range fields {
+		if field.value < 0 {
+			return fmt.Errorf("proxy.resource_limits.%s 不能为负数", field.name)
+		}
+	}
+	return nil
+}
+
+func applyResourceEnv(l *resource.Limits) {
+	bytesFields := []struct {
+		name   string
+		target *int64
+	}{
+		{"MAX_REQUEST_BYTES", &l.MaxRequestBytes},
+		{"MAX_RESPONSE_BYTES", &l.MaxResponseBytes},
+		{"MAX_TOOL_ARGUMENTS_BYTES", &l.MaxToolArgumentsBytes},
+		{"MAX_ACCUMULATED_BYTES", &l.MaxAccumulatedBytes},
+	}
+	for _, field := range bytesFields {
+		if value := os.Getenv("PORTUNUS_PROXY_" + field.name); value != "" {
+			if n, err := strconv.ParseInt(value, 10, 64); err == nil {
+				*field.target = n
+			}
+		}
+	}
+	intFields := []struct {
+		name   string
+		target *int
+	}{
+		{"MAX_NATIVE_FRAGMENTS", &l.MaxNativeFragments},
+		{"MAX_JSON_DEPTH", &l.MaxJSONDepth},
+	}
+	for _, field := range intFields {
+		if value := os.Getenv("PORTUNUS_PROXY_" + field.name); value != "" {
+			if n, err := strconv.Atoi(value); err == nil {
+				*field.target = n
+			}
 		}
 	}
 }

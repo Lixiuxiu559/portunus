@@ -27,7 +27,7 @@ test('不能提交空成员、重复成员、空名称或已移除的手动成�
   for (const input of [
     { name: 'x', strategy: 'manual', selected: [] },
     { name: 'x', strategy: 'failover', selected: [first, first] },
-    { name: ' ', strategy: 'round_robin', selected: [first] },
+    { name: ' ', strategy: 'failover', selected: [first] },
     { name: 'x', strategy: 'manual', selected: [second], activeModelId: first.id },
   ]) assert.throws(() => groupCreatePayload(input));
 });
@@ -57,4 +57,10 @@ test('关闭失效请求，过期错误静默失效；当前错误仍可重试',
   const retry = loader.load({ page: 1 });
   pending[2].resolve({ total: 0, data: [] });
   assert.deepEqual(await retry, { models: [], total: 0 });
+});
+
+test('已废弃的轮询和未知策略不能提交，有效名称及成员不能绕过策略校验', () => {
+  for (const strategy of ['round_robin', 'unknown', '', undefined]) {
+    assert.throws(() => groupCreatePayload({ name: 'coding', strategy, selected: [first], activeModelId: first.id }));
+  }
 });

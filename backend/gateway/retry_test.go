@@ -261,8 +261,13 @@ func TestCircuitBreakerOpenAndRecover(t *testing.T) {
 	if allow, _ := bs.Allow(id); !allow {
 		t.Fatal("冷却期后应半开放行")
 	}
-	bs.Record(id, false)
-	bs.Record(id, false)
+	for i := 0; i < 2; i++ {
+		lease, err := bs.Acquire(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lease.Finish(breakerSucceeded)
+	}
 	b2, _ := bs.m.Load(id)
 	if b2.(*circuitBreaker).state != stateClosed {
 		t.Errorf("半开连续成功应转关闭，实际 state=%d", b2.(*circuitBreaker).state)

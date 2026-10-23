@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -216,9 +217,62 @@ func responsesRequestToOpenAI(body []byte) (*ChatCompletionRequest, error) {
 		})
 	}
 	if req.ToolChoice != nil {
-		out.ToolChoice = req.ToolChoice
+		out.ToolChoice = responsesToolChoiceToOpenAI(req.ToolChoice)
 	}
 	return out, nil
+}
+
+// responsesToolChoiceToOpenAI 将 Responses 的具名函数选择 {type:"function",name}
+// 映射为 canonical/Chat 的 {type,function:{name}}。仅识别标准具名函数形态；
+// 字符串、托管工具及未知形态沿用原有兼容行为，不猜测其语义。
+func responsesToolChoiceToOpenAI(choice any) any {
+	m, ok := choice.(map[string]any)
+	if !ok || m["type"] != "function" {
+		return choice
+	}
+	name, ok := m["name"].(string)
+	if !ok || name == "" {
+		return choice
+	}
+	if _, exists := m["function"]; exists {
+		return choice
+	}
+	out := make(map[string]any, len(m))
+	for key, value := range m {
+		if key != "name" {
+			out[key] = value
+		}
+	}
+	out["function"] = map[string]any{"name": name}
+	return out
+}
+
+// openAIToolChoiceToResponses 将 canonical/Chat 的具名函数选择还原为 Responses
+// 的扁平 name。未知嵌套字段无法无损移位时保持原形，避免静默丢弃扩展。
+func openAIToolChoiceToResponses(choice any) any {
+	m, ok := choice.(map[string]any)
+	if !ok || m["type"] != "function" {
+		return choice
+	}
+	fn, ok := m["function"].(map[string]any)
+	if !ok || len(fn) != 1 {
+		return choice
+	}
+	name, ok := fn["name"].(string)
+	if !ok || name == "" {
+		return choice
+	}
+	if _, exists := m["name"]; exists {
+		return choice
+	}
+	out := make(map[string]any, len(m))
+	for key, value := range m {
+		if key != "function" {
+			out[key] = value
+		}
+	}
+	out["name"] = name
+	return out
 }
 
 // isResponsesWebSearchType 判断 Responses 的 tool.type 是否是 hosted web_search
@@ -464,7 +518,7 @@ func responsesRequestFromOpenAI(req *ChatCompletionRequest) ([]byte, error) {
 		})
 	}
 	if req.ToolChoice != nil {
-		out.ToolChoice = req.ToolChoice
+		out.ToolChoice = openAIToolChoiceToResponses(req.ToolChoice)
 	}
 	return json.Marshal(out)
 }
@@ -583,6 +637,9 @@ type responsesToOpenAIStream struct {
 func newResponsesToOpenAIStream() StreamConverter { return &responsesToOpenAIStream{} }
 
 func (r *responsesToOpenAIStream) Decode(payload []byte) ([]StreamEvent, error) {
+	if err := r.st.budget.payload(ProviderOpenAIResponses, payload, true); err != nil {
+		return nil, err
+	}
 	var ev ResponsesStreamEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return nil, fmt.Errorf("解析 responses 流事件失败: %w", err)
@@ -662,6 +719,9 @@ func hasFunctionCallItem(output []OutputItem) bool {
 }
 
 func (r *responsesToOpenAIStream) End() ([]StreamEvent, error) {
+	if r.st.budget.err != nil {
+		return nil, r.st.budget.err
+	}
 	if b := r.st.emitFinal(); b != nil {
 		return []StreamEvent{*b}, nil
 	}
@@ -854,4 +914,8 @@ func (r *responsesToOpenAIStream) Convert(payload []byte) ([][]byte, error) {
 func (r *responsesToOpenAIStream) Finish() ([][]byte, error) {
 	events, err := r.End()
 	return encodeOpenAIEvents(events, err)
+}
+
+func (r *responsesToOpenAIStream) setResourceLimits(l resource.Limits) {
+	r.st.budget.limits = l.Normalize()
 }

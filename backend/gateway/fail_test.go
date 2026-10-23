@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Lixiuxiu559/portunus/backend/protocol"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -30,6 +31,10 @@ func TestFailSpec(t *testing.T) {
 		want failDecision
 	}{
 		{"nil", nil, failDecision{}},
+		{"渠道满载不计故障也不重试同目标", &channelCapacityError{Limit: 2, InFlight: 2},
+			failDecision{ErrKind: shared.ErrKindChannelCapacity, Status: 503, RelayKind: relayErrOverloaded, RetryAfter: "1"}},
+		{"原生重放保护仍优先于容量拒绝", &streamReplayUnsafeError{err: &channelCapacityError{Limit: 1, InFlight: 1}},
+			failDecision{StopRequest: true, ErrKind: shared.ErrKindChannelCapacity, Status: 503, RelayKind: relayErrOverloaded, RetryAfter: "1"}},
 		{"客户端取消", context.Canceled,
 			failDecision{StopRequest: true, ErrKind: shared.ErrKindClientCancel, Status: http.StatusBadGateway, RelayKind: relayErrAPI}},
 		{"url.Error 包装取消（net.Error 形态仍归取消）", &url.Error{Op: "Post", Err: context.Canceled},
@@ -47,7 +52,21 @@ func TestFailSpec(t *testing.T) {
 		{"流静默假死（保留重试+504）", &streamStallError{stage: "首包", wait: 30 * time.Second},
 			failDecision{Retryable: true, StallMidStream: true, BreakerFail: true, ErrKind: shared.ErrKindWatchdog, Status: http.StatusGatewayTimeout, RelayKind: relayErrAPI}},
 		{"上游429+Retry-After透传", &upstreamStatusError{status: 429, retryAfter: "30"},
-			failDecision{Retryable: true, BreakerFail: true, ErrKind: shared.ErrKindUpstream, Status: http.StatusTooManyRequests, RelayKind: relayErrRateLimit, RetryAfter: "30"}},
+			failDecision{RateLimited: true, ErrKind: shared.ErrKindUpstream, Status: http.StatusTooManyRequests, RelayKind: relayErrRateLimit, RetryAfter: "30"}},
+		{"流内429跳过目标且不计故障", &protocol.StreamFailureError{Status: 429, Reason: "rate_limit"},
+			failDecision{RateLimited: true, ErrKind: shared.ErrKindUpstream, Status: 429, RelayKind: relayErrRateLimit}},
+		{"已交付流内429不得重放或计故障", &streamCommittedError{err: &protocol.StreamFailureError{Status: 429, Reason: "rate_limit"}},
+			failDecision{RateLimited: true, ErrKind: shared.ErrKindStreamInterrupt, Status: 502, RelayKind: relayErrAPI}},
+		{"原生操作429仍停止整个请求", &streamReplayUnsafeError{err: &upstreamStatusError{status: 429}},
+			failDecision{StopRequest: true, RateLimited: true, ErrKind: shared.ErrKindUpstream, Status: 429, RelayKind: relayErrRateLimit}},
+		{"本地冷却没有新上游429", &rateLimitCooldownError{Scope: "model", RetryAfter: 11},
+			failDecision{ErrKind: shared.ErrKindRateLimitCooldown, Status: 429, RelayKind: relayErrRateLimit, RetryAfter: "11"}},
+		{"半开名额忙不重试同目标且不计故障", &circuitUnavailableError{Reason: "probe_busy", RetryAfter: 1},
+			failDecision{ErrKind: shared.ErrKindCircuitOpen, Status: 503, RelayKind: relayErrOverloaded, RetryAfter: "1"}},
+		{"兼容重试旧代租约不再发送", &circuitUnavailableError{Reason: "stale_lease", RetryAfter: 1},
+			failDecision{ErrKind: shared.ErrKindCircuitOpen, Status: 503, RelayKind: relayErrOverloaded, RetryAfter: "1"}},
+		{"原生操作遇到旧代租约仍停止整个请求", &streamReplayUnsafeError{err: &circuitUnavailableError{Reason: "stale_lease", RetryAfter: 1}},
+			failDecision{StopRequest: true, ErrKind: shared.ErrKindCircuitOpen, Status: 503, RelayKind: relayErrOverloaded, RetryAfter: "1"}},
 		{"上游500", &upstreamStatusError{status: 500},
 			failDecision{Retryable: true, BreakerFail: true, ErrKind: shared.ErrKindUpstream, Status: 500, RelayKind: relayErrAPI}},
 		{"上游503", &upstreamStatusError{status: 503},

@@ -269,7 +269,7 @@ func DeleteItemsByModelIDsTx(tx *gorm.DB, modelIDs []int64) error {
 func itemsWithMetadata(db *gorm.DB) *gorm.DB {
 	return db.Select("group_items.*, models.name AS model_name, models.channel_id AS channel_id").
 		Joins("LEFT JOIN models ON models.id = group_items.model_id").
-		Order("group_items.priority")
+		Order("group_items.priority ASC").Order("group_items.id ASC")
 }
 
 // itemInGroup 判断分组项是否属于指定分组。

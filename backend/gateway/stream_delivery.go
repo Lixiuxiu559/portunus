@@ -27,6 +27,7 @@ type streamDeliveryReport struct {
 }
 
 type streamRelayOptions struct {
+	OnRateLimit       func() // 源429已识别时先观察，不能被后续客户端写失败覆盖
 	Source            protocol.Provider
 	ReplayUnsafe      bool
 	Report            *streamDeliveryReport

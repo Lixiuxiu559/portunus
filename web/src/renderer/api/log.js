@@ -29,3 +29,8 @@ export function listUpstreamAttempts(params) {
 export function listLogRequests(params) {
   return request.get('/logs/requests', { params });
 }
+
+/** 精确查询网关切换诊断；data 为 null 时无法确认是否发生跳过。 */
+export function getRoutingTrace(params) {
+  return request.get('/logs/routing', { params });
+}

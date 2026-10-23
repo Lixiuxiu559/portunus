@@ -38,6 +38,7 @@
 .request-attempt-row p { margin-top: 4px; }
 .request-attempt-row pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; font-size: 12px; margin-block: 12px; user-select: text; }
 .request-attempt-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.request-routing-events { margin-top: 12px; max-height: 480px; overflow-y: auto; }
 
 .logs-query-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; font-size: 12px; flex-shrink: 0; }
 .logs-query-caption { color: var(--muted); }

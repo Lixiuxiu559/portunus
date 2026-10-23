@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 // StreamEvent 是协议无关的语义增量帧。保留同一源帧的字段组合，避免拆帧改变
@@ -63,6 +64,8 @@ type streamEncoder interface {
 
 type typedStreamConverter struct {
 	from                    Provider
+	limits                  resource.Limits
+	failed                  error
 	decoder                 streamDecoder
 	encoder                 streamEncoder
 	legacyIntermediateUsage bool
@@ -101,8 +104,12 @@ func legacyIntermediateUsage(usage *Usage) *Usage {
 }
 
 func (s *typedStreamConverter) Convert(payload []byte) ([][]byte, error) {
-	native, err := CaptureResponseEvent(s.from, SSEEvent{Data: payload, HasData: true})
+	if s.failed != nil {
+		return nil, s.failed
+	}
+	native, err := CaptureResponseEvent(s.from, SSEEvent{Data: payload, HasData: true}, s.limits)
 	if err != nil {
+		s.failed = err
 		return nil, err
 	}
 	return s.convertNative(payload, native)
@@ -110,7 +117,15 @@ func (s *typedStreamConverter) Convert(payload []byte) ([][]byte, error) {
 
 // convertNative attaches the original event before encoding. Payload may contain
 // an inferred type; Native always retains the unmodified source data and SSE.
-func (s *typedStreamConverter) convertNative(payload []byte, native *ResponseEnvelope) ([][]byte, error) {
+func (s *typedStreamConverter) convertNative(payload []byte, native *ResponseEnvelope) (out [][]byte, err error) {
+	if s.failed != nil {
+		return nil, s.failed
+	}
+	defer func() {
+		if err != nil {
+			s.failed = err
+		}
+	}()
 	events, err := s.decoder.Decode(payload)
 	if err != nil {
 		return nil, err
@@ -128,7 +143,11 @@ func cloneResponseEvent(native *ResponseEnvelope) *ResponseEnvelope {
 	return native.clone()
 }
 
+func (s *typedStreamConverter) resourceLimits() resource.Limits { return s.limits.Normalize() }
 func (s *typedStreamConverter) Finish() ([][]byte, error) {
+	if s.failed != nil {
+		return nil, s.failed
+	}
 	out, err := s.encode(s.decoder.End())
 	if err != nil {
 		return nil, err

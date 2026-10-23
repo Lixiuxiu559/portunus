@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 )
 
 // 本文件是协议转换的非流式入口，所有转换都经 OpenAI 规范格式中转。
@@ -16,6 +18,9 @@ func ConvertRequest(from, to Provider, body []byte) ([]byte, error) {
 	if !to.Valid() {
 		return nil, fmt.Errorf("未知的目标协议: %s", to)
 	}
+	if err := inspectNativeResources(from, body, resource.Defaults(), resource.Request); err != nil {
+		return nil, err
+	}
 	if from == to {
 		return body, nil
 	}
@@ -23,7 +28,14 @@ func ConvertRequest(from, to Provider, body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return renderRequestFromOpenAI(to, req)
+	out, err := renderRequestFromOpenAI(to, req)
+	if err == nil {
+		err = inspectNativeResources(to, out, resource.Defaults(), resource.Request)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ConvertResponse 将 from 协议的响应体转换为 to 协议的响应体。
@@ -34,6 +46,7 @@ func ConvertResponse(from, to Provider, body []byte) ([]byte, error) {
 
 // UpstreamRequest 是装配上游请求时的覆盖项。零值字段表示「不覆盖」。
 type UpstreamRequest struct {
+	Limits   resource.Limits
 	Model    string          // 上游模型名（渠道侧命名）；空 = 不替换
 	Thinking *ThinkingConfig // -thinking 后缀驱动的思考开关意图；仅 openai 兼容上游消费
 	// ThinkingCompat 渠道级 thinking 兼容垫片：开启后对 openai 兼容上游注入
@@ -76,7 +89,7 @@ type ComposeStats struct {
 // thinking 曾导致部分上游 400（见 9a8e785）。
 // 第二个返回值是本次装配的诊断遥测（ComposeStats），与请求体一同交给调用方。
 func ComposeUpstreamRequest(from, to Provider, body []byte, up UpstreamRequest) ([]byte, ComposeStats, error) {
-	envelope, err := CaptureRequest(from, body)
+	envelope, err := CaptureRequest(from, body, up.Limits)
 	if err != nil {
 		return nil, ComposeStats{}, err
 	}

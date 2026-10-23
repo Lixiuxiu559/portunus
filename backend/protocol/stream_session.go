@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/Lixiuxiu559/portunus/backend/resource"
 	"strings"
 )
 
@@ -40,6 +41,8 @@ type StreamSession struct {
 	framer            *StreamFramer
 	outcome           StreamOutcome
 	finished, closed  bool
+	failed            error
+	limits            resource.Limits
 	anthropicStop     string
 	choices           map[int]string
 	nativeEvent       *ResponseEnvelope
@@ -48,7 +51,7 @@ type StreamSession struct {
 }
 
 func NewStreamSession(from, to Provider, conv StreamConverter) *StreamSession {
-	return &StreamSession{from: from, to: to, conv: conv, framer: NewStreamFramer(to, conv), outcome: StreamOutcome{Status: "pending"}, choices: map[int]string{}, compatibility: ConversionReport{Scope: "stream_native_v1", Compatible: true}, compatibilitySeen: map[ConversionIssue]bool{}}
+	return &StreamSession{from: from, to: to, conv: conv, limits: converterLimits(conv), framer: NewStreamFramer(to, conv), outcome: StreamOutcome{Status: "pending"}, choices: map[int]string{}, compatibility: ConversionReport{Scope: "stream_native_v1", Compatible: true}, compatibilitySeen: map[ConversionIssue]bool{}}
 }
 func (s *StreamSession) Outcome() StreamOutcome { return s.outcome }
 
@@ -62,7 +65,7 @@ func (s *StreamSession) Compatibility() ConversionReport {
 }
 
 func (s *StreamSession) captureNativeEvent(ev SSEEvent) error {
-	native, err := CaptureResponseEvent(s.from, ev)
+	native, err := CaptureResponseEvent(s.from, ev, s.limits)
 	if err != nil {
 		return err
 	}
@@ -72,6 +75,9 @@ func (s *StreamSession) captureNativeEvent(ev SSEEvent) error {
 	s.compatibility.Compatible = s.compatibility.Compatible && report.Compatible
 	for _, issue := range report.Issues {
 		if !s.compatibilitySeen[issue] {
+			if len(s.compatibilitySeen) >= s.limits.MaxNativeFragments {
+				return &resource.LimitError{Scope: resource.Stream, Kind: "diagnostic_items", Limit: int64(s.limits.MaxNativeFragments)}
+			}
 			s.compatibilitySeen[issue] = true
 			s.compatibility.Issues = append(s.compatibility.Issues, issue)
 		}
@@ -86,7 +92,15 @@ func (s *StreamSession) convertNative(payload []byte) ([][]byte, error) {
 	return s.conv.Convert(payload)
 }
 func (s *StreamSession) Process(ev SSEEvent) (batch StreamBatch, err error) {
+	if s.failed != nil {
+		return batch, s.failed
+	}
 	defer func() {
+		var limit *resource.LimitError
+		if errors.As(err, &limit) {
+			s.failed = err
+			s.outcome = StreamOutcome{Status: "failed", Reason: "resource_limit", TerminalObserved: s.outcome.TerminalObserved}
+		}
 		if errors.Is(err, ErrStreamIncomplete) {
 			s.outcome = StreamOutcome{Status: "truncated", Reason: "missing_terminal"}
 		}
@@ -98,7 +112,7 @@ func (s *StreamSession) Process(ev SSEEvent) (batch StreamBatch, err error) {
 		return batch, nil
 	}
 	if err := s.captureNativeEvent(ev); err != nil {
-		return batch, ErrStreamInvalid
+		return batch, streamConversionError(err)
 	}
 	if !ev.HasData || len(bytes.TrimSpace(ev.Data)) == 0 {
 		if s.from == s.to {
@@ -165,7 +179,7 @@ func (s *StreamSession) Process(ev SSEEvent) (batch StreamBatch, err error) {
 	if s.from == s.to {
 		// Conversion is used only for side-band usage extraction; wire bytes stay raw.
 		if _, err = s.convertNative(payload); err != nil {
-			return batch, ErrStreamInvalid
+			return batch, streamConversionError(err)
 		}
 		batch.Frames = [][]byte{ev.Raw}
 		batch.Meaningful = unknown || streamPayloadMeaningful(s.to, payload)
@@ -181,7 +195,7 @@ func (s *StreamSession) Process(ev SSEEvent) (batch StreamBatch, err error) {
 			}
 		}
 		if err != nil {
-			return StreamBatch{}, ErrStreamInvalid
+			return StreamBatch{}, streamConversionError(err)
 		}
 		batch.Frames = s.framer.frameAll(chunks)
 		for _, chunk := range chunks {
@@ -192,6 +206,9 @@ func (s *StreamSession) Process(ev SSEEvent) (batch StreamBatch, err error) {
 	return batch, nil
 }
 func (s *StreamSession) Finish() (StreamBatch, error) {
+	if s.failed != nil {
+		return StreamBatch{}, s.failed
+	}
 	if s.finished {
 		return StreamBatch{}, nil
 	}
@@ -208,7 +225,12 @@ func (s *StreamSession) Finish() (StreamBatch, error) {
 	}
 	chunks, err := s.conv.Finish()
 	if err != nil {
-		return StreamBatch{}, ErrStreamInvalid
+		var limit *resource.LimitError
+		if errors.As(err, &limit) {
+			s.failed = err
+			s.outcome = StreamOutcome{Status: "failed", Reason: "resource_limit", TerminalObserved: s.outcome.TerminalObserved}
+		}
+		return StreamBatch{}, streamConversionError(err)
 	}
 	batch.Frames = s.framer.frameAll(chunks)
 	for _, chunk := range chunks {
@@ -280,6 +302,9 @@ func (s *StreamSession) observe(obj map[string]json.RawMessage, eventName string
 			var idx int
 			_ = json.Unmarshal(c["index"], &idx)
 			if _, ok := s.choices[idx]; !ok {
+				if len(s.choices) >= s.limits.MaxNativeFragments {
+					return false, false, &resource.LimitError{Scope: resource.Stream, Kind: "stream_items", Limit: int64(s.limits.MaxNativeFragments)}
+				}
 				s.choices[idx] = ""
 			}
 			reason := rawString(c["finish_reason"])
@@ -378,6 +403,9 @@ func (s *StreamSession) observe(obj map[string]json.RawMessage, eventName string
 				_ = json.Unmarshal(c["index"], &idx)
 			}
 			if _, ok := s.choices[idx]; !ok {
+				if len(s.choices) >= s.limits.MaxNativeFragments {
+					return false, false, &resource.LimitError{Scope: resource.Stream, Kind: "stream_items", Limit: int64(s.limits.MaxNativeFragments)}
+				}
 				s.choices[idx] = ""
 			}
 			reason := rawString(c["finishReason"])
@@ -544,4 +572,12 @@ func hasValue(m map[string]json.RawMessage, keys ...string) bool {
 		}
 	}
 	return false
+}
+
+func streamConversionError(err error) error {
+	var limit *resource.LimitError
+	if errors.As(err, &limit) {
+		return err
+	}
+	return ErrStreamInvalid
 }

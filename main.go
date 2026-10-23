@@ -52,6 +52,9 @@ func main() {
 	); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
+	if err := group.MigrateLegacyStrategies(shared.DB); err != nil {
+		log.Fatalf("迁移分组路由策略失败: %v", err)
+	}
 	if err := shared.InitLogDB(cfg); err != nil {
 		log.Fatalf("初始化日志库失败: %v", err)
 	}
@@ -67,9 +70,11 @@ func main() {
 	r := gin.Default()
 
 	gateway.Register(r, gateway.Deps{
-		Cfg:      cfg.Proxy,
-		Client:   gateway.NewHTTPClient(cfg.Proxy),
-		Breakers: gateway.NewBreakerStore(cfg.Proxy),
+		Cfg:         cfg.Proxy,
+		Client:      gateway.NewHTTPClient(cfg.Proxy),
+		Breakers:    gateway.NewBreakerStore(cfg.Proxy),
+		Cooldowns:   gateway.NewRateLimitStore(cfg.Proxy),
+		Concurrency: gateway.NewChannelConcurrencyStore(),
 		Auth: func(key string) (int64, bool) {
 			var k shared.APIKey
 			if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
@@ -79,6 +84,7 @@ func main() {
 		},
 		LogWrite:     func(e *shared.Log) { shared.LogDB.Create(e) },
 		AttemptWrite: shared.WriteUpstreamAttempt,
+		RoutingWrite: shared.WriteRoutingTrace,
 	})
 	quotaService := quota.NewService(shared.DB, quota.NewHTTPClient(), func(tx *gorm.DB, id int64) (string, error) {
 		var ch channel.Channel

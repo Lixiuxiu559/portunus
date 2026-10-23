@@ -42,7 +42,7 @@ backend/
   upstream  厂商预设、配置档与连接解析
   quota     独立余额／额度来源、适配器、缓存和有界调度
   model     模型：归渠道的上游资源目录，供模型分组引用
-  group     分组：跨渠道聚合模型，每个分组必配路由策略（manual/round_robin/failover）
+  group     分组：跨渠道聚合模型，每个分组必配路由策略（manual/failover）
   protocol  协议转换：OpenAI Chat/Responses ↔ Anthropic ↔ Gemini
   api       管理 API（/api/*，供前端调用）
   gateway   对外 /v1 LLM 接口（Chat / Responses / Messages，供客户端和应用调用）

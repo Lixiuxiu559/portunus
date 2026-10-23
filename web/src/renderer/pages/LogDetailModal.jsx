@@ -1,5 +1,6 @@
 import { Button, Modal, toast } from '@heroui/react';
 import RequestAttemptTimeline from './RequestAttemptTimeline';
+import RequestRoutingTrace from './RequestRoutingTrace';
 import { copyLogText, logChannelLabel, logErrorSummary, errKindLabels } from '../utils/logDetails';
 
 export default function LogDetailModal({ record, channels, onClose, association }) {
@@ -38,6 +39,7 @@ export default function LogDetailModal({ record, channels, onClose, association 
           {error && <Button size="sm" variant="secondary" onPress={() => copy(error)}>复制错误摘要</Button>}
         </section>
         <RequestAttemptTimeline key={record.request_id || `log:${record.id}`} requestId={record.request_id} channels={channels} />
+        <RequestRoutingTrace key={`routing:${record.request_id || record.id}`} requestId={record.request_id} channels={channels} />
         <details className="mt-4 text-sm"><summary>兼容与桥接信息</summary><dl className="log-detail-fields mt-3"><dt>思考桥解码</dt><dd>{value(record.bridge_decoded)}</dd><dt>垫片改写</dt><dd>{value(record.shim_rewrites)}</dd><dt>剥离托管工具</dt><dd>{value(record.hosted_tools_stripped)}</dd></dl></details>
       </>}</Modal.Body>
       <Modal.Footer><Button variant="secondary" onPress={onClose}>关闭</Button></Modal.Footer>

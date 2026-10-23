@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyProfile, connectionIdentity, connectionPayload, createDraft, isCurrentRequest, normalizeModels, savePayload } from './channelDraft.js';
+import { applyProfile, connectionIdentity, connectionPayload, createDraft, isCurrentRequest, normalizeModels, savePayload, validateChannelCapacity } from './channelDraft.js';
 
 const preset = { id: 'generic', profiles: [] };
 const profile = { id: 'chat', type: 'openai', adapter_id: 'generic', base_url: 'https://example.test/v1', model_discovery: 'api' };
@@ -92,5 +92,43 @@ test('历史渠道空连接设置只改名后保留原自动同步选择', () =>
       assert.equal(payload.name, 'renamed');
       assert.equal('key' in payload, false);
     }
+  }
+});
+
+test('429 冷却范围默认按模型，整渠道设置编辑保存往返且不改变连接身份', () => {
+  for (const channel of [undefined, {}, { rate_limit_scope: '' }]) {
+    const draft = createDraft(channel);
+    assert.equal(draft.rate_limit_scope, 'model');
+    assert.equal(savePayload(draft, []).rate_limit_scope, 'model');
+  }
+  const draft = createDraft({ rate_limit_scope: 'channel' });
+  assert.equal(savePayload(draft, []).rate_limit_scope, 'channel');
+  assert.equal(applyProfile(draft, preset, profile).rate_limit_scope, 'channel');
+  assert.equal(connectionIdentity(draft), connectionIdentity({ ...draft, rate_limit_scope: 'model' }));
+  assert.equal('rate_limit_scope' in connectionPayload(draft), false);
+});
+
+test('渠道并发默认不限，编辑保留上限并能显式清零，不改变连接和发现结果', () => {
+  for (const channel of [undefined, {}, { max_concurrent_requests: 0 }]) {
+    assert.equal(createDraft(channel).max_concurrent_requests, '0');
+    assert.equal(savePayload(createDraft(channel), []).max_concurrent_requests, 0);
+  }
+  const draft = createDraft({ max_concurrent_requests: 12 });
+  assert.equal(draft.max_concurrent_requests, '12');
+  assert.equal(savePayload(draft, []).max_concurrent_requests, 12);
+  assert.equal(savePayload({ ...draft, max_concurrent_requests: '0' }, []).max_concurrent_requests, 0);
+  assert.equal(applyProfile(draft, preset, profile).max_concurrent_requests, '12');
+  assert.equal(connectionIdentity(draft), connectionIdentity({ ...draft, max_concurrent_requests: '3' }));
+  assert.equal('max_concurrent_requests' in connectionPayload(draft), false);
+});
+
+test('渠道并发拒绝空白、负数、小数、指数、非法文本和无法精确表达的整数', () => {
+  for (const value of ['', ' ', '-1', '1.5', '1e2', '+1', 'abc', 'Infinity', 'NaN', '9007199254740992']) {
+    assert.match(validateChannelCapacity(value), /非负整数/);
+    assert.throws(() => savePayload({ ...createDraft(), max_concurrent_requests: value }, []), /非负整数/);
+  }
+  for (const value of ['0', '1', '256', '9007199254740991']) {
+    assert.equal(validateChannelCapacity(value), null);
+    assert.equal(savePayload({ ...createDraft(), max_concurrent_requests: value }, []).max_concurrent_requests, Number(value));
   }
 });

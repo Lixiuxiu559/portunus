@@ -127,7 +127,7 @@ func TestGroupCreationActiveModelValidationAndAtomicity(t *testing.T) {
 		})
 	}
 	// 旧客户端省略 active_model_id，保持未激活；非 manual 显式 0 同样兼容。
-	for _, strategy := range []string{"manual", "round_robin", "failover"} {
+	for _, strategy := range []string{"manual", "failover"} {
 		field := ""
 		if strategy != "manual" {
 			field = `,"active_model_id":0`
