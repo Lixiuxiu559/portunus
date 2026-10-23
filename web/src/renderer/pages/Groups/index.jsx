@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Card, ScrollShadow, Spinner, toast } from '@heroui/react';
-import { Plus, Trash2, Pencil, RotateCw, X, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
+import { Button, Typography, Chip, Card, ScrollShadow, Spinner, TextField, Input, toast } from '@heroui/react';
+import { Plus, Trash2, Pencil, RotateCw, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
 import { listGroups, updateGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -54,6 +54,10 @@ export default function Groups() {
   const [showCreate, setShowCreate] = useState(false);
   // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
+  // 名称查询：输入框是草稿，点查询或回车后才生效（与模型页一致）。
+  // 分组列表本身一次返回全部，过滤在本地完成，不需要额外请求。
+  const [draftName, setDraftName] = useState('');
+  const [queryName, setQueryName] = useState('');
 
   const fetchAll = async (isRefresh = false) => {
     // 有数据时使用 refreshing（不遮挡内容），无数据时使用 loading（显示加载状态）
@@ -76,6 +80,13 @@ export default function Groups() {
   useEffect(() => { fetchAll(); }, []);
 
   const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
+
+  // 分组数量不多，名称过滤直接在已加载列表上完成；保留已生效条件供刷新后继续使用。
+  const visibleGroups = queryName
+    ? groups.filter((g) => g.name.toLocaleLowerCase().includes(queryName.toLocaleLowerCase()))
+    : groups;
+  const handleSearch = () => setQueryName(draftName.trim());
+  const clearSearch = () => { setDraftName(''); setQueryName(''); };
 
   const handleSetActive = async (groupId, itemId) => {
     try {
@@ -127,18 +138,34 @@ export default function Groups() {
 
   return (
     <div className="groups-page flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-end mb-4 shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
+        <TextField
+          size="sm"
+          aria-label="按分组名称查询"
+          value={draftName}
+          onChange={setDraftName}
+          placeholder="按名称查询"
+          className="w-56"
+          onKeyDown={(event) => { if (event.key === 'Enter') handleSearch(); }}
+        >
+          <Input />
+        </TextField>
+        {draftName && <IconButton size="sm" label="清除名称查询" onClick={clearSearch}><X className="size-3.5" /></IconButton>}
+        <Button variant="secondary" size="sm" onPress={handleSearch} isPending={loading || refreshing}>
+          <Search className="size-4" />
+          查询
+        </Button>
+        <div className="ml-auto flex items-center gap-2">
           <Button
             variant="secondary"
-            size="md"
+            size="sm"
             aria-label="刷新分组"
             onPress={() => fetchAll(true)}
             isPending={refreshing}
           >
             <RotateCw className="size-4" />
           </Button>
-          <Button variant="primary" size="md" isDisabled={loading || !modelCount} onPress={() => setShowCreate(true)}>
+          <Button variant="primary" size="sm" isDisabled={loading || !modelCount} onPress={() => setShowCreate(true)}>
             <Plus className="size-4" />
             新增分组
           </Button>
@@ -170,11 +197,16 @@ export default function Groups() {
             新增分组
           </Button>
         </div>
+      ) : visibleGroups.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-muted">
+          <span>没有匹配「{queryName}」的分组</span>
+          <Button variant="secondary" size="sm" onPress={clearSearch}>清除查询</Button>
+        </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">
         <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-          {groups.map((g) => {
+          {visibleGroups.map((g) => {
             const configuration = groupConfiguration(g);
             return (
               <Card key={g.id} data-expand-card className="gap-4 p-5 h-[24rem]" aria-label={`模型分组 ${g.name}`}>
@@ -232,7 +264,6 @@ export default function Groups() {
             );
           })}
         </div>
-        <p className="mt-4 mb-2 text-xs text-muted">分组名称即客户端的 model。配置状态仅反映成员设置，上游可用性以实际调用为准。</p>
         </DragDropContext>
         </div>
       )}
