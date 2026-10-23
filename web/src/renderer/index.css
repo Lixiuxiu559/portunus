@@ -67,44 +67,101 @@
  * @see https://heroui.com/docs/react/getting-started/theming
  */
 
+/*
+ * 颜色色阶 primitive（规范见 docs/product/COLOR-SCALE.md）：
+ * 品牌橙取自 logo #F85820；页面只应通过下方 semantic token 引用，
+ * 图表与品牌图形可直接使用 --brand-*。
+ */
+:root {
+  --brand-50: oklch(97.3% 0.014 37.6);
+  --brand-100: oklch(94.5% 0.028 37.6);
+  --brand-200: oklch(89.2% 0.058 37.6);
+  --brand-300: oklch(82.0% 0.104 37.6);
+  --brand-400: oklch(74.2% 0.161 37.6);
+  --brand-500: oklch(66.9% 0.205 37.6);
+  --brand-600: oklch(58.5% 0.190 37.6);
+  --brand-700: oklch(53.0% 0.165 37.6);
+  --brand-800: oklch(45.5% 0.130 37.6);
+  --brand-900: oklch(38.0% 0.100 37.6);
+  --brand-950: oklch(30.5% 0.075 37.6);
+
+  /* 亮色主题的暖中性色（色相 34.4） */
+  --neutral-50: oklch(98.5% 0.0040 34.4);
+  --neutral-100: oklch(96.5% 0.0050 34.4);
+  --neutral-200: oklch(92.5% 0.0060 34.4);
+  --neutral-300: oklch(86.5% 0.0070 34.4);
+  --neutral-400: oklch(72.0% 0.0100 34.4);
+  --neutral-500: oklch(60.0% 0.0120 34.4);
+  --neutral-600: oklch(52.0% 0.0120 34.4);
+  --neutral-700: oklch(44.0% 0.0120 34.4);
+  --neutral-800: oklch(36.0% 0.0100 34.4);
+  --neutral-900: oklch(27.0% 0.0080 34.4);
+  --neutral-950: oklch(20.5% 0.0060 34.4);
+
+  /* 状态色：警告使用琥珀色相 80，与品牌橙 37.6 拉开 */
+  --success-100: oklch(94% 0.045 145);
+  --success-400: oklch(70% 0.145 145);
+  --success-500: oklch(60% 0.150 145);
+  --success-700: oklch(47% 0.120 145);
+  --warning-100: oklch(96% 0.060 80);
+  --warning-400: oklch(86% 0.145 80);
+  --warning-500: oklch(80% 0.150 80);
+  --warning-700: oklch(50% 0.110 80);
+  --danger-100: oklch(94% 0.035 15);
+  --danger-400: oklch(70% 0.170 15);
+  --danger-600: oklch(55% 0.200 15);
+  --danger-700: oklch(50% 0.190 15);
+}
+
 :root,
 .light,
 .default,
 [data-theme="light"],
 [data-theme="default"] {
   /* Theme Colors (Light Mode) */
-  --accent: oklch(57% 0.20 48);
-  --accent-foreground: oklch(99% 0 0);
-  --background: oklch(97.02% 0.0088 34.39);
-  --border: oklch(90.00% 0.0088 34.39);
-  --danger: oklch(48% 0.22 25);
-  --danger-foreground: oklch(99% 0 0);
-  --default: oklch(94.00% 0.0088 34.39);
-  --default-foreground: oklch(21.03% 0.0059 34.39);
-  --field-background: oklch(100.00% 0.0044 34.39);
+  --accent: var(--brand-600);
+  --accent-foreground: oklch(100% 0 0);
+  --accent-hover: var(--brand-700);
+  --accent-pressed: var(--brand-800);
+  --accent-subtle: var(--brand-50);
+  --accent-subtle-foreground: var(--brand-700);
+  --background: var(--neutral-50);
+  --border: var(--neutral-300);
+  --border-strong: var(--neutral-500);
+  --danger: var(--danger-600);
+  --danger-foreground: oklch(100% 0 0);
+  --danger-subtle: var(--danger-100);
+  --danger-subtle-foreground: var(--danger-700);
+  --default: var(--neutral-200);
+  --default-foreground: var(--neutral-900);
+  --field-background: oklch(100% 0 0);
   --field-border: transparent;
-  --field-focus: oklch(100.00% 0.0044 34.39);
-  --field-foreground: oklch(21.03% 0.0088 34.39);
-  --field-placeholder: oklch(55.17% 0.0176 34.39);
-  --focus: oklch(57% 0.20 48);
-  --foreground: oklch(21.03% 0.0088 34.39);
-  --muted: oklch(52% 0.015 34.39);
-  --overlay: oklch(100.00% 0.0026 34.39);
-  --overlay-foreground: oklch(21.03% 0.0088 34.39);
-  --scrollbar: oklch(87.10% 0.0088 34.39);
-  --segment: oklch(100.00% 0.0088 34.39);
-  --segment-foreground: oklch(21.03% 0.0088 34.39);
-  --separator: oklch(92.00% 0.0088 34.39);
-  --success: oklch(47% 0.18 124.48);
-  --success-foreground: oklch(99% 0 0);
-  --surface: oklch(100.00% 0.0044 34.39);
-  --surface-foreground: oklch(21.03% 0.0088 34.39);
-  --surface-secondary: oklch(95.24% 0.0070 34.39);
-  --surface-secondary-foreground: oklch(21.03% 0.0088 34.39);
-  --surface-tertiary: oklch(93.73% 0.0070 34.39);
-  --surface-tertiary-foreground: oklch(21.03% 0.0088 34.39);
-  --warning: oklch(50% 0.14 46);
-  --warning-foreground: oklch(99% 0 0);
+  --field-focus: oklch(100% 0 0);
+  --field-foreground: var(--neutral-900);
+  --field-placeholder: var(--neutral-600);
+  --focus: var(--brand-500);
+  --foreground: var(--neutral-900);
+  --muted: var(--neutral-600);
+  --overlay: oklch(100% 0 0);
+  --overlay-foreground: var(--neutral-900);
+  --scrollbar: var(--neutral-300);
+  --segment: oklch(100% 0 0);
+  --segment-foreground: var(--neutral-900);
+  --separator: var(--neutral-200);
+  --success: var(--success-700);
+  --success-foreground: oklch(100% 0 0);
+  --success-subtle: var(--success-100);
+  --success-subtle-foreground: var(--success-700);
+  --surface: oklch(100% 0 0);
+  --surface-foreground: var(--neutral-900);
+  --surface-secondary: var(--neutral-100);
+  --surface-secondary-foreground: var(--neutral-900);
+  --surface-tertiary: var(--neutral-200);
+  --surface-tertiary-foreground: var(--neutral-900);
+  --warning: var(--warning-700);
+  --warning-foreground: oklch(100% 0 0);
+  --warning-subtle: var(--warning-100);
+  --warning-subtle-foreground: var(--warning-700);
 
   /* Border Radius */
   --radius: 0.5rem;
@@ -117,39 +174,63 @@ html[data-theme="dark"],
 html.dark [data-slot],
 html[data-theme="dark"] [data-slot] {
   color-scheme: dark;
+  /* 暗色主题的冷中性色（色相 265） */
+  --cool-50: oklch(97.5% 0.0040 265);
+  --cool-100: oklch(94.5% 0.0060 265);
+  --cool-200: oklch(88.5% 0.0080 265);
+  --cool-300: oklch(80.0% 0.0100 265);
+  --cool-400: oklch(70.0% 0.0120 265);
+  --cool-500: oklch(60.0% 0.0140 265);
+  --cool-600: oklch(51.0% 0.0150 265);
+  --cool-700: oklch(42.0% 0.0160 265);
+  --cool-800: oklch(33.0% 0.0180 265);
+  --cool-900: oklch(26.0% 0.0200 265);
+  --cool-950: oklch(18.0% 0.0200 265);
+
   /* Theme Colors (Dark Mode) */
-  --accent: oklch(74% 0.15 48);
-  --accent-foreground: oklch(20% 0.02 48);
-  --background: oklch(20% 0.02 265);
-  --border: oklch(30% 0.02 265);
-  --danger: oklch(74% 0.18 25);
-  --danger-foreground: oklch(20% 0.03 25);
-  --default: oklch(30% 0.02 265);
-  --default-foreground: oklch(97% 0.005 265);
-  --field-background: oklch(27% 0.02 265);
-  --field-border: oklch(36% 0.02 265);
-  --field-focus: oklch(27% 0.02 265);
-  --field-foreground: oklch(97% 0.005 265);
-  --field-placeholder: oklch(70% 0.015 265);
-  --focus: oklch(74% 0.15 48);
-  --foreground: oklch(96% 0.005 265);
-  --muted: oklch(76% 0.015 265);
-  --overlay: oklch(25% 0.02 265);
-  --overlay-foreground: oklch(97% 0.005 265);
-  --scrollbar: oklch(48% 0.02 265);
-  --segment: oklch(42% 0.02 265);
-  --segment-foreground: oklch(97% 0.005 265);
-  --separator: oklch(28% 0.02 265);
-  --success: oklch(82% 0.16 124.48);
-  --success-foreground: oklch(20% 0.03 124.48);
-  --surface: oklch(25% 0.02 265);
-  --surface-foreground: oklch(97% 0.005 265);
-  --surface-secondary: oklch(29% 0.02 265);
-  --surface-secondary-foreground: oklch(97% 0.005 265);
-  --surface-tertiary: oklch(31% 0.02 265);
-  --surface-tertiary-foreground: oklch(97% 0.005 265);
-  --warning: oklch(84% 0.12 50);
-  --warning-foreground: oklch(20% 0.03 50);
+  --accent: var(--brand-400);
+  --accent-foreground: var(--cool-950);
+  --accent-hover: var(--brand-300);
+  --accent-pressed: var(--brand-500);
+  --accent-subtle: color-mix(in oklch, var(--brand-500) 16%, var(--surface));
+  --accent-subtle-foreground: var(--brand-300);
+  --background: var(--cool-950);
+  --border: var(--cool-700);
+  --border-strong: var(--cool-500);
+  --danger: var(--danger-400);
+  --danger-foreground: var(--cool-950);
+  --danger-subtle: color-mix(in oklch, var(--danger-400) 16%, var(--surface));
+  --danger-subtle-foreground: var(--danger-400);
+  --default: var(--cool-800);
+  --default-foreground: var(--cool-50);
+  --field-background: var(--cool-900);
+  --field-border: var(--cool-700);
+  --field-focus: var(--cool-900);
+  --field-foreground: var(--cool-50);
+  --field-placeholder: var(--cool-400);
+  --focus: var(--brand-400);
+  --foreground: var(--cool-50);
+  --muted: var(--cool-400);
+  --overlay: var(--cool-900);
+  --overlay-foreground: var(--cool-50);
+  --scrollbar: var(--cool-600);
+  --segment: var(--cool-700);
+  --segment-foreground: var(--cool-50);
+  --separator: var(--cool-800);
+  --success: var(--success-400);
+  --success-foreground: var(--cool-950);
+  --success-subtle: color-mix(in oklch, var(--success-400) 16%, var(--surface));
+  --success-subtle-foreground: var(--success-400);
+  --surface: var(--cool-900);
+  --surface-foreground: var(--cool-50);
+  --surface-secondary: var(--cool-800);
+  --surface-secondary-foreground: var(--cool-50);
+  --surface-tertiary: var(--cool-700);
+  --surface-tertiary-foreground: var(--cool-50);
+  --warning: var(--warning-400);
+  --warning-foreground: var(--cool-950);
+  --warning-subtle: color-mix(in oklch, var(--warning-400) 16%, var(--surface));
+  --warning-subtle-foreground: var(--warning-400);
 }
 
 * {
@@ -382,11 +463,12 @@ html.dark .card {
     box-shadow 200ms var(--ease-out);
 }
 
-/* 主按钮：accent 玻璃——保留主色身份，顶部提亮成"受光"质感 */
+/* 主按钮：直接使用语义 accent 档位，玻璃质感交给描边与内高光。
+   不再与白/黑混色，保证白字在各状态都达到 4.5:1。 */
 .button--primary {
-  --button-bg: color-mix(in oklch, var(--accent) 88%, white);
-  --button-bg-hover: color-mix(in oklch, var(--accent) 78%, white);
-  --button-bg-pressed: color-mix(in oklch, var(--accent) 92%, black);
+  --button-bg: var(--accent);
+  --button-bg-hover: var(--accent-hover);
+  --button-bg-pressed: var(--accent-pressed);
   --button-fg: var(--accent-foreground);
   box-shadow:
     inset 0 1px 0 color-mix(in oklch, white 42%, transparent),
@@ -438,9 +520,9 @@ html.dark .card {
 }
 
 html.dark .button--primary {
-  --button-bg: color-mix(in oklch, var(--accent) 84%, black);
-  --button-bg-hover: color-mix(in oklch, var(--accent) 92%, white);
-  --button-bg-pressed: color-mix(in oklch, var(--accent) 78%, black);
+  --button-bg: var(--accent);
+  --button-bg-hover: var(--accent-hover);
+  --button-bg-pressed: var(--accent-pressed);
   box-shadow:
     inset 0 1px 0 color-mix(in oklch, white 18%, transparent),
     inset 0 -1px 0 color-mix(in oklch, black 24%, transparent),
