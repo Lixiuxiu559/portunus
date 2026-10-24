@@ -176,29 +176,11 @@ export default function Logs() {
       ) : '—'),
     },
     {
-      title: '客户端 / 桥接',
+      title: '客户端协议',
       dataIndex: 'client_protocol',
       key: 'client_protocol',
       width: '104px',
-      render: (val, record) => {
-        // client_protocol 为空 = 本次改动前的存量日志（未记录入口协议）。
-        // 桥接/垫片计数是判断「缓存问题是否真被修复」的观测点：
-        // 桥接恒为 0 而客户端是 anthropic → Claude Code 没回传网关签名，桥接未生效。
-        const bridge = record?.bridge_decoded || 0;
-        const shim = record?.shim_rewrites || 0;
-        return (
-          <span className="block text-center text-xs">
-            <span className="font-mono">{val || '—'}</span>
-            {(bridge > 0 || shim > 0) && (
-              <span className="block text-muted">
-                {bridge > 0 ? `桥接 ${bridge}` : ''}
-                {bridge > 0 && shim > 0 ? ' · ' : ''}
-                {shim > 0 ? `垫片 ${shim}` : ''}
-              </span>
-            )}
-          </span>
-        );
-      },
+      render: (val) => <span className="block text-center font-mono text-xs">{val || '—'}</span>,
     },
     {
       title: '输入 Tokens',
