@@ -92,10 +92,13 @@ export default function ConnectionFields({ state, editing = false }) {
           onChange={(event) => patch({ auto_sync: event.target.checked })} />
         <span>自动同步模型<span className="block text-xs text-muted">定时新增发现的全部模型，包含本次未选择和以后发现的模型。手动发现模式不启用。</span></span>
       </label>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" className="mt-0.5" checked={draft.thinking_compat} onChange={(event) => patch({ thinking_compat: event.target.checked })} />
-        <span>thinking 兼容垫片<span className="block text-xs text-muted">用于严格思考模型：assistant 历史缺少思考内容时注入占位，避免上游拒绝多轮请求。</span></span>
-      </label>
+      {editing && <details className="text-sm">
+        <summary className="cursor-pointer">高级设置</summary>
+        <label className="mt-3 flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={draft.thinking_compat} onChange={(event) => patch({ thinking_compat: event.target.checked })} />
+          <span>思考内容兼容<span className="block text-xs text-muted">为缺少历史思考内容的工具调用补齐兼容字段，帮助部分模型继续多轮对话。新渠道默认开启；若中转服务不接受此字段，可关闭。</span></span>
+        </label>
+      </details>}
     </>
   );
 }
