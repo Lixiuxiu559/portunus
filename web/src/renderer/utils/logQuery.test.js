@@ -19,8 +19,9 @@ test('buildLogParams：时间值带时区偏移（RFC3339），Go time.Parse 可
   const p = buildLogParams({ model_name: '', success: 'all', range: RANGE }, 1, 20);
   assert.match(p.start_time, RFC3339);
   assert.match(p.end_time, RFC3339);
-  // 同一刻换算为 UTC 后 Instant 一致（本地时区语义不丢）
-  assert.equal(new Date(p.start_time).getTime(), new Date('2026-09-10T08:30:00+08:00').getTime());
+  // CalendarDateTime 表示运行环境的本地墙上时间，不能固定假设为东八区。
+  assert.equal(new Date(p.start_time).getTime(), new Date(2026, 8, 10, 8, 30, 0).getTime());
+  assert.equal(new Date(p.end_time).getTime(), new Date(2026, 8, 10, 23, 59, 0).getTime());
 });
 
 test('buildLogParams：其余筛选与分页映射，空值省略', () => {
