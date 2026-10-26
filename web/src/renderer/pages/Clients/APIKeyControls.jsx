@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Modal, TextField, Input, Label, Dropdown } from '@heroui/react';
+import { Button, Modal, TextField, Input, Label, Dropdown, Select, ListBox } from '@heroui/react';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Copy, Eye, EyeOff, MoreHorizontal, Plus, Search, KeyRound, ArrowUpRight, Pencil, RotateCcw, Ban, Trash2, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -52,7 +52,14 @@ export default function APIKeyControls({ apiKeys, busy, onCreate, onRename, onRe
     </div>
     <div className="key-manager-filters">
       <label className="key-search"><Search className="size-4" /><input aria-label="搜索 API Key 名称" placeholder="搜索名称…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-      <select aria-label="API Key 状态" className="key-status-filter" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">有效密钥</option><option value="all">全部状态</option><option value="revoked">已禁用</option></select>
+      <Select aria-label="API Key 状态" className="key-status-filter" selectedKey={status} onSelectionChange={(key) => { if (key !== null) setStatus(String(key)); }}>
+        <Select.Trigger aria-label="API Key 状态" aria-labelledby={null} className="key-status-trigger"><Select.Value /><Select.Indicator /></Select.Trigger>
+        <Select.Popover><ListBox aria-label="API Key 状态">
+          <ListBox.Item id="active" textValue="有效密钥">有效密钥<ListBox.ItemIndicator /></ListBox.Item>
+          <ListBox.Item id="all" textValue="全部状态">全部状态<ListBox.ItemIndicator /></ListBox.Item>
+          <ListBox.Item id="revoked" textValue="已禁用">已禁用<ListBox.ItemIndicator /></ListBox.Item>
+        </ListBox></Select.Popover>
+      </Select>
       <span className="key-filter-note">{activeCount} 把有效密钥</span>
     </div>
     <div className="key-table-scroll">
