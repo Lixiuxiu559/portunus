@@ -65,5 +65,8 @@ jobs:
       - name: Web tests
         run: pnpm test
 
+      - name: Web typecheck
+        run: pnpm run typecheck
+
       - name: Renderer build
         run: pnpm run build:renderer

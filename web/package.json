@@ -69,6 +69,7 @@
     "build:win": "node scripts/build-go.mjs windows amd64 && pnpm run build:renderer && electron-builder --win nsis zip --x64",
     "start": "electron .",
     "test": "node --test \"src/**/*.test.js\"",
+    "typecheck": "tsc --noEmit",
     "test:e2e": "node scripts/startup-race-check.mjs",
     "build:dev": "node scripts/build-dev.mjs",
     "preview:dev": "node scripts/preview-dev.mjs"

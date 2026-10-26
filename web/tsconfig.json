@@ -5,6 +5,8 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
@@ -17,8 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["./src/renderer/*"]
-    },
-    "baseUrl": "."
+    }
   },
   "include": ["src"]
 }

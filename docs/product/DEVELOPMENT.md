@@ -50,7 +50,7 @@ macOS 预览路径：`web/dist-dev/mac-arm64/Portunus Dev.app`（Intel 为 `mac/
 
 - 分支 push、PR 和手动触发 CI 时，在 Ubuntu 上执行两个独立任务：`Go checks`、`Web checks`。PR 更新会取消同组旧检查。
 - Go 版本取自 `go.mod`；执行 `go test ./... -count=1`、`go vet ./...`、`go build ./...`。
-- 前端使用 Node 24、pnpm 10 与依赖缓存；在 `web/` 执行 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run build:renderer`。仅构建 renderer，跳过 Electron 运行时下载，不启动桌面应用。
+- 前端使用 Node 24、pnpm 10 与依赖缓存；在 `web/` 执行 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run typecheck`、`pnpm run build:renderer`。类型检查覆盖 TS/TSX 与 JS 模块互操作，业务 JSX 尚未开启 `checkJs`。仅构建 renderer，跳过 Electron 运行时下载，不启动桌面应用。
 - `v*` 标签及手动 Release 均先复用上述 CI，全部通过才进入三平台安装包构建。标签创建草稿 Release；手动 Release 只构建产物。草稿仍需人工确认发布。
 - CI 不加载用户配置、正式/Dev 数据或上游密钥，不执行真实生成调用。桌面启动检查 `pnpm test:e2e`、跨设备 LAN 和真实上游验证单独进行，不能以 CI 通过代替。
 
