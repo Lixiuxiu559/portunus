@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions, strategyLabels } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Button, Typography, Chip, Card, ScrollShadow, TextField, Input, toast } from '@heroui/react';
-import { Plus, Trash2, Pencil, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
+import { Button, Typography, Chip, Card, ScrollShadow, toast } from '@heroui/react';
+import { Plus, Trash2, Pencil, X, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
 import { listGroups, updateGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -17,6 +17,7 @@ import AddGroupItemModal from './AddGroupItemModal';
 import PageSkeleton from '../../components/PageSkeleton';
 import { getCachedResponse } from '../../api/responseCache';
 import useDelayedFlag from '../../hooks/useDelayedFlag';
+import GroupSearch from './GroupSearch';
 import './groups.css';
 
 function MemberRow({ provided, dragging, name, channelName, active, manual, sortable, index, onActivate, onRemove }) {
@@ -60,7 +61,7 @@ export default function Groups() {
   const [loadError, setLoadError] = useState(false);
   // 名称查询：输入框是草稿，点查询或回车后生效。
   // 分组列表本身一次返回全部，过滤在本地完成；查询同时重新拉取服务端数据，不再单设刷新按钮。
-  const [draftName, setDraftName] = useState('');
+  const [searchReset, setSearchReset] = useState(0);
   const [queryName, setQueryName] = useState('');
 
   const fetchAll = async (isRefresh = false) => {
@@ -89,11 +90,11 @@ export default function Groups() {
   const visibleGroups = queryName
     ? groups.filter((g) => g.name.toLocaleLowerCase().includes(queryName.toLocaleLowerCase()))
     : groups;
-  const handleSearch = () => {
-    setQueryName(draftName.trim());
+  const handleSearch = (name) => {
+    setQueryName(name);
     fetchAll(true);
   };
-  const clearSearch = () => { setDraftName(''); setQueryName(''); };
+  const clearSearch = () => { setSearchReset((value) => value + 1); setQueryName(''); };
 
   const handleSetActive = async (groupId, itemId) => {
     try {
@@ -146,22 +147,8 @@ export default function Groups() {
   return (
     <div data-page-ready={!loading} className="groups-page flex flex-col flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
-        <TextField
-          size="sm"
-          aria-label="按分组名称查询"
-          value={draftName}
-          onChange={setDraftName}
-          placeholder="按名称查询"
-          className="w-56"
-          onKeyDown={(event) => { if (event.key === 'Enter') handleSearch(); }}
-        >
-          <Input />
-        </TextField>
-        {draftName && <IconButton size="sm" label="清除名称查询" onClick={clearSearch}><X className="size-3.5" /></IconButton>}
-        <Button variant="secondary" size="sm" onPress={handleSearch} isDisabled={refreshing || loading} isPending={loading || showRefreshing}>
-          <Search className="size-4" />
-          查询
-        </Button>
+        <GroupSearch key={searchReset} onSearch={handleSearch} onClear={() => setQueryName('')}
+          disabled={refreshing || loading} pending={loading || showRefreshing} />
         <div className="ml-auto flex items-center gap-2">
           <Button variant="primary" size="sm" isDisabled={loading || !modelCount} onPress={() => setShowCreate(true)}>
             <Plus className="size-4" />

@@ -1,0 +1,32 @@
+[
+  {
+    "version": "before",
+    "initial": {
+      "readyMs": 114.19999998807907,
+      "selected": 0,
+      "checkboxes": 5000
+    },
+    "selected": {
+      "readyMs": 5864.0999999940395,
+      "selected": 5000,
+      "checkboxes": 5000,
+      "measuredAt": 6363
+    },
+    "selectWallMs": 5274.5
+  },
+  {
+    "version": "after",
+    "initial": {
+      "readyMs": 33.5,
+      "selected": 0,
+      "checkboxes": 50
+    },
+    "selected": {
+      "readyMs": 194.40000000596046,
+      "selected": 5000,
+      "checkboxes": 50,
+      "measuredAt": 306.19999998807907
+    },
+    "selectWallMs": 112.5
+  }
+]

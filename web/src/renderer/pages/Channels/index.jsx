@@ -1,22 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, useEffect, useMemo, useState } from 'react';
 import { Button, Typography, Card, Chip, toast } from '@heroui/react';
 import { Plus, Trash2, RefreshCw, Pencil, RotateCw, Search, X } from 'lucide-react';
-import CreateChannelModal from './CreateChannelModal';
-import DeleteChannelModal from './DeleteChannelModal';
-import EditChannelEditor from './EditChannelEditor';
 import ProviderIcon from '../../components/ProviderIcon';
 import IconButton from '../../components/IconButton';
 import ExpandEditor from '../../components/ExpandEditor';
+import AsyncContent from '../../components/AsyncContent';
 import { captureCardRect } from '../../utils/expandRect';
 import { listChannels, syncChannel } from '../../api';
 import QuotaSummary from './quota/QuotaSummary';
-import QuotaPanel from './quota/QuotaPanel';
 import useQuotaSummaries from './quota/useQuotaSummaries';
 import { filterChannels } from './channelSearch.js';
 import PageSkeleton from '../../components/PageSkeleton';
 import { getCachedResponse } from '../../api/responseCache';
 import useDelayedFlag from '../../hooks/useDelayedFlag';
 import './channels.css';
+
+const CreateChannelModal = lazy(() => import('./CreateChannelModal'));
+const DeleteChannelModal = lazy(() => import('./DeleteChannelModal'));
+const EditChannelEditor = lazy(() => import('./EditChannelEditor'));
+const QuotaPanel = lazy(() => import('./quota/QuotaPanel'));
 
 export default function Channels() {
   const [isOpen, setIsOpen] = useState(false);
@@ -167,20 +169,21 @@ export default function Channels() {
         </div>
       )}
 
+      <AsyncContent fallback={<p role="status" className="text-sm text-muted">正在加载编辑面板…</p>}>
       {quotaTarget && <QuotaPanel channel={quotaTarget} onClose={() => setQuotaTarget(null)} onChanged={quota.invalidate} />}
-      <CreateChannelModal
+      {isOpen && <CreateChannelModal
         isOpen={isOpen}
         onOpenChange={setIsOpen}
         onCreated={() => fetchChannels(true)}
-      />
-      <DeleteChannelModal
+      />}
+      {deleteTarget && <DeleteChannelModal
         channel={deleteTarget}
         isOpen={deleteTarget !== null}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
         onDeleted={() => fetchChannels(true)}
-      />
+      />}
       {editTarget && (
         <ExpandEditor
           triggerRect={editRect}
@@ -210,6 +213,7 @@ export default function Channels() {
           )}
         </ExpandEditor>
       )}
+      </AsyncContent>
     </div>
   );
 }

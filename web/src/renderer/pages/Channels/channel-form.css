@@ -62,3 +62,5 @@
   min-height: 0;
   overflow: hidden;
 }
+.channel-model-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.channel-model-pagination > span { margin-right: auto; }

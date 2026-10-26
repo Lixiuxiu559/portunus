@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Button, Modal, Tabs, Typography } from '@heroui/react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import PageSkeleton from './PageSkeleton';
+import AsyncContent from './AsyncContent';
 import logo from '../assets/logo.png';
 import { useUpdater } from '../hooks/useUpdater';
 import useLiquidNav from '../hooks/useLiquidNav';
@@ -68,7 +70,11 @@ export default function Layout() {
           <Button variant="primary" size="sm" onPress={install} isDisabled={installing}>{installing ? '正在重启…' : '重启以更新'}</Button>
         </div>}
         <main id="workspace-content" tabIndex={-1} className="app-main">
-          <div key={location.pathname} className="page-in app-page"><Outlet /></div>
+          <div key={location.pathname} className="page-in app-page">
+            <AsyncContent fallback={<PageSkeleton variant={current.id === 'logs' ? 'table' : current.id === 'clients' ? 'connection' : current.id} />}>
+              <Outlet />
+            </AsyncContent>
+          </div>
         </main>
       </section>
 

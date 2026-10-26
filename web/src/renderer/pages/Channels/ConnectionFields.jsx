@@ -25,7 +25,7 @@ export default function ConnectionFields({ state, editing = false }) {
     <section className="channel-form-block" aria-label="渠道信息">
       <header className="channel-block-heading"><h3>渠道信息</h3></header>
       <div className="channel-block-content channel-identity-row">
-        <ChannelIconPicker compact draft={draft} onChange={(icon) => patch({ icon })} onProcessingChange={state.setIconPending} />
+        <ChannelIconPicker draft={draft} onChange={(icon) => patch({ icon })} onProcessingChange={state.setIconPending} />
         <TextField isRequired name="name" value={draft.name} onChange={(name) => patch({ name })} autoFocus autoComplete="off" validate={(value) => !value?.trim() ? '请填写渠道名称' : null}>
           <Label>渠道名称</Label><Input placeholder="例如：DeepSeek 工作账号" /><FieldError />
         </TextField>

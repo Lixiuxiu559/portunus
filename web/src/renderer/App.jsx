@@ -1,14 +1,26 @@
+import { lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Background from './components/Background';
 import Layout from './components/Layout';
-import Channels from './pages/Channels';
-import Models from './pages/Models';
-import Groups from './pages/Groups';
-import Logs from './pages/Logs';
-import Clients from './pages/Clients';
-import Settings from './pages/Settings';
+const pageLoaders = {
+  channels: () => import('./pages/Channels'),
+  models: () => import('./pages/Models'),
+  groups: () => import('./pages/Groups'),
+  logs: () => import('./pages/Logs'),
+  clients: () => import('./pages/Clients'),
+  settings: () => import('./pages/Settings'),
+};
+const pages = Object.fromEntries(Object.entries(pageLoaders).map(([id, load]) => [id, lazy(load)]));
+
+// 先加载当前地址对应的一页，避免冷启动先显示 Suspense、再等待第二次提交。
+export async function preloadInitialPage(hash) {
+  const id = hash.split('?')[0].replace(/^#\//, '') || 'channels';
+  const page = Object.hasOwn(pageLoaders, id) ? id : 'channels';
+  pages[page] = (await pageLoaders[page]()).default;
+}
 
 export default function App() {
+  const { channels: Channels, models: Models, groups: Groups, logs: Logs, clients: Clients, settings: Settings } = pages;
   return (
     <HashRouter>
       <Background />

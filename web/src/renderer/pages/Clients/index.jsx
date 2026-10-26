@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, toast } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
@@ -12,13 +12,15 @@ import ConfirmModal from '../../components/ConfirmModal';
 import ConnectionCard from './ConnectionCard';
 import APIKeyControls from './APIKeyControls';
 import PageSkeleton from '../../components/PageSkeleton';
+import AsyncContent from '../../components/AsyncContent';
 import TreeNav from './TreeNav';
 import ExamplesPane from './ExamplesPane';
-import ClaudeConfigPanel from './ClaudeConfigPanel';
 import { normalizeSearch, parseSelection, selectionSearch } from './sectionState';
 import { getCachedResponse } from '../../api/responseCache';
 import useDelayedFlag from '../../hooks/useDelayedFlag';
 import '../service-access.css';
+
+const ClaudeConfigPanel = lazy(() => import('./ClaudeConfigPanel'));
 
 // 工作区顶部对齐视口顶部时留一点余量，和滚动目标共用同一个值
 const WORKSPACE_TOP_GAP = 8;
@@ -282,7 +284,9 @@ export default function Clients() {
                   logsPath={logsPath}
                 />
               ) : (
-                <ClaudeConfigPanel groups={groups} apiKey={apiKey} serverUrl={serverUrl} onDirtyChange={onDirtyChange} />
+                <AsyncContent fallback={<PageSkeleton variant="content" />}>
+                  <ClaudeConfigPanel groups={groups} apiKey={apiKey} serverUrl={serverUrl} onDirtyChange={onDirtyChange} />
+                </AsyncContent>
               )}
             </div>
           </section>

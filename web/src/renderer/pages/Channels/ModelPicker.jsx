@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Chip, Input, ScrollShadow } from '@heroui/react';
 import { X } from 'lucide-react';
 import FieldHelp from './FieldHelp';
+import { modelPickerPage } from './modelPickerPage';
 
-export default function ModelPicker({ state, existing = [], onDelete, existingError = '', onReload }) {
+const EMPTY_MODELS = [];
+
+export default function ModelPicker({ state, existing = EMPTY_MODELS, onDelete, existingError = '', onReload }) {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [manual, setManual] = useState('');
   const { candidates, selected, setSelected, pending, results, draft } = state;
-  const existingNames = new Set(existing.map((model) => model.name));
-  const imports = candidates.filter((name) => !existingNames.has(name));
-  const selectedCount = selected.filter((name) => !existingNames.has(name)).length;
+  const existingNames = useMemo(() => new Set(existing.map((model) => model.name)), [existing]);
+  const imports = useMemo(() => candidates.filter((name) => !existingNames.has(name)), [candidates, existingNames]);
+  const selectedNames = useMemo(() => new Set(selected), [selected]);
+  const selectedCount = useMemo(() => selected.filter((name) => !existingNames.has(name)).length, [selected, existingNames]);
+  const visible = useMemo(() => modelPickerPage(imports, search, page), [imports, search, page]);
   const add = () => { if (manual.trim()) { state.addModel(manual); setManual(''); } };
   return <section className="channel-form-block" aria-label="模型选择">
     <header className="channel-block-heading"><h3>模型</h3><span className="channel-block-count">待导入 {selectedCount}</span><FieldHelp title="模型导入">
@@ -30,8 +36,14 @@ export default function ModelPicker({ state, existing = [], onDelete, existingEr
       {results.preview?.models && <p role="status" className="channel-form-result">已获取 {results.preview.models.length} 个模型</p>}
       <div className="channel-inline-actions"><Input aria-label="手动添加模型名称" placeholder="输入上游模型名称" value={manual} onChange={(event) => setManual(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /><Button type="button" size="sm" variant="secondary" isDisabled={!manual.trim()} onPress={add}>添加</Button></div>
       {imports.length > 0 ? <>
-        <div className="channel-inline-actions"><Input aria-label="搜索待导入模型" placeholder="搜索模型" value={search} onChange={(event) => setSearch(event.target.value)} /><Button type="button" size="sm" variant="tertiary" onPress={() => setSelected(imports)}>全选</Button><Button type="button" size="sm" variant="tertiary" onPress={() => setSelected([])}>清空</Button></div>
-        <ScrollShadow className="flex flex-col gap-2 max-h-[220px] p-1" hideScrollBar>{imports.filter((name) => name.toLowerCase().includes(search.toLowerCase())).map((name) => <label key={name} className="flex items-center gap-2 text-sm min-w-0"><input type="checkbox" checked={selected.includes(name)} onChange={(event) => setSelected((old) => event.target.checked ? [...old, name] : old.filter((item) => item !== name))} /><code className="truncate" title={name}>{name}</code></label>)}</ScrollShadow>
+        <div className="channel-inline-actions"><Input aria-label="搜索待导入模型" placeholder="搜索模型" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /><Button type="button" size="sm" variant="tertiary" onPress={() => setSelected(imports)}>全选</Button><Button type="button" size="sm" variant="tertiary" onPress={() => setSelected([])}>清空</Button></div>
+        <ScrollShadow className="flex flex-col gap-2 max-h-[220px] p-1" hideScrollBar>{visible.names.map((name) => <label key={name} className="flex items-center gap-2 text-sm min-w-0"><input type="checkbox" checked={selectedNames.has(name)} onChange={(event) => setSelected((old) => event.target.checked ? [...old, name] : old.filter((item) => item !== name))} /><code className="truncate" title={name}>{name}</code></label>)}</ScrollShadow>
+        {!visible.total && <p className="channel-model-empty">没有匹配的模型</p>}
+        {visible.totalPages > 1 && <div className="channel-model-pagination" role="group" aria-label="待导入模型分页">
+          <span>共 {visible.total} 个，第 {visible.page}/{visible.totalPages} 页</span>
+          <Button type="button" size="sm" variant="tertiary" isDisabled={visible.page <= 1} onPress={() => setPage(visible.page - 1)}>上一页模型</Button>
+          <Button type="button" size="sm" variant="tertiary" isDisabled={visible.page >= visible.totalPages} onPress={() => setPage(visible.page + 1)}>下一页模型</Button>
+        </div>}
       </> : <div className="channel-model-empty">暂无待导入模型</div>}
     </div>
   </section>;

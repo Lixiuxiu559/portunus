@@ -1,0 +1,42 @@
+[
+  {
+    "readyMs": 259.80000001192093,
+    "domInteractive": 27.700000017881393,
+    "scripts": 605340,
+    "longTaskCount": 1,
+    "longTaskMs": 50,
+    "maxLongTaskMs": 50
+  },
+  {
+    "readyMs": 145,
+    "domInteractive": 28.69999998807907,
+    "scripts": 605340,
+    "longTaskCount": 0,
+    "longTaskMs": 0,
+    "maxLongTaskMs": 0
+  },
+  {
+    "readyMs": 138.7999999821186,
+    "domInteractive": 25.599999994039536,
+    "scripts": 605340,
+    "longTaskCount": 0,
+    "longTaskMs": 0,
+    "maxLongTaskMs": 0
+  },
+  {
+    "readyMs": 141.40000000596046,
+    "domInteractive": 30.80000001192093,
+    "scripts": 605340,
+    "longTaskCount": 0,
+    "longTaskMs": 0,
+    "maxLongTaskMs": 0
+  },
+  {
+    "readyMs": 151,
+    "domInteractive": 23.400000005960464,
+    "scripts": 605340,
+    "longTaskCount": 0,
+    "longTaskMs": 0,
+    "maxLongTaskMs": 0
+  }
+]
