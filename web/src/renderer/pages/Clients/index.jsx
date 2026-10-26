@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { Button, toast } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
 import { listGroups } from '../../api/group';
-import { getAPIKey, regenerateAPIKey } from '../../api/apikey';
+import { listAPIKeys, createAPIKey, renameAPIKey, regenerateNamedAPIKey, setAPIKeyStatus, deleteAPIKey } from '../../api/apikey';
+import { selectAPIKey } from '../../utils/apiKeys';
 import { strategyLabels } from '../../utils/groupService';
 import { buildConnectionGuide } from '../../utils/connectionGuide';
 import { selectServiceGroup } from '../../utils/serviceAccess';
 import ConfirmModal from '../../components/ConfirmModal';
 import ConnectionCard from './ConnectionCard';
+import APIKeyControls from './APIKeyControls';
 import PageSkeleton from '../../components/PageSkeleton';
 import TreeNav from './TreeNav';
 import ExamplesPane from './ExamplesPane';
@@ -25,18 +27,22 @@ export default function Clients() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = useMemo(() => parseSelection(searchParams), [searchParams]);
   const requestedGroup = searchParams.get('group');
+  const managementView = searchParams.get('view') === 'keys' || (!searchParams.has('view') && !['section', 'tool', 'group'].some((key) => searchParams.has(key)));
 
   const [networkMode, setNetworkMode] = useState(null);
   const [savingMode, setSavingMode] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [cached] = useState(() => {
     const groups = getCachedResponse('/groups');
-    const key = getCachedResponse('/apikey');
-    return groups !== undefined && key !== undefined ? { groups, key } : null;
+    const keys = getCachedResponse('/apikeys');
+    return groups !== undefined && keys !== undefined ? { groups, keys } : null;
   });
   const [groups, setGroups] = useState(cached?.groups ?? []);
   const [selectedGroup, setSelectedGroup] = useState(() => selectServiceGroup(cached?.groups ?? [], requestedGroup, ''));
-  const [apiKey, setApiKey] = useState(cached?.key?.key ?? '');
+  const [apiKeys, setApiKeys] = useState(cached?.keys ?? []);
+  const [selectedKeyID, setSelectedKeyID] = useState(() => selectAPIKey(cached?.keys ?? [])?.id ?? '');
+  const selectedKey = selectAPIKey(apiKeys, selectedKeyID);
+  const apiKey = selectedKey?.key ?? '';
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(!cached);
   // 已有数据时的刷新不进入加载态：保留当前配置展示，只在按钮上给反馈
@@ -58,7 +64,7 @@ export default function Clients() {
     // 首次加载或没有可展示的数据时才遮蔽内容；刷新失败保留旧配置
     const blocking = !cached && (!isRefresh || (!groups.length && !apiKey));
     if (blocking) setLoading(true); else setRefreshing(true);
-    const [groupResult, keyResult] = await Promise.allSettled([listGroups(), getAPIKey()]);
+    const [groupResult, keyResult] = await Promise.allSettled([listGroups(), listAPIKeys()]);
     const failed = groupResult.status === 'rejected' || keyResult.status === 'rejected';
     // 刷新失败保留旧配置，只有首次加载失败才进入错误态
     if (!failed || blocking) setLoadError(failed);
@@ -70,8 +76,12 @@ export default function Clients() {
       setGroups([]);
       setSelectedGroup('');
     }
-    if (keyResult.status === 'fulfilled') setApiKey(keyResult.value?.key || '');
-    else if (blocking) setApiKey('');
+    if (keyResult.status === 'fulfilled') {
+      const keys = Array.isArray(keyResult.value) ? keyResult.value : [];
+      setApiKeys(keys);
+      setShowKey(false);
+      setSelectedKeyID((old) => selectAPIKey(keys, old)?.id ?? '');
+    } else if (blocking) setApiKeys([]);
     setLoading(false);
     setRefreshing(false);
     // 刷新失败保留旧值，不动画；成功时重放一次逐字显示
@@ -89,6 +99,7 @@ export default function Clients() {
   // URL 规范化：非法 section/tool 回退，默认值不写进地址栏
   useEffect(() => {
     const normalized = normalizeSearch(searchParams);
+    if (!managementView && !normalized.has('view')) normalized.set('view', 'guides');
     if (normalized.toString() !== searchParams.toString()) {
       setSearchParams(normalized, { replace: true });
     }
@@ -136,15 +147,30 @@ export default function Clients() {
     finally { setSavingMode(false); }
   };
 
-  const generateKey = async () => {
+  const updateKey = async (operation, message) => {
     setRegenerating(true);
     try {
-      const key = await regenerateAPIKey();
-      setApiKey(key?.key || '');
-      toast.success('令牌已生成，请更新所有调用方的配置');
-    } catch { /* 请求拦截器显示错误 */ }
-    finally { setRegenerating(false); }
+      const key = await operation();
+      setApiKeys((keys) => keys.some((item) => item.id === key.id)
+        ? keys.map((item) => item.id === key.id ? key : item)
+        : [...keys, key]);
+      setSelectedKeyID(key.id);
+      setShowKey(false);
+      toast.success(message);
+    } finally { setRegenerating(false); }
   };
+
+  const removeKey = async (id) => {
+    setRegenerating(true);
+    try {
+      await deleteAPIKey(id);
+      setApiKeys((keys) => keys.filter((item) => item.id !== id));
+      setShowKey(false);
+      toast.success('API Key 已删除，历史调用记录和用量保留');
+    } finally { setRegenerating(false); }
+  };
+
+  const chooseKey = (id) => { setSelectedKeyID(id); setShowKey(false); };
 
   const chooseGroup = (name) => {
     const next = new URLSearchParams(searchParams);
@@ -162,10 +188,21 @@ export default function Clients() {
     setSearchParams(selectionSearch(searchParams, next));
   };
 
+  const changeView = (view) => {
+    if (configDirty && view === 'keys') { setPendingEntry({ view }); return; }
+    const next = new URLSearchParams(searchParams);
+    next.set('view', view);
+    setSearchParams(next, { replace: true });
+  };
+
   const confirmLeaveConfig = () => {
     const next = pendingEntry;
     setPendingEntry(null);
-    if (next) setSearchParams(selectionSearch(searchParams, next));
+    if (next?.view) {
+      const params = new URLSearchParams(searchParams);
+      params.set('view', next.view);
+      setSearchParams(params, { replace: true });
+    } else if (next) setSearchParams(selectionSearch(searchParams, next));
   };
 
   const guide = buildConnectionGuide({ serverUrl, apiKey, model: selectedGroup });
@@ -174,19 +211,37 @@ export default function Clients() {
   const selected = groups.find((g) => g.name === selectedGroup);
   const selectedDescription = selected ? `${strategyLabels[selected.strategy] || selected.strategy} · ${selected.items?.length || 0} 个成员` : '';
   const missingRequestedGroup = requestedGroup !== null && !groups.some((g) => g.name === requestedGroup) ? requestedGroup : null;
-  const logsPath = selectedGroup ? `/logs?group=${encodeURIComponent(selectedGroup)}` : '/logs';
+  const logSearch = new URLSearchParams();
+  if (selectedGroup) logSearch.set('group', selectedGroup);
+  if (selectedKey) logSearch.set('api_key_id', selectedKey.id);
+  const logsPath = `/logs${logSearch.size ? `?${logSearch}` : ''}`;
   const onDirtyChange = useCallback((dirty) => setConfigDirty(dirty), []);
 
   return (
     <div data-page-ready={!loading} className="service-page flex flex-col flex-1 min-h-0 min-w-0">
       <h1 className="sr-only">服务接入</h1>
       <div className="service-toolbar">
-        <p className="service-toolbar-hint">选择模型分组，为你的应用提供一个稳定入口。</p>
-        <Button size="md" variant="secondary" onPress={() => load(true)} isDisabled={loading || refreshing} isPending={loading || showRefreshing} aria-label="刷新连接信息"><RefreshCw className="size-4" />刷新连接</Button>
+        <div className="service-view-tabs" role="group" aria-label="接入管理视图">
+          <button type="button" aria-pressed={managementView} onClick={() => changeView('keys')}>API Key</button>
+          <button type="button" aria-pressed={!managementView} onClick={() => changeView('guides')}>接入指南</button>
+        </div>
+        <Button size="md" variant="secondary" onPress={() => load(true)} isDisabled={loading || refreshing || regenerating} isPending={loading || showRefreshing} aria-label="刷新连接信息"><RefreshCw className="size-4" />{managementView ? '刷新列表' : '刷新连接'}</Button>
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
         <div className="service-access-grid">
+          {managementView ? (
+            loading ? <PageSkeleton variant="content" /> : <>
+              {loadError && <p role="alert" className="text-sm text-danger">连接信息加载失败，请刷新重试。</p>}
+              <APIKeyControls apiKeys={apiKeys} busy={regenerating || refreshing || loadError}
+                onCreate={(name) => updateKey(() => createAPIKey(name), 'API Key 已创建')}
+                onRename={(id, name) => updateKey(() => renameAPIKey(id, name), '名称已保存')}
+                onReset={(id) => updateKey(() => regenerateNamedAPIKey(id), '密钥已重置，请更新对应工具配置')}
+                onStatus={(id, revoked) => updateKey(() => setAPIKeyStatus(id, revoked), revoked ? 'API Key 已禁用，可随时启用' : 'API Key 已启用')}
+                onDelete={removeKey}
+                onConnect={(id) => { chooseKey(id); changeView('guides'); }} />
+            </>
+          ) : <>
           <ConnectionCard
             guide={guide}
             apiKey={apiKey}
@@ -196,8 +251,10 @@ export default function Clients() {
             refreshing={showRefreshing}
             revealKey={revealKey}
             loadError={loadError}
-            regenerating={regenerating}
-            onResetToken={generateKey}
+            apiKeys={apiKeys}
+            selectedKey={selectedKey}
+            onSelectKey={chooseKey}
+            keyBusy={regenerating || refreshing}
             networkMode={networkMode}
             savingMode={savingMode}
             onSaveNetworkMode={saveNetworkMode}
@@ -229,6 +286,7 @@ export default function Clients() {
               )}
             </div>
           </section>
+          </>}
         </div>
       </div>
 

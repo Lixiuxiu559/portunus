@@ -7,15 +7,15 @@
 .logs-stat-card .card__content { flex-direction: row; align-items: baseline; gap: 8px; }
 .logs-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-bottom: 16px; flex-shrink: 0; }
 .logs-filter-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-/* 五个筛选控件等宽分配，查询与刷新靠右；宽度不足时整行自然换行。 */
+/* 筛选控件等宽分配，查询与刷新靠右；宽度不足时整行自然换行。 */
+.logs-filter-key,
 .logs-filter-channel,
 .logs-filter-status,
-.logs-filter-protocol,
 .logs-filter-field { flex: 1 1 150px; min-width: 128px; max-width: 220px; }
 .logs-table { flex: 1 0 180px; min-height: 180px; border-radius: 16px; font-variant-numeric: tabular-nums; container-type: inline-size; container-name: logs-table; }
-.logs-table [role="grid"] { table-layout: fixed; min-width: 1120px; }
+.logs-table [role="grid"] { table-layout: fixed; min-width: 1166px; }
 /* 只有表格真正横向溢出时，才把行操作固定在右侧；颜色沿用表格玻璃与表头底色，避免出现色带。 */
-@container logs-table (max-width: 1119px) {
+@container logs-table (max-width: 1165px) {
   .logs-table th:last-child, .logs-table td:last-child { position: sticky; right: 0; background: color-mix(in oklch, var(--surface) 70%, transparent); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)); box-shadow: -1px 0 0 var(--separator); }
   .logs-table th:last-child { background: var(--surface-secondary); z-index: 12; }
 }

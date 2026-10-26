@@ -1,6 +1,6 @@
 // 仅为页面首帧提供快照；所有请求仍然访问后端，失败不会被缓存掩盖。
 // 数据只保存在当前渲染进程内，刷新/退出即释放，不写入浏览器存储。
-const cacheable = new Set(['/channels', '/models', '/groups', '/logs', '/logs/stat', '/settings', '/apikey', '/quota/summaries']);
+const cacheable = new Set(['/channels', '/models', '/groups', '/logs', '/logs/stat', '/settings', '/apikey', '/apikeys', '/quota/summaries']);
 
 export function createResponseCache({ maxEntries = 64, maxAge = 300_000, now = Date.now } = {}) {
   const entries = new Map();

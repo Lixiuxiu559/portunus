@@ -123,3 +123,61 @@
 }
 
 .service-page { min-width: 0; }
+
+
+/* 令牌管理与接入指南分开，列表优先展示身份与状态。 */
+.service-view-tabs { display: flex; gap: 24px; align-self: stretch; }
+.service-view-tabs button { position: relative; padding: 10px 2px 13px; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; }
+.service-view-tabs button[aria-pressed="true"] { color: var(--foreground); }
+.service-view-tabs button[aria-pressed="true"]::after { content: ''; position: absolute; height: 2px; background: var(--accent); bottom: 0; left: 0; right: 0; border-radius: 2px; }
+.service-view-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.key-manager { background: color-mix(in oklch, var(--surface) 88%, transparent); border: 1px solid var(--separator); border-radius: 16px; overflow: hidden; min-width: 0; }
+.key-manager-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 26px 24px 22px; }
+.key-manager-heading h2 { display: flex; gap: 10px; align-items: center; font-size: 19px; line-height: 28px; font-weight: 600; color: var(--foreground); }
+.key-manager-heading p { color: var(--muted); font-size: 12px; line-height: 20px; margin-top: 5px; }
+.key-count { font-size: 11px; padding: 0 8px; line-height: 22px; border: 1px solid var(--separator); border-radius: 6px; font-weight: 500; color: var(--muted); }
+.key-manager-filters { display: flex; gap: 10px; align-items: center; padding: 0 24px 20px; }
+.key-search { display: flex; align-items: center; gap: 8px; width: 280px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--separator); background: var(--surface); border-radius: 8px; color: var(--muted); }
+.key-search input { min-width: 0; width: 100%; outline: none; font-size: 13px; color: var(--foreground); background: transparent; }
+.key-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.key-status-filter { border: 1px solid var(--separator); border-radius: 8px; padding: 8px 28px 8px 12px; font-size: 12px; color: var(--foreground); background-color: var(--surface); cursor: pointer; }
+.key-filter-note { margin-left: auto; color: var(--muted); font-size: 12px; }
+.key-table-scroll { overflow-x: auto; }
+.key-table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
+.key-table th { background: color-mix(in oklch, var(--surface-secondary) 65%, transparent); color: var(--muted); font-size: 12px; font-weight: 500; padding: 12px 20px; border-block: 1px solid var(--separator); }
+.key-table td { padding: 20px; border-bottom: 1px solid var(--separator); font-size: 13px; }
+.key-table th:first-child, .key-table td:first-child { padding-left: 24px; }
+.key-table tbody tr:last-child td { border-bottom: 0; }
+.key-table tbody tr:hover { background: color-mix(in oklch, var(--surface-secondary) 35%, transparent); }
+.key-name-cell { display: flex; align-items: center; gap: 12px; min-width: 160px; }
+.key-name-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--separator); border-radius: 9px; color: var(--muted); background: var(--surface); }
+.key-name-cell strong { display: block; font-weight: 550; color: var(--foreground); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.key-name-cell div > span { font-size: 10px; line-height: 18px; color: var(--muted); font-family: var(--font-mono); }
+.key-status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; font-size: 11px; border-radius: 6px; color: var(--success); background: color-mix(in oklch, var(--success) 8%, transparent); }
+.key-status-badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.key-status-badge.is-revoked { color: var(--muted); background: var(--surface-secondary); }
+.key-secret-cell { display: flex; align-items: center; gap: 3px; }
+.key-secret-cell code { color: var(--muted); font-size: 12px; margin-right: 6px; }
+.key-secret-cell .button { width: 28px; height: 28px; min-width: 28px; background: transparent; color: var(--muted); }
+.key-created { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.key-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.key-actions-heading { text-align: right; }
+.key-usage-link { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); }
+.key-usage-link:hover { color: var(--accent); }
+.key-more-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 30px; color: var(--muted); border-radius: 6px; cursor: pointer; }
+.key-more-button:hover { background: var(--surface-secondary); color: var(--foreground); }
+.key-more-button:focus-visible { outline: 2px solid var(--accent); }
+.key-more-button:disabled { opacity: .5; cursor: default; }
+.key-table-footer { border-top: 1px solid var(--separator); padding: 14px 24px; display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; gap: 16px; }
+.key-table-empty { padding: 70px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--muted); }
+.key-table-empty p { font-size: 14px; color: var(--foreground); }
+.key-table-empty span { font-size: 12px; }
+.service-guide-key-select { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; font-size: 12px; color: var(--muted); }
+.service-guide-key-select select { width: 220px; }
+@media (max-width: 700px) {
+  .key-manager-heading { align-items: flex-start; padding: 20px 16px; flex-wrap: wrap; gap: 14px; }
+  .key-manager-filters { padding: 0 16px 16px; flex-wrap: wrap; }
+  .key-filter-note { display: none; }
+  .key-table-footer { padding-inline: 16px; }
+  .key-table-footer span:last-child { display: none; }
+}

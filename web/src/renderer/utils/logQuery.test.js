@@ -76,3 +76,11 @@ test('渠道与请求 ID 同分组/状态组合，保持特殊字符并复用分
     assert.deepEqual(params, { page: 1, page_size: 20 });
   }
 });
+
+test('API Key 与模型/渠道组合筛选，非法或全部 Key 不发出参数', () => {
+  assert.deepEqual(buildLogParams({ api_key_id: '3', model_name: 'gpt', channel_id: '22', success: 'all' }, 2, 20),
+    { page: 2, page_size: 20, api_key_id: 3, model_name: 'gpt', channel_id: 22 });
+  for (const api_key_id of ['all', '', 0, -1, 'bad', 1.5]) {
+    assert.deepEqual(buildLogParams({ api_key_id, success: 'all' }, 1, 20), { page: 1, page_size: 20 });
+  }
+});

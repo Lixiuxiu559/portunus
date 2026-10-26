@@ -6,11 +6,12 @@
 /** 把筛选状态折叠成 /api/logs 的 query 参数；空筛选不出现在结果里。 */
 export function buildLogParams(filters, page, pageSize) {
   const params = { page, page_size: pageSize };
+  if (Number.isSafeInteger(Number(filters.api_key_id)) && Number(filters.api_key_id) > 0) params.api_key_id = Number(filters.api_key_id);
   if (filters.group_name) params.group_name = filters.group_name;
   if (Number.isSafeInteger(Number(filters.channel_id)) && Number(filters.channel_id) > 0) params.channel_id = Number(filters.channel_id);
   if (filters.request_id?.trim()) params.request_id = filters.request_id.trim();
   if (filters.model_name) params.model_name = filters.model_name;
-  // 客户端入口协议：把 DSH(openai) 与 Claude Code(anthropic) 的流量分开比较缓存命中率
+  // 入口协议筛选与 API Key 调用方身份独立。
   if (filters.client_protocol && filters.client_protocol !== 'all') params.client_protocol = filters.client_protocol;
   if (filters.success !== 'all') params.success = filters.success;
   if (filters.range?.start) params.start_time = toRFC3339(filters.range.start);

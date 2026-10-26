@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import ConfirmModal from '../../components/ConfirmModal';
 import { CopyValue } from './shared';
 import PageSkeleton from '../../components/PageSkeleton';
 
@@ -15,13 +13,14 @@ export default function ConnectionCard({
   refreshing,
   revealKey,
   loadError,
-  regenerating,
-  onResetToken,
+  apiKeys,
+  selectedKey,
+  onSelectKey,
+  keyBusy,
   networkMode,
   savingMode,
   onSaveNetworkMode,
 }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
   if (loading) return <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5"><PageSkeleton variant="connection" /></aside>;
 
   return (
@@ -56,11 +55,15 @@ export default function ConnectionCard({
           </div>
         </div>
 
+        <label className="service-guide-key-select"><span>接入使用的 API Key</span><select className="mm-select" aria-label="选择 API Key" value={selectedKey?.id ?? ''} disabled={keyBusy || loadError} onChange={(event) => onSelectKey(Number(event.target.value))}>
+          {!selectedKey && <option value="">暂无有效 API Key</option>}
+          {apiKeys.filter((key) => !key.revoked && !key.deleted_at).map((key) => <option key={key.id} value={key.id}>{key.name} · #{key.id}</option>)}
+        </select></label>
         <div className="service-config-values">
           <CopyValue label="网关地址" value={guide.baseUrl} revealKey={revealKey} />
           <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} revealKey={revealKey} />
           <CopyValue
-            label="访问令牌"
+            label={selectedKey ? `访问令牌 · ${selectedKey.name}` : '访问令牌'}
             value={apiKey}
             display={loading ? '加载中…' : apiKey ? (showKey ? apiKey : '••••••••••••••••') : '尚未生成'}
             revealKey={revealKey}
@@ -74,21 +77,11 @@ export default function ConnectionCard({
         <div className="service-config-footer">
           <details className="service-disclosure text-xs text-muted">
             <summary>访问与令牌说明</summary>
-            <div className="space-y-2 pt-3 leading-6"><p>网关地址供本机调用。其他设备请使用本机局域网 IP 和端口 {new URL(guide.baseUrl).port || '80'}，不能使用 127.0.0.1 或 0.0.0.0 作为目标地址。</p><p>切换范围会自动重启服务，进行中的请求可能中断。管理操作仅限本机，服务请求始终需要令牌。</p><p>重置令牌后旧令牌立即失效，所有调用方都需更新。上游 API Key 只在上游渠道中保存。</p><p>应用运行期间提供服务，退出后停止。分组名称就是客户端 model，调整组内上游无需修改客户端。</p></div>
+            <div className="space-y-2 pt-3 leading-6"><p>网关地址供本机调用。其他设备请使用本机局域网 IP 和端口 {new URL(guide.baseUrl).port || '80'}，不能使用 127.0.0.1 或 0.0.0.0 作为目标地址。</p><p>切换范围会自动重启服务，进行中的请求可能中断。管理操作仅限本机，服务请求始终需要令牌。</p><p>为不同工具创建独立的命名 API Key，可在调用记录按 Key 筛选用量。重置、禁用或删除只影响使用该 Key 的工具；禁用后可恢复启用。上游 API Key 只在上游渠道中保存。</p><p>应用运行期间提供服务，退出后停止。分组名称就是客户端 model，调整组内上游无需修改客户端。</p></div>
           </details>
-          <Button size="sm" variant="tertiary" isDisabled={loading || loadError} isPending={regenerating} onPress={() => (apiKey ? setConfirmOpen(true) : onResetToken())}>{apiKey ? '重置令牌' : '生成令牌'}</Button>
         </div>
       </aside>
 
-      <ConfirmModal
-        isOpen={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="重新生成访问令牌"
-        description="旧令牌会立即失效，所有已接入的应用与客户端都需更新配置。是否继续？"
-        confirmText="重新生成"
-        pendingText="正在生成…"
-        onConfirm={onResetToken}
-      />
     </>
   );
 }

@@ -4,6 +4,8 @@ import { Typography, Button, Card, TextField, Input, Select, ListBox, Label } fr
 import { Search, RotateCw } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
+import { listHistoricalAPIKeys } from '../api/apikey';
+import { apiKeyLabel, logAPIKeyLabel } from '../utils/apiKeys';
 import { listLogs, getLogStats, listChannels } from '../api';
 import { errKindLabels, logChannelLabel } from '../utils/logDetails';
 import LogDetailModal from './LogDetailModal';
@@ -16,24 +18,15 @@ const successOptions = [
   { id: 'false', label: '失败' },
 ];
 
-// 客户端入口协议（与后端 protocol.Provider 取值一致）。DSH 走 openai、
-// Claude Code 走 anthropic，两者共用同一 APIKey——只有按此筛选才能把它们的
-// 缓存命中率分开比较（存量日志该字段为空，表示未记录）。
-const clientProtocolOptions = [
-  { id: 'all', label: '全部' },
-  { id: 'openai', label: 'OpenAI' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'openai_responses', label: 'Responses' },
-  { id: 'gemini', label: 'Gemini' },
-];
-
 export default function Logs() {
   const [searchParams] = useSearchParams();
   const linkedGroup = searchParams.get('group') || '';
-  const lastLinkedGroup = useRef(linkedGroup);
+  const linkedKey = searchParams.get('api_key_id') || 'all';
+  const linkedSelection = `${linkedGroup}/${linkedKey}`;
+  const lastLinkedSelection = useRef(linkedSelection);
   const requestSequence = useRef(0);
   const [cached] = useState(() => {
-    const params = buildLogParams({ group_name: linkedGroup, channel_id: 'all', success: 'all' }, 1, 20);
+    const params = buildLogParams({ group_name: linkedGroup, api_key_id: linkedKey, channel_id: 'all', success: 'all' }, 1, 20);
     const logs = getCachedResponse('/logs', params);
     const stats = getCachedResponse('/logs/stat', params);
     return logs !== undefined && stats !== undefined ? { logs, stats } : null;
@@ -42,6 +35,13 @@ export default function Logs() {
   const [stats, setStats] = useState(cached?.stats ?? null);
   const [channels, setChannels] = useState(() => getCachedResponse('/channels') ?? []);
   const [channelError, setChannelError] = useState(false);
+  const [apiKeys, setApiKeys] = useState(() => getCachedResponse('/apikeys', { include_deleted: true }) ?? []);
+  const [keyError, setKeyError] = useState(false);
+  const fetchKeys = async () => {
+    try { const keys = await listHistoricalAPIKeys(); setApiKeys(Array.isArray(keys) ? keys : []); setKeyError(false); }
+    catch { setKeyError(true); }
+  };
+  useEffect(() => { fetchKeys(); }, []);
   const [detail, setDetail] = useState(null);
   const fetchChannels = async () => {
     try { const result = await listChannels(); setChannels(Array.isArray(result) ? result : []); setChannelError(false); }
@@ -60,21 +60,21 @@ export default function Logs() {
 
   const [filters, setFilters] = useState({
     group_name: linkedGroup,
+    api_key_id: linkedKey,
     model_name: '',
     channel_id: 'all',
-    client_protocol: 'all',
     success: 'all',
   });
 
   const [query, setQuery] = useState(filters);
 
   useEffect(() => {
-    if (lastLinkedGroup.current === linkedGroup) return;
-    lastLinkedGroup.current = linkedGroup;
-    setFilters((f) => ({ ...f, group_name: linkedGroup }));
-    setQuery((q) => ({ ...q, group_name: linkedGroup }));
+    if (lastLinkedSelection.current === linkedSelection) return;
+    lastLinkedSelection.current = linkedSelection;
+    setFilters((f) => ({ ...f, group_name: linkedGroup, api_key_id: linkedKey }));
+    setQuery((q) => ({ ...q, group_name: linkedGroup, api_key_id: linkedKey }));
     setPage(1);
-  }, [linkedGroup]);
+  }, [linkedGroup, linkedKey, linkedSelection]);
 
   // targetPage 显式传页码，避免 setPage 与请求闭包页码不一致的双请求竞态
   const fetchLogs = async (targetPage = page) => {
@@ -114,6 +114,8 @@ export default function Logs() {
   useEffect(() => { fetchLogs(); }, [page, query]);
 
   const channelIds = [...new Set([...channels.map((item) => String(item.id)), ...(logs.data || []).map((item) => (item.latest_log || item).channel_id).filter((id) => id > 0).map(String), ...(filters.channel_id !== 'all' ? [filters.channel_id] : [])])];
+
+  const keyIds = [...new Set([...apiKeys.map((key) => String(key.id)), ...(logs.data || []).map((row) => row.api_key_id).filter((id) => id > 0).map(String), ...(filters.api_key_id !== 'all' ? [filters.api_key_id] : [])])];
 
   const totalPages = Math.max(1, Math.ceil((logs.total || 0) / pageSize));
 
@@ -175,13 +177,7 @@ export default function Logs() {
         <span className="block truncate text-center" title={String(val)}>{val}</span>
       ) : '—'),
     },
-    {
-      title: '客户端协议',
-      dataIndex: 'client_protocol',
-      key: 'client_protocol',
-      width: '104px',
-      render: (val) => <span className="block text-center font-mono text-xs">{val || '—'}</span>,
-    },
+    { title: 'API Key', dataIndex: 'api_key_id', key: 'api_key_id', width: '150px', render: (id, record) => <span className="block truncate text-center" title={logAPIKeyLabel(record)}>{logAPIKeyLabel(record)}</span> },
     {
       title: '输入 Tokens',
       dataIndex: 'input_token',
@@ -245,7 +241,7 @@ export default function Logs() {
     },
   ];
 
-  const hasActiveFilters = query.channel_id !== 'all' || Boolean(query.group_name) || Boolean(query.model_name) || query.success !== 'all' || query.client_protocol !== 'all';
+  const hasActiveFilters = query.api_key_id !== 'all' || query.channel_id !== 'all' || Boolean(query.group_name) || Boolean(query.model_name) || query.success !== 'all';
 
   return (
     <div data-page-ready={!loading} className="logs-page flex flex-col flex-1 min-h-0">
@@ -260,8 +256,16 @@ export default function Logs() {
         </div>
       ) : loading ? <div className="logs-stats" aria-hidden="true">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton-stat"><span className="skeleton-block skeleton-title" /><span className="skeleton-block skeleton-line" /></div>)}</div> : null}
 
-      {/* 筛选栏：五个条件等宽排布，查询与刷新固定在右侧 */}
+      {/* 筛选条件与统计使用同一查询范围。 */}
       <div className="logs-filters">
+        <Select aria-label="日志 API Key" selectedKey={filters.api_key_id} onSelectionChange={(value) => setFilters((current) => ({ ...current, api_key_id: value || 'all' }))} className="logs-filter-key">
+          <Label>API Key</Label><Select.Trigger className="logs-control"><Select.Value /><Select.Indicator /></Select.Trigger>
+          <Select.Popover className="dialog-options"><ListBox>
+            <ListBox.Item id="all" textValue="全部 API Key">全部 API Key<ListBox.ItemIndicator /></ListBox.Item>
+            {keyIds.map((id) => <ListBox.Item key={id} id={id} textValue={apiKeyLabel(id, apiKeys)}>{apiKeyLabel(id, apiKeys)}<ListBox.ItemIndicator /></ListBox.Item>)}
+          </ListBox></Select.Popover>
+        </Select>
+        {keyError && <Button size="sm" variant="secondary" onPress={fetchKeys}>重试 Key 名称</Button>}
         <Select aria-label="日志渠道" selectedKey={filters.channel_id} onSelectionChange={(value) => setFilters((current) => ({ ...current, channel_id: value || 'all' }))} className="logs-filter-channel">
           <Label>渠道</Label><Select.Trigger className="logs-control"><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover className="dialog-options"><ListBox>
@@ -284,28 +288,6 @@ export default function Logs() {
           <Select.Popover>
             <ListBox>
               {successOptions.map((o) => (
-                <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-                  {o.label}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-        <Select
-          name="client_protocol"
-          selectedKey={filters.client_protocol}
-          onSelectionChange={(v) => setFilters((f) => ({ ...f, client_protocol: v }))}
-          className="logs-filter-protocol"
-        >
-          <Label>客户端</Label>
-          <Select.Trigger className="logs-control">
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {clientProtocolOptions.map((o) => (
                 <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
                   {o.label}
                   <ListBox.ItemIndicator />
@@ -356,15 +338,15 @@ export default function Logs() {
       <div className="logs-query-summary" aria-label="已生效筛选">
         <span className="logs-query-caption">当前查询</span>
         <div className="logs-query-tags">
+          {query.api_key_id !== 'all' && <span>API Key：{apiKeyLabel(query.api_key_id, apiKeys)}</span>}
           {query.channel_id !== 'all' && <span>渠道：{logChannelLabel(query.channel_id, channels)}</span>}
           {query.group_name && <span>分组：{query.group_name}</span>}
           {query.model_name && <span>模型：{query.model_name}</span>}
           {query.success !== 'all' && <span>状态：{query.success === 'true' ? '成功' : '失败'}</span>}
-          {query.client_protocol !== 'all' && <span>客户端：{clientProtocolOptions.find((option) => option.id === query.client_protocol)?.label || query.client_protocol}</span>}
           {!hasActiveFilters && <span className="logs-query-all">全部记录</span>}
         </div>
         <Button size="sm" variant="tertiary" isDisabled={!hasActiveFilters} onPress={() => {
-          const cleared = { group_name: '', model_name: '', channel_id: 'all', client_protocol: 'all', success: 'all' };
+          const cleared = { api_key_id: 'all', group_name: '', model_name: '', channel_id: 'all', success: 'all' };
           setFilters(cleared); setQuery(cleared); setPage(1);
         }}>清空筛选</Button>
       </div>
@@ -374,7 +356,7 @@ export default function Logs() {
         className="logs-table"
         ariaLabel="调用记录"
         dataSource={logs.data || []}
-        columns={['created_at', 'success', 'group_name', 'model_name', 'client_protocol', 'input_token', 'output_token', 'duration_ms', 'detail'].map((key) => columns.find((column) => column.key === key))}
+        columns={['created_at', 'success', 'api_key_id', 'group_name', 'model_name', 'input_token', 'output_token', 'duration_ms', 'detail'].map((key) => columns.find((column) => column.key === key))}
         loading={loading}
         refreshing={showRefreshing}
         emptyText={hasActiveFilters ? '没有符合条件的调用记录，可调整或清除筛选' : '暂无调用记录'}

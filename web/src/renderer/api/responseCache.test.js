@@ -57,3 +57,16 @@ test('仅缓存页面入口白名单，不保留渠道明文详情或诊断响�
     assert.equal(cache.read(url), undefined);
   }
 });
+
+test('Key 管理列表和历史元数据按参数隔离，历史元数据不覆盖管理凭据', () => {
+  const cache = createResponseCache();
+  const active = [{ id: 1, name: 'Codex', key: 'sk-private', revoked: false, deleted_at: null }];
+  const historical = [{ id: 1, name: 'Codex', revoked: false, deleted_at: null }, { id: 2, name: '旧工具', revoked: true, deleted_at: '2026-10-26T00:00:00Z' }];
+  cache.write('/apikeys', undefined, active, cache.generation());
+  cache.write('/apikeys', { include_deleted: true }, historical, cache.generation());
+  assert.deepEqual(cache.read('/apikeys'), active);
+  assert.deepEqual(cache.read('/apikeys', { include_deleted: true }), historical);
+  cache.invalidate();
+  assert.equal(cache.read('/apikeys'), undefined);
+  assert.equal(cache.read('/apikeys', { include_deleted: true }), undefined);
+});
