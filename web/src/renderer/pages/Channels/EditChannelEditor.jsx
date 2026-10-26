@@ -60,20 +60,22 @@ export default function EditChannelEditor({ channel, onClose, onUpdated }) {
     } finally { setSaving(false); }
   };
   return <>
-    <Form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4">
-        <fieldset disabled={saving} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
-          <ConnectionFields state={state} editing />
-          {state.draft.type !== channel.type && <p role="alert" className="text-sm text-danger">
-            协议修改将影响本渠道全部{modelsError ? '' : ` ${models.length} 个`}模型及其分组调用；现有模型 ID 和分组引用保留。保存后才生效。
-          </p>}
-          <ModelPicker state={state} existing={models} onDelete={setDeleteTarget} existingError={modelsError} onReload={loadModels} />
-          <CallTestPanel state={state} existing={models} />
+    <Form ref={formRef} onSubmit={handleSubmit} className="channel-edit-form">
+      <div className="dialog-form-content">
+        <fieldset disabled={saving} className="channel-form-grid">
+          <div className="channel-form-column">
+            <ConnectionFields state={state} editing />
+            {state.draft.type !== channel.type && <p role="alert" className="channel-form-error">协议修改将影响本渠道全部{modelsError ? '' : ` ${models.length} 个`}模型的调用，保存后生效。</p>}
+          </div>
+          <div className="channel-form-column">
+            <ModelPicker state={state} existing={models} onDelete={setDeleteTarget} existingError={modelsError} onReload={loadModels} />
+            <CallTestPanel state={state} existing={models} />
+          </div>
         </fieldset>
       </div>
-      <div className="flex justify-end gap-2 mt-2">
+      <div className="dialog-form-actions">
         <Button variant="secondary" isDisabled={saving} onPress={onClose}>取消</Button>
-        <Button variant="primary" isPending={saving} isDisabled={state.iconPending} onPress={() => formRef.current?.requestSubmit()}>{saving ? '保存中…' : '保存并导入所选模型'}</Button>
+        <Button variant="primary" isPending={saving} isDisabled={state.iconPending} onPress={() => formRef.current?.requestSubmit()}>{saving ? '保存中…' : '保存更改'}</Button>
       </div>
     </Form>
     <ConfirmModal isOpen={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="删除模型"

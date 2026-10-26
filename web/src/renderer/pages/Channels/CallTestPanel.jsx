@@ -1,5 +1,7 @@
 import { useId, useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
+import { ChevronDown } from 'lucide-react';
+import FieldHelp from './FieldHelp';
 
 export default function CallTestPanel({ state, existing = [] }) {
   const [model, setModel] = useState('');
@@ -11,30 +13,22 @@ export default function CallTestPanel({ state, existing = [] }) {
   const result = results.test;
   const validLimit = Number.isInteger(Number(limit)) && Number(limit) >= 1 && Number(limit) <= 128;
   const models = [...new Set([...state.selected, ...existing.map((item) => item.name)])];
-  return (
-    <section className="flex flex-col gap-3 border-t border-separator pt-4" aria-label="主动调用验证">
-      <span className="text-sm">主动调用验证</span>
-      <p className="text-xs text-muted">点击后会向当前草稿连接发送一次指定模型请求，可能消耗上游额度。输出上限不代表总消耗上限；不自动重试或轮测模型。未保存配置不影响正式调用。</p>
-      <div className="dialog-form-grid grid grid-cols-2 gap-3">
-        <TextField value={model} onChange={change(setModel)}><Label>测试模型</Label><Input placeholder="填写单个上游模型名" list={listId} /></TextField>
+  return <details className="channel-form-block channel-test-block" aria-label="主动调用验证">
+    <summary><span>调用验证</span><ChevronDown className="size-4" /></summary>
+    <div className="channel-block-content">
+      <div className="channel-model-subheading"><span className="channel-test-warning">可能消耗上游额度</span><FieldHelp title="调用验证"><p>点击验证按钮后，会向当前草稿连接发送一次指定模型请求。输出上限不代表总消耗上限。</p><p>每次只验证一个模型，不自动重试或轮测。未保存配置不影响正式调用，验证结果只代表本次请求。</p></FieldHelp></div>
+      <div className="channel-fields-grid">
+        <TextField value={model} onChange={change(setModel)}><Label>测试模型</Label><Input placeholder="上游模型名" list={listId} /></TextField>
         <datalist id={listId}>{models.map((name) => <option key={name} value={name} />)}</datalist>
-        <TextField value={limit} onChange={change(setLimit)} isInvalid={!validLimit}>
-          <Label>最大输出 token（1–128）</Label><Input type="number" min="1" max="128" step="1" /><FieldError>请输入 1–128 的整数</FieldError>
-        </TextField>
+        <TextField value={limit} onChange={change(setLimit)} isInvalid={!validLimit}><Label>最大输出 Token</Label><Input type="number" min="1" max="128" step="1" /><FieldError>请输入 1–128 的整数</FieldError></TextField>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={stream} onChange={(event) => change(setStream)(event.target.checked)} />流式验证</label>
-        <div className="flex gap-2">
-          {pending.test && <Button type="button" size="sm" variant="secondary" onPress={() => state.clearResult('test')}>取消验证</Button>}
-          <Button type="button" size="sm" variant="secondary" isPending={pending.test} isDisabled={!state.canConnect || !model.trim() || !validLimit}
-            onPress={() => state.test({ model: model.trim(), stream, max_output_tokens: Number(limit) })}>发送一次验证请求</Button>
-        </div>
+      <label className="channel-toggle-row"><span>流式验证</span><input type="checkbox" checked={stream} onChange={(event) => change(setStream)(event.target.checked)} /></label>
+      <div className="channel-inline-actions">
+        {pending.test && <Button type="button" size="sm" variant="secondary" onPress={() => state.clearResult('test')}>取消验证</Button>}
+        <Button type="button" size="sm" variant="secondary" isPending={pending.test} isDisabled={!state.canConnect || !model.trim() || !validLimit} onPress={() => state.test({ model: model.trim(), stream, max_output_tokens: Number(limit) })}>发送验证请求</Button>
       </div>
-      {result?.error && <p role="alert" className="text-xs text-danger">验证失败：{result.error}</p>}
-      {result && !result.error && <div role="status" className={`text-xs ${result.success ? 'text-muted' : 'text-danger'}`}>
-        <p>{result.success ? '本次调用验证通过' : '本次调用验证失败'}：{result.message}</p>
-        <p className="break-all">模型 {result.model} · {result.stream ? '流式' : '非流式'} · 输出上限 {result.max_output_tokens} · 阶段 {result.stage} · HTTP {result.status || '—'} · {result.duration_ms} ms</p>
-      </div>}
-    </section>
-  );
+      {result?.error && <p role="alert" className="channel-form-error">验证失败：{result.error}</p>}
+      {result && !result.error && <div role="status" className={result.success ? 'channel-form-result' : 'channel-form-error'}><p>{result.success ? '本次验证通过' : '本次验证失败'}：{result.message}</p><p>模型 {result.model} · {result.stream ? '流式' : '非流式'} · 输出上限 {result.max_output_tokens} · 阶段 {result.stage} · HTTP {result.status || '—'} · {result.duration_ms} ms</p></div>}
+    </div>
+  </details>;
 }

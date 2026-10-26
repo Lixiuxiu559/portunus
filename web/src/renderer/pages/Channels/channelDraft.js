@@ -70,3 +70,8 @@ export function validateChannelCapacity(value) {
 export function isCurrentRequest(request, generation, latest) {
   return request.generation === generation && request.id === latest;
 }
+
+/** 仅比较需要保存的输入，检查结果、加载状态不构成未保存修改。 */
+export function channelDraftFingerprint(draft, selected) {
+  return JSON.stringify({ ...draft, selected: normalizeModels(selected).sort() });
+}

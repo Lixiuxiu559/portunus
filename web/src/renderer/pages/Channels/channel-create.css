@@ -1,0 +1,12 @@
+.modal__container .channel-create-dialog { width: min(1040px, calc(100vw - 48px)) !important; max-width: none !important; height: min(780px, calc(100dvh - 80px)); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; border-radius: 18px; }
+.channel-create-dialog .channel-create-header { padding: 22px 26px !important; display: flex; flex-direction: row !important; flex-shrink: 0; align-items: center; border-bottom: 1px solid var(--separator); }
+.channel-create-header h2 { font-size: 18px; font-weight: 600; }
+.channel-create-close { display: grid; place-items: center; flex-shrink: 0; margin-left: auto; border-radius: 8px; width: 32px; height: 32px; color: var(--muted); cursor: pointer; }
+.channel-create-close:hover { background: var(--surface-secondary); color: var(--foreground); }
+.channel-create-close:focus-visible { outline: 2px solid var(--accent); }
+.channel-create-close:disabled { opacity: .4; cursor: default; }
+.channel-create-dialog .channel-create-body { flex: 1; min-height: 0; overflow-y: auto; margin: 0 !important; width: 100%; max-width: 100%; padding: 0 !important; }
+.channel-form-grid.channel-create-form-grid { padding: 24px; }
+.channel-create-dialog .channel-create-footer { display: flex; align-items: center; gap: 10px; margin: 0 !important; padding: 16px 24px !important; border-top: 1px solid var(--separator); flex-shrink: 0; }
+.channel-create-footer > span { color: var(--muted); font-size: 12px; margin-right: auto; }
+@media (max-width: 760px) { .modal__container .channel-create-dialog { height: calc(100dvh - 32px); max-height: calc(100dvh - 32px); } .channel-form-grid.channel-create-form-grid { padding: 16px; } }

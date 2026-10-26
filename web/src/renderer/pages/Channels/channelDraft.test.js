@@ -132,3 +132,12 @@ test('渠道并发拒绝空白、负数、小数、指数、非法文本和无�
     assert.equal(savePayload({ ...createDraft(), max_concurrent_requests: value }, []).max_concurrent_requests, Number(value));
   }
 });
+
+test('草稿比较覆盖待保存字段和模型选择，不受选择顺序和重复项影响', async () => {
+  const { channelDraftFingerprint } = await import('./channelDraft.js');
+  const draft = createDraft();
+  assert.equal(channelDraftFingerprint(draft, ['b', 'a']), channelDraftFingerprint(draft, ['a', 'b', 'a']));
+  assert.notEqual(channelDraftFingerprint(draft, []), channelDraftFingerprint({ ...draft, key: 'secret' }, []));
+  assert.notEqual(channelDraftFingerprint(draft, []), channelDraftFingerprint({ ...draft, icon: 'deepseek' }, []));
+  assert.notEqual(channelDraftFingerprint(draft, []), channelDraftFingerprint(draft, ['a']));
+});

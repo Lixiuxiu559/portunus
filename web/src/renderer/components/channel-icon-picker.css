@@ -1,0 +1,18 @@
+.channel-icon-compact { position: relative; flex-shrink: 0; }
+.channel-icon-preview.button { position: relative; width: 68px; height: 68px; padding: 12px; min-width: 68px; overflow: hidden; border: 1px dashed var(--separator); border-radius: 12px; background: var(--surface-secondary); }
+.channel-icon-preview-image { width: 36px; height: 36px; }
+.channel-icon-preview-overlay { position: absolute; inset: auto 0 0; display: flex; gap: 3px; align-items: center; justify-content: center; padding: 3px 0; font-size: 9px; color: var(--muted); background: color-mix(in oklch, var(--surface) 92%, transparent); }
+.channel-icon-preview:hover { border-color: var(--accent); }
+.channel-icon-popover { width: 320px; max-width: calc(100vw - 36px); }
+.channel-icon-popover-dialog { padding: 16px; outline: none; }
+.channel-icon-popover-dialog h2 { font-size: 14px; font-weight: 600; }
+.channel-icon-help { font-size: 11px; line-height: 18px; color: var(--muted); margin-top: 5px; }
+.channel-icon-search { width: 100%; min-width: 0; margin: 12px 0; padding: 8px 10px; border: 1px solid var(--separator); border-radius: 7px; background: var(--surface); font-size: 12px; }
+.channel-icon-search:focus-visible { outline: 2px solid var(--accent); }
+.channel-icon-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; max-height: 220px; overflow-y: auto; padding: 2px; }
+.channel-icon-grid > button { position: relative; display: grid; place-items: center; min-width: 0; height: 40px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.channel-icon-grid > button:hover, .channel-icon-grid > button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 8%, var(--surface)); }
+.channel-icon-grid > button:focus-visible { outline: 2px solid var(--accent); }
+.channel-icon-selected { position: absolute; width: 10px; height: 10px; right: 0; bottom: 0; border-radius: 3px; color: var(--accent-foreground); background: var(--accent); }
+.channel-icon-upload-row { display: flex; gap: 8px; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--separator); }
+.channel-icon-error { position: absolute; top: 100%; left: 0; width: 250px; padding: 4px 0; font-size: 11px; color: var(--danger); }

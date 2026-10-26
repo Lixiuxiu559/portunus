@@ -186,6 +186,7 @@ export default function Channels() {
           triggerRect={editRect}
           onExited={() => setEditTarget(null)}
           ariaLabel="编辑渠道"
+          width={1040}
           title={
             <>
               <ProviderIcon type={editTarget.type} providerId={editTarget.provider_id} icon={editTarget.icon} name={editTarget.name} className="size-6 shrink-0" />
