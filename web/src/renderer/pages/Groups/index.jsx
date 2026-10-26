@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions, strategyLabels } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button, Typography, Chip, Card, ScrollShadow, TextField, Input, toast } from '@heroui/react';
-import { Plus, Trash2, Pencil, RotateCw, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Search, GripVertical, CircleCheck, Layers2, ArrowUpRight, List } from 'lucide-react';
 import { listGroups, updateGroup, updateGroupItem, deleteGroupItem, listModels, listChannels } from '../../api';
 import IconButton from '../../components/IconButton';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -58,8 +58,8 @@ export default function Groups() {
   const [showCreate, setShowCreate] = useState(false);
   // 首次加载失败标记：区分"真没数据"和"加载失败"，后者给重试入口
   const [loadError, setLoadError] = useState(false);
-  // 名称查询：输入框是草稿，点查询或回车后才生效（与模型页一致）。
-  // 分组列表本身一次返回全部，过滤在本地完成，不需要额外请求。
+  // 名称查询：输入框是草稿，点查询或回车后生效。
+  // 分组列表本身一次返回全部，过滤在本地完成；查询同时重新拉取服务端数据，不再单设刷新按钮。
   const [draftName, setDraftName] = useState('');
   const [queryName, setQueryName] = useState('');
 
@@ -85,11 +85,14 @@ export default function Groups() {
 
   const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
 
-  // 分组数量不多，名称过滤直接在已加载列表上完成；保留已生效条件供刷新后继续使用。
+  // 分组数量不多，名称过滤直接在已加载列表上完成；查询时同时重取服务端数据。
   const visibleGroups = queryName
     ? groups.filter((g) => g.name.toLocaleLowerCase().includes(queryName.toLocaleLowerCase()))
     : groups;
-  const handleSearch = () => setQueryName(draftName.trim());
+  const handleSearch = () => {
+    setQueryName(draftName.trim());
+    fetchAll(true);
+  };
   const clearSearch = () => { setDraftName(''); setQueryName(''); };
 
   const handleSetActive = async (groupId, itemId) => {
@@ -160,15 +163,6 @@ export default function Groups() {
           查询
         </Button>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="刷新分组"
-            onPress={() => fetchAll(true)}
-            isDisabled={refreshing || loading} isPending={showRefreshing}
-          >
-            <RotateCw className="size-4" />
-          </Button>
           <Button variant="primary" size="sm" isDisabled={loading || !modelCount} onPress={() => setShowCreate(true)}>
             <Plus className="size-4" />
             新增分组

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Typography, Button, Card, TextField, Input, Select, ListBox, Label, Tooltip } from '@heroui/react';
-import { Search, RotateCw } from 'lucide-react';
+import { Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
 import { listHistoricalAPIKeys } from '../api/apikey';
@@ -313,17 +313,7 @@ export default function Logs() {
           <Input className="logs-control" placeholder="筛选模型" />
         </TextField>
         <div className="logs-filter-actions">
-          <Button
-            size="md"
-            variant="secondary"
-            aria-label="刷新调用记录"
-            onPress={() => fetchLogs()}
-            isPending={showRefreshing}
-            className="logs-refresh-action"
-          >
-            <RotateCw className="size-4" />
-          </Button>
-          {/* 查询：已在第 1 页直接带筛选刷新；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
+          {/* 查询：已在第 1 页直接带筛选请求；否则回第 1 页由 effect 以新页码请求，避免双请求竞态 */}
           <Button
             size="md"
             variant="primary"

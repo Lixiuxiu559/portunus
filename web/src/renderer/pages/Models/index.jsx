@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Typography, Card, toast, Select, ListBox, TextField, Input } from '@heroui/react';
-import { Plus, Trash2, RotateCw, X, Search } from 'lucide-react';
+import { Plus, Trash2, X, Search } from 'lucide-react';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
@@ -141,7 +141,6 @@ export default function Models() {
         </Select>
         <Button variant="secondary" size="sm" onPress={handleSearch} isDisabled={refreshing || loading} isPending={loading || showRefreshing}><Search className="size-4" />查询</Button>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="secondary" size="sm" onPress={() => performSearch(queryChannel, queryName, page)} isDisabled={refreshing || loading} isPending={loading || showRefreshing} aria-label="刷新模型列表"><RotateCw className="size-4" /></Button>
           <Button variant="primary" size="sm" onPress={() => setShowCreate(true)}><Plus className="size-4" />新增模型</Button>
         </div>
       </div>
