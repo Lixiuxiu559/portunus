@@ -1,0 +1,30 @@
+/* 卡片摘要随 QuotaSummary 加载，不依赖按需打开的设置面板。 */
+.quota-card-summary { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--separator); }
+
+/* Keep the card focused on the available amount; full records live in the source panel. */
+.quota-compact-source { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.quota-compact-source + .quota-compact-source { padding-top: 12px; border-top: 1px solid var(--separator); }
+.quota-compact-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-width: 0; min-height: 24px; }
+.quota-compact-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
+.quota-compact-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.quota-icon-button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.quota-icon-button:hover { color: var(--accent); background: color-mix(in oklch, var(--accent) 8%, transparent); }
+.quota-icon-button:focus-visible, .quota-empty-link:focus-visible, .quota-more-items:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.quota-icon-button:disabled { cursor: default; opacity: .45; background: transparent; }
+.quota-compact-values { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.quota-compact-amount { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.quota-compact-amount > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+.quota-compact-amount strong { font-size: 20px; font-weight: 600; line-height: 28px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.quota-compact-amount > span + strong { font-size: 17px; line-height: 24px; text-align: right; }
+.quota-compact-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 16px; font-size: 10px; line-height: 16px; color: var(--muted); }
+.quota-compact-failure { color: var(--warning, var(--accent)); cursor: help; }
+.quota-more-items { width: fit-content; text-align: left; font-size: 11px; line-height: 18px; color: var(--muted); cursor: pointer; border-radius: 4px; }
+.quota-more-items:hover { color: var(--accent); }
+.quota-empty-link { display: flex; align-items: center; gap: 8px; min-height: 32px; width: 100%; font-size: 12px; text-align: left; color: var(--muted); cursor: pointer; border-radius: 8px; }
+.quota-empty-link > svg:last-child { margin-left: auto; }
+.quota-empty-link:hover { color: var(--accent); }
+.quota-empty-link:disabled { cursor: default; }
+.quota-summary-error { color: var(--muted); font-size: 11px; }
+.quota-refresh-spinning { animation: quota-refresh-spin 1s linear infinite; }
+@keyframes quota-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .quota-refresh-spinning { animation: none; } }

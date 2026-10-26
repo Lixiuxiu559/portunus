@@ -1,5 +1,6 @@
 import { RefreshCw, Settings2, Wallet } from 'lucide-react';
 import QuotaItems from './QuotaItems';
+import './quota-summary.css';
 import { quotaStatus, visibleSnapshot, formatQuotaTime, formatQuotaRelativeTime, quotaValue } from './quotaModel';
 
 export function QuotaSourceState({ view, details = false }) {
