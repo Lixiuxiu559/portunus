@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react';
+import { Button, Select, ListBox } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { CopyValue } from './shared';
 import PageSkeleton from '../../components/PageSkeleton';
@@ -21,6 +21,7 @@ export default function ConnectionCard({
   savingMode,
   onSaveNetworkMode,
 }) {
+  const activeKeys = apiKeys.filter((key) => !key.revoked && !key.deleted_at);
   if (loading) return <aside className="service-connection-panel rounded-2xl bg-surface/70 p-5"><PageSkeleton variant="connection" /></aside>;
 
   return (
@@ -55,10 +56,30 @@ export default function ConnectionCard({
           </div>
         </div>
 
-        <label className="service-guide-key-select"><span>接入使用的 API Key</span><select className="mm-select" aria-label="选择 API Key" value={selectedKey?.id ?? ''} disabled={keyBusy || loadError} onChange={(event) => onSelectKey(Number(event.target.value))}>
-          {!selectedKey && <option value="">暂无有效 API Key</option>}
-          {apiKeys.filter((key) => !key.revoked && !key.deleted_at).map((key) => <option key={key.id} value={key.id}>{key.name} · #{key.id}</option>)}
-        </select></label>
+        <div className="service-guide-key-select">
+          <span className="service-group-label">接入使用的 API Key</span>
+          <Select
+            aria-label="选择 API Key"
+            placeholder="暂无有效 API Key"
+            selectedKey={selectedKey ? String(selectedKey.id) : null}
+            isDisabled={keyBusy || loadError || !activeKeys.length}
+            onSelectionChange={(id) => { if (id !== null) onSelectKey(Number(id)); }}
+            className="service-group-select min-w-0"
+          >
+            <Select.Trigger aria-label="选择 API Key" aria-labelledby={null} className="service-group-trigger w-full min-w-0 rounded-xl">
+              <Select.Value className="min-w-0 flex-1 truncate text-left" />
+              <Select.Indicator className="size-4 shrink-0 text-muted" />
+            </Select.Trigger>
+            <Select.Popover className="service-group-popover">
+              <ListBox aria-label="可接入的 API Key">
+                {activeKeys.map((key) => <ListBox.Item key={key.id} id={String(key.id)} textValue={key.name} className="min-w-0 py-2.5">
+                  <span className="min-w-0 flex-1 truncate" title={key.name}>{key.name}</span>
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>)}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
         <div className="service-config-values">
           <CopyValue label="网关地址" value={guide.baseUrl} revealKey={revealKey} />
           <CopyValue label="OpenAI Base URL · 含 /v1" value={guide.openAIBaseUrl} revealKey={revealKey} />

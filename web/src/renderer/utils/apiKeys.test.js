@@ -19,18 +19,18 @@ test('接入保留选中 Key，禁用或删除后回退有效 Key，启用后可
   assert.equal(selectAPIKey([], 1), null);
 });
 
-test('筛选使用当前名称与稳定 ID，同名 Key 和历史状态可区分', () => {
-  assert.equal(apiKeyLabel('3', keys), 'Codex · #3');
-  assert.equal(apiKeyLabel(1, keys), '旧工具 · #1（已禁用）');
-  assert.equal(apiKeyLabel(4, keys), 'Codex · #4（已删除）');
-  assert.equal(apiKeyLabel(20, keys), 'API Key #20');
+test('筛选只显示当前名称，同名 Key 仍按 ID 独立选择', () => {
+  assert.equal(apiKeyLabel('3', keys), 'Codex');
+  assert.equal(apiKeyLabel(1, keys), '旧工具');
+  assert.equal(apiKeyLabel(4, keys), 'Codex');
+  assert.equal(apiKeyLabel(20, keys), '未记录名称');
   assert.equal(apiKeyLabel(0, keys), '未记录 API Key');
 });
 
 test('日志名称只用调用时快照，重命名、禁用、删除不替换快照；旧日志明确未知', () => {
   const historical = { api_key_id: 3, api_key_name: '旧名称' };
-  assert.equal(logAPIKeyLabel(historical), '旧名称 · #3');
-  assert.equal(logAPIKeyLabel({ api_key_id: 3 }), 'API Key #3（未记录调用时名称）');
-  assert.equal(logAPIKeyLabel({ api_key_id: 3, api_key_name: '' }), 'API Key #3（未记录调用时名称）');
+  assert.equal(logAPIKeyLabel(historical), '旧名称');
+  assert.equal(logAPIKeyLabel({ api_key_id: 3 }), '未记录调用时名称');
+  assert.equal(logAPIKeyLabel({ api_key_id: 3, api_key_name: '' }), '未记录调用时名称');
   assert.equal(logAPIKeyLabel({ api_key_id: 0 }), '未记录 API Key');
 });

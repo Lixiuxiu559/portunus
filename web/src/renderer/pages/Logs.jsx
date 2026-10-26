@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Typography, Button, Card, TextField, Input, Select, ListBox, Label } from '@heroui/react';
+import { Typography, Button, Card, TextField, Input, Select, ListBox, Label, Tooltip } from '@heroui/react';
 import { Search, RotateCw } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
@@ -130,10 +130,10 @@ export default function Logs() {
         if (!val) return <span className="block text-center text-xs text-muted">—</span>;
         const date = new Date(val);
         return (
-          <span className="block whitespace-nowrap text-center font-mono text-xs">
+          <LogCell text={date.toLocaleString('zh-CN', { hour12: false })} className="whitespace-nowrap font-mono text-xs">
             <span className="block text-muted">{date.toLocaleDateString('zh-CN')}</span>
             <span className="block">{date.toLocaleTimeString('zh-CN', { hour12: false })}</span>
-          </span>
+          </LogCell>
         );
       },
     },
@@ -143,6 +143,7 @@ export default function Logs() {
       key: 'success',
       width: '88px',
       render: (val, record) => (
+        <LogCell text={[val ? '成功' : '失败', record?.err_kind && (errKindLabels[record.err_kind] || record.err_kind), record?.err_msg].filter(Boolean).join('\n')}>
         <span className="flex w-full flex-col items-center gap-0.5">
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
             val ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
@@ -157,7 +158,7 @@ export default function Logs() {
               {errKindLabels[record.err_kind] || record.err_kind}
             </span>
           )}
-        </span>
+        </span></LogCell>
       ),
     },
     {
@@ -165,7 +166,7 @@ export default function Logs() {
       dataIndex: 'model_name',
       key: 'model_name',
       width: '216px',
-      render: (val, record) => <span className="block text-center"><span className="block truncate" title={String(val || '')}>{val || '未记录模型'}</span><span className="block truncate text-xs text-muted" title={logChannelLabel(record.channel_id, channels)}>{logChannelLabel(record.channel_id, channels)}</span></span>,
+      render: (val, record) => <LogCell text={`模型：${val || '未记录模型'}\n渠道：${logChannelLabel(record.channel_id, channels)}`}><span className="block truncate">{val || '未记录模型'}</span><span className="block truncate text-xs text-muted">{logChannelLabel(record.channel_id, channels)}</span></LogCell>,
     },
     { title: '详情', dataIndex: 'id', key: 'detail', width: '78px', render: (id, record) => <Button size="sm" variant="secondary" aria-label={`查看日志 ${id} 详情`} onPress={() => setDetail({ record })}>详情</Button> },
     {
@@ -174,10 +175,10 @@ export default function Logs() {
       key: 'group_name',
       width: '150px',
       render: (val) => (val ? (
-        <span className="block truncate text-center" title={String(val)}>{val}</span>
+        <LogCell text={String(val)}><span className="block truncate">{val}</span></LogCell>
       ) : '—'),
     },
-    { title: 'API Key', dataIndex: 'api_key_id', key: 'api_key_id', width: '150px', render: (id, record) => <span className="block truncate text-center" title={logAPIKeyLabel(record)}>{logAPIKeyLabel(record)}</span> },
+    { title: 'API Key', dataIndex: 'api_key_id', key: 'api_key_id', width: '150px', render: (id, record) => <LogCell text={logAPIKeyLabel(record)}><span className="block truncate">{logAPIKeyLabel(record)}</span></LogCell> },
     {
       title: '输入 Tokens',
       dataIndex: 'input_token',
@@ -190,7 +191,7 @@ export default function Logs() {
         // 缓存命中明细放小字；input_token 为非缓存输入。
         const total = val == null ? null : val + cacheRead + cacheWrite;
         return (
-          <span className="block text-center font-mono">
+          <LogCell text={`总输入：${total ?? '未记录'}\n非缓存输入：${val ?? '未记录'}\n缓存读：${cacheRead}\n缓存写：${cacheWrite}`} className="font-mono">
             {formatNum(total)}
             {cacheRead > 0 && (
               <span className="block text-xs text-muted">缓存读 {formatNum(cacheRead)}</span>
@@ -198,7 +199,7 @@ export default function Logs() {
             {cacheWrite > 0 && (
               <span className="block text-xs text-muted">缓存写 {formatNum(cacheWrite)}</span>
             )}
-          </span>
+          </LogCell>
         );
       },
     },
@@ -208,7 +209,7 @@ export default function Logs() {
       key: 'output_token',
       width: '96px',
       render: (val) => (
-        <span className="text-center font-mono block">{formatNum(val)}</span>
+        <LogCell text={`输出 Tokens：${val ?? '未记录'}`} className="font-mono">{formatNum(val)}</LogCell>
       ),
     },
     {
@@ -220,6 +221,7 @@ export default function Logs() {
         // stream 字段由后端按客户端请求记录；旧数据（迁移前）回退按首包推断
         const isStream = record?.stream || record?.first_token_ms > 0;
         return (
+          <LogCell text={`耗时：${val ?? '未记录'} ms\n首包：${record.first_token_ms > 0 ? `${record.first_token_ms} ms` : '未记录或不适用'}\n响应：${isStream ? '流式' : '非流式'}${record.request_id ? `\n请求 ID：${record.request_id}` : ''}`}>
           <span className="flex items-center justify-center gap-1">
             <span
               className="inline-block rounded-full px-2 py-0.5 text-xs font-mono bg-accent/15 text-accent"
@@ -235,7 +237,7 @@ export default function Logs() {
             <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${isStream ? 'bg-success/15 text-success' : 'bg-default/40 text-muted'}`}>
               {isStream ? '流' : '非流'}
             </span>
-          </span>
+          </span></LogCell>
         );
       },
     },
@@ -378,6 +380,17 @@ export default function Logs() {
       </div>
     </div>
   );
+}
+
+function LogCell({ text, children, className = '' }) {
+  return <Tooltip delay={250}>
+    <Button variant="tertiary" className={`log-cell-tooltip-trigger ${className}`}>
+      {children}
+    </Button>
+    <Tooltip.Content className="max-w-[min(32rem,calc(100vw-2rem))] whitespace-pre-wrap break-words text-sm">
+      {text}
+    </Tooltip.Content>
+  </Tooltip>;
 }
 
 function StatCard({ label, value, detail }) {
