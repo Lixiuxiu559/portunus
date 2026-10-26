@@ -8,6 +8,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // Register 注册对外 /v1 LLM 接口，供 claude code / codex 等客户端调用。
@@ -38,14 +39,21 @@ func (s *relayServer) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		apiKeyID, ok := s.deps.Auth(key)
+		var identity shared.APIKeyIdentity
+		var ok bool
+		if s.deps.AuthIdentity != nil {
+			identity, ok = s.deps.AuthIdentity(key)
+		} else if s.deps.Auth != nil {
+			identity.ID, ok = s.deps.Auth(key)
+		}
 		if !ok {
 			writeRelayError(c, proto, http.StatusUnauthorized, relayErrAuth, "invalid api key")
 			c.Abort()
 			return
 		}
 
-		c.Set("api_key_id", apiKeyID)
+		c.Set("api_key_id", identity.ID)
+		c.Set("api_key_name", identity.Name)
 		c.Next()
 	}
 }

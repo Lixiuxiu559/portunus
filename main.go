@@ -70,18 +70,12 @@ func main() {
 	r := gin.Default()
 
 	gateway.Register(r, gateway.Deps{
-		Cfg:         cfg.Proxy,
-		Client:      gateway.NewHTTPClient(cfg.Proxy),
-		Breakers:    gateway.NewBreakerStore(cfg.Proxy),
-		Cooldowns:   gateway.NewRateLimitStore(cfg.Proxy),
-		Concurrency: gateway.NewChannelConcurrencyStore(),
-		Auth: func(key string) (int64, bool) {
-			var k shared.APIKey
-			if err := shared.DB.Where("key = ?", key).First(&k).Error; err != nil {
-				return 0, false
-			}
-			return k.ID, true
-		},
+		Cfg:          cfg.Proxy,
+		Client:       gateway.NewHTTPClient(cfg.Proxy),
+		Breakers:     gateway.NewBreakerStore(cfg.Proxy),
+		Cooldowns:    gateway.NewRateLimitStore(cfg.Proxy),
+		Concurrency:  gateway.NewChannelConcurrencyStore(),
+		AuthIdentity: shared.AuthenticateAPIKeyIdentity,
 		LogWrite:     func(e *shared.Log) { shared.LogDB.Create(e) },
 		AttemptWrite: shared.WriteUpstreamAttempt,
 		RoutingWrite: shared.WriteRoutingTrace,

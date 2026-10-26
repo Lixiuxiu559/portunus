@@ -55,6 +55,15 @@ const thinkingSuffix = "-thinking"
 // 耗尽才换下一个目标；熔断开路的模型会被跳过。
 func (s *relayServer) handleRelay(clientProto protocol.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 日志 writer 按请求复制，不改变共享 server；所有成功、失败和重试日志使用同一鉴权快照。
+		requestServer := *s
+		write := s.deps.LogWrite
+		keyName := c.GetString("api_key_name")
+		requestServer.deps.LogWrite = func(entry *shared.Log) {
+			entry.APIKeyName = keyName
+			write(entry)
+		}
+		s := &requestServer
 		requestID := newRequestID()
 		diagnostics := newRoutingDiagnostics(c, requestID, clientProto)
 		defer diagnostics.flush(s, c)

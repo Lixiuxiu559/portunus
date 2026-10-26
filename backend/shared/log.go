@@ -11,6 +11,7 @@ import (
 type Log struct {
 	ID              int64   `gorm:"primaryKey" json:"id"`
 	APIKeyID        int64   `gorm:"index" json:"api_key_id"`
+	APIKeyName      string  `gorm:"size:80" json:"api_key_name"` // 鉴权时的名称快照；空表示旧日志未采集，不回填当前名称
 	GroupName       string  `gorm:"index" json:"group_name"`
 	ChannelID       int64   `gorm:"index" json:"channel_id"`
 	ModelName       string  `gorm:"index" json:"model_name"`
