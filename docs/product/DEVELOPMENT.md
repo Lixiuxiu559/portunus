@@ -40,6 +40,10 @@ pnpm test:e2e       # 仅针对 Dev 产物与 13061 的启动检查；先退出�
 
 macOS 预览路径：`web/dist-dev/mac-arm64/Portunus Dev.app`（Intel 为 `mac/`）。正式安装包仍用 `build:mac` / `build:win`，不要把开发产物拖入 `/Applications` 覆盖正式应用。
 
+正式安装包使用 `normal` 压缩。`build`、`build:mac`、`build:win` 和 Release CI 均为 Go 后端启用 `--release`（`-trimpath -ldflags="-s -w"`），移除本机构建路径、符号表与 DWARF 调试信息。开发用的 `build:go`、`dev`、`build:dev` 保留 Go 调试信息，Dev 目录包继续使用 `store` 加快构建。需要单独交叉编译正式后端时执行 `node scripts/build-go.mjs <os> <arch> --release`。
+
+安装包压缩主要减少下载体积；安装后应用体积的减少来自 Go 后端瘦身。各平台收益需以实际产物为准，不覆盖已发布版本的安装包或更新清单。
+
 独立运行 `go run .` 是命令行后端模式，仍保留其默认 3060 与仓库 `data/`，不属于桌面 Dev；Vite 代理统一指向桌面 Dev 的 13061。
 
 ## 失败与停止边界

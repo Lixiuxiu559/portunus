@@ -75,7 +75,9 @@ function loadRenderer(win) {
   // 仅生产模式检查（dev 无 app-update.yml，调了只会报错）。
   win
     .loadFile(path.join(__dirname, '../../dist/renderer/index.html'))
-    .then(() => runtime.updatesEnabled && checkForUpdates())
+    .then(() => {
+      return runtime.updatesEnabled && checkForUpdates();
+    })
     .catch(() => {
       // 静默失败：loadFile 失败或更新检查失败都不阻塞主流程
     });
@@ -162,6 +164,11 @@ clientConfig.register(ipcMain);
 
 // ─── IPC：应用信息（依赖 electron app，留 main.js）───
 ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('update:renderer-ready', (event) => process.platform === 'darwin' && require('./mac-update-health').confirmRendererReady({
+  event, window: mainWindow, backendReady: backend.state === 'ready',
+  rendererFile: path.join(__dirname, '../../dist/renderer/index.html'),
+  executable: app.getPath('exe'), version: app.getVersion(),
+}));
 ipcMain.handle('app:platform', () => process.platform);
 
 // ─── IPC：打开外部链接（依赖 electron shell，留 main.js）───
@@ -237,7 +244,17 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
+let backendStoppedForQuit = false;
+let backendQuitPromise = null;
+app.on('before-quit', (event) => {
   isQuitting = true;
+  if (process.platform === 'darwin' && !backendStoppedForQuit) {
+    event.preventDefault();
+    backendQuitPromise ??= backend.stopAndWait().finally(() => {
+      backendStoppedForQuit = true;
+      app.quit();
+    });
+    return;
+  }
   backend.stop();
 });

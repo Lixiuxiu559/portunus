@@ -19,12 +19,12 @@ BUCKET = "portunus-1321735248"
 REGION = "ap-shanghai"
 PREFIX = "releases/"
 MANIFESTS = ("latest.yml", "latest-mac.yml", "latest-linux.yml")
-ASSET_SUFFIXES = (".exe", ".dmg", ".zip", ".AppImage", ".blockmap")
+ASSET_SUFFIXES = (".exe", ".dmg", ".zip", ".AppImage", ".blockmap", ".zip.sig")
 KEEP_VERSIONS = 3
 VERSIONED_ASSET = re.compile(
     r"Portunus-(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))-"
     r"(?:mac-(?:arm64|x64)\.(?:dmg|zip)|windows-(?:arm64|x64)\.(?:exe|zip)"
-    r"|linux-(?:arm64|x64|x86_64)\.AppImage)(?:\.blockmap)?"
+    r"|linux-(?:arm64|x64|x86_64)\.AppImage)(?:\.blockmap|\.sig)?"
 )
 
 
@@ -70,6 +70,17 @@ def prepare_files(directory, tag):
                 raise ValueError(f"{name} SHA-512 校验失败")
             if "size" in entry and asset.stat().st_size != entry["size"]:
                 raise ValueError(f"{name} 大小与更新清单不一致")
+            # 0.5.0 及更早的历史包没有独立签名。后续 mac ZIP 必须随包提供签名。
+            if name.endswith(".zip") and "-mac-" in name and tuple(map(int, version.split("."))) > (0, 5, 0):
+                signature = directory / (name + ".sig")
+                if signature not in assets:
+                    raise ValueError(f"{name} 缺少更新签名")
+                signed = json.loads(signature.read_text(encoding="utf-8"))
+                arch = name.removesuffix(".zip").rsplit("-", 1)[-1]
+                if (signed.get("version") != version or signed.get("arch") != arch
+                        or signed.get("size") != asset.stat().st_size or signed.get("sha512") != entry["sha512"]
+                        or len(base64.b64decode(signed.get("signature", ""), validate=True)) != 64):
+                    raise ValueError(f"{name} 更新签名元数据不匹配")
         # electron-updater 旧版元数据也携带 path，必须和 files 指向同一安装包。
         if data.get("path") and data["path"] not in [entry["url"] for entry in files]:
             raise ValueError(f"{path.name} 的 path 与 files 不一致")

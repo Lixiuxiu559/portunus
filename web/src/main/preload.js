@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   getUpdateState: () => ipcRenderer.invoke('update:get-state'),
+  confirmRendererReady: () => ipcRenderer.invoke('update:renderer-ready'),
 
   // 监听更新事件（channel 白名单来自 update-channels 单一来源）
   onUpdateEvent: (channel, callback) => {

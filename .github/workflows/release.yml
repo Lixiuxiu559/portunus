@@ -54,7 +54,7 @@ jobs:
 
       - name: 构建 Go 后端
         working-directory: web
-        run: node scripts/build-go.mjs ${{ matrix.goos }} ${{ matrix.goarch }}
+        run: node scripts/build-go.mjs ${{ matrix.goos }} ${{ matrix.goarch }} --release
 
       - name: 安装依赖
         working-directory: web
@@ -63,8 +63,9 @@ jobs:
       - name: 构建渲染层并打包
         working-directory: web
         env:
-          # 本阶段不签名：mac 半自动、Windows 暂不签名，关闭签名身份自动发现避免误签名
+          # 不使用 Apple Developer ID；mac ZIP 由 afterAllArtifactBuild 使用独立 Ed25519 私钥签名。
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          PORTUNUS_UPDATE_SIGNING_KEY: ${{ secrets.PORTUNUS_UPDATE_SIGNING_KEY }}
           # Electron（file://）要求相对资源路径。必须走 env 块：Windows runner 默认
           # PowerShell，不支持 bash 的 VAR=x cmd 前缀语法（会把 VAR=x 当命令名）
           VITE_BASE: ./
@@ -102,7 +103,7 @@ jobs:
           find artifacts -type f \( \
             -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o \
             -name "*.AppImage" -o \
-            -name "*.blockmap" -o -name "latest.yml" -o -name "latest-mac.yml" -o -name "latest-linux.yml" \) \
+            -name "*.blockmap" -o -name "*.zip.sig" -o -name "latest.yml" -o -name "latest-mac.yml" -o -name "latest-linux.yml" \) \
             -not -path "*unpacked*" -exec cp {} release-assets/ \;
           # 固定文件名副本：README 的免绕安装命令依赖 latest/download/<固定名> 永远指向最新版
           # 注意：electron-builder 的 ${arch} 在 linux 平台输出 x86_64（win/mac 才是 x64/arm64）

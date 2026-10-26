@@ -72,6 +72,26 @@ class SyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "版本"):
             prepare_files(self.root, "v0.5.0")
 
+    def test_new_mac_release_requires_signature_before_upload(self):
+        new_asset = self.root / "Portunus-0.5.1-mac-arm64.zip"
+        new_asset.write_bytes(self.asset.read_bytes())
+        for name in MANIFESTS:
+            self.write_manifest(name, version="0.5.1", path=new_asset.name,
+                                files=[{"url": new_asset.name, "sha512": self.digest, "size": new_asset.stat().st_size}])
+        with self.assertRaisesRegex(ValueError, "缺少更新签名"):
+            prepare_files(self.root, "v0.5.1")
+        import json
+        signature = new_asset.with_name(new_asset.name + ".sig")
+        signature.write_text(json.dumps({"version": "0.5.1", "arch": "arm64", "size": new_asset.stat().st_size,
+                                        "sha512": self.digest, "signature": base64.b64encode(bytes(64)).decode()}))
+        assets, _ = prepare_files(self.root, "v0.5.1")
+        self.assertIn(signature, assets)
+        data = json.loads(signature.read_text())
+        data["version"] = "0.5.0"
+        signature.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, "元数据不匹配"):
+            prepare_files(self.root, "v0.5.1")
+
     def test_corrupted_package_is_rejected(self):
         self.asset.write_bytes(b"corrupted")
         with self.assertRaisesRegex(ValueError, "SHA-512"):

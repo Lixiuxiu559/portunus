@@ -59,6 +59,20 @@ test('start：spawn 后 ping 成功 → ready，ready settle', async () => {
   await backend.ready; // 不 reject
 });
 
+test('stopAndWait 等待本次后端 exit 后才允许更新退出', async () => {
+  const { backend, children } = makeBackend();
+  await backend.start();
+  let finished = false;
+  const pending = backend.stopAndWait().then(() => { finished = true; });
+  await Promise.resolve();
+  assert.equal(children[0].killed, true);
+  assert.equal(finished, false);
+  children[0].emit('exit', 0);
+  await pending;
+  assert.equal(finished, true);
+  await backend.stopAndWait();
+});
+
 test('binPath 不存在 → failed，error 暴露、ready 仍 settle', async () => {
   const { backend, spawnCalls } = makeBackend({ binPath: '/nonexistent/portunus' });
   await backend.start();

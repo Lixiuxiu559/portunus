@@ -211,6 +211,26 @@ function createBackend(deps) {
     setState('stopped');
   }
 
+  // macOS 更新替换前等待自己启动的后端退出，避免新版立即启动时端口仍占用。
+  function stopAndWait() {
+    const ownedChild = child;
+    if (!ownedChild || ownedChild.exitCode != null || ownedChild.signalCode != null) {
+      stop();
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(forceTimer);
+        clearTimeout(deadlineTimer);
+        resolve();
+      };
+      const forceTimer = setTimeout(() => ownedChild.kill('SIGKILL'), 6000);
+      const deadlineTimer = setTimeout(finish, 8000);
+      ownedChild.once('exit', finish);
+      stop();
+    });
+  }
+
   async function restart() {
     const run = ++generation;
     stopChild();
@@ -236,6 +256,7 @@ function createBackend(deps) {
     ready,
     start,
     stop,
+    stopAndWait,
     restart,
   };
 }

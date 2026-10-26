@@ -5,7 +5,10 @@ const { profileFor } = require('./runtime-profile');
 if (profileFor({ isPackaged: app.isPackaged, metadata: require('../../package.json') }) === 'development') {
   module.exports = require('./disabled-updater');
 } else {
-  const { autoUpdater } = require('electron-updater');
+  const updaterModule = require('electron-updater');
+  const autoUpdater = process.platform === 'darwin'
+    ? require('./mac-update-installer').createMacUpdater({ MacUpdater: updaterModule.MacUpdater, app })
+    : updaterModule.autoUpdater;
   const { createUpdateService } = require('./update-service');
   module.exports = createUpdateService(autoUpdater);
 }

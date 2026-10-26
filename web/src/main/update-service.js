@@ -9,10 +9,10 @@ const COS_SOURCE = {
 const GITHUB_SOURCE = { provider: 'github', owner: 'Lixiuxiu559', repo: 'portunus' };
 
 // 注入 updater，允许离线验证切源与事件行为，无需启动 Electron。
-function createUpdateService(autoUpdater, logger = console) {
+function createUpdateService(autoUpdater, logger = console, { primarySource = COS_SOURCE, fallbackSource = GITHUB_SOURCE } = {}) {
   // 由服务调度下载，确保自动下载也经过同版本备用源校验。
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = autoUpdater.supportsInstallOnQuit !== false;
 
   let currentWindow = null;
   let source = null;
@@ -92,11 +92,11 @@ function createUpdateService(autoUpdater, logger = console) {
   async function checkSources() {
     offeredVersion = null;
     try {
-      selectSource(COS_SOURCE);
+      selectSource(primarySource);
       return await autoUpdater.checkForUpdates();
     } catch (err) {
       logger.warn('[updater] COS 检查失败，切换 GitHub:', err.message);
-      selectSource(GITHUB_SOURCE);
+      selectSource(fallbackSource);
       return autoUpdater.checkForUpdates();
     }
   }
@@ -139,7 +139,7 @@ function createUpdateService(autoUpdater, logger = console) {
     try {
       return await autoUpdater.downloadUpdate();
     } catch (err) {
-      if (source !== COS_SOURCE || err.code === 'ERR_CANCELLED') throw err;
+      if (source !== primarySource || err.code === 'ERR_CANCELLED') throw err;
       logger.warn('[updater] COS 下载失败，切换 GitHub:', err.message);
     }
 
@@ -147,7 +147,7 @@ function createUpdateService(autoUpdater, logger = console) {
     offeredVersion = null;
     refreshingDownload = true;
     try {
-      selectSource(GITHUB_SOURCE);
+      selectSource(fallbackSource);
       const result = await autoUpdater.checkForUpdates();
       if (!result?.isUpdateAvailable || result.updateInfo.version !== version) {
         throw new Error(`GitHub 备用源尚未提供版本 ${version}，请稍后重新检查更新`);
@@ -193,7 +193,11 @@ function createUpdateService(autoUpdater, logger = console) {
     if (!state.downloaded) throw new Error('更新尚未下载完成');
     updateState({ installing: true, error: null });
     try {
-      autoUpdater.quitAndInstall(true, true);
+      const installation = autoUpdater.quitAndInstall(true, true);
+      if (installation?.then) return installation.then(() => true).catch((err) => {
+        reportError(err);
+        throw err;
+      });
       return true;
     } catch (err) {
       reportError(err);

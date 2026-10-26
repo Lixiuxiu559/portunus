@@ -2,6 +2,7 @@
 const { build } = require('./package.json');
 module.exports = {
   ...build,
+  compression: 'store',
   appId: 'com.portunus.app.dev',
   productName: 'Portunus Dev',
   directories: { output: 'dist-dev' },

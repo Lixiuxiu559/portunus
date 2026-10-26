@@ -315,3 +315,15 @@ test('缓存仅保留版本元数据，不克隆更新器内部取消令牌', as
   cached.updateInfo.version = 'tampered';
   assert.equal((await service.checkForUpdates()).updateInfo.version, '0.5.0');
 });
+
+test('独立安装器异步准备失败时恢复可重试状态，重试成功后退出', async () => {
+  const { service, updater } = setup();
+  await service.checkForUpdates();
+  await service.downloadUpdate();
+  updater.quitAndInstall = async () => { throw new Error('helper preflight failed'); };
+  await assert.rejects(service.quitAndInstall(), /helper preflight failed/);
+  assert.equal(service.getState().installing, false);
+  assert.equal(service.getState().downloaded, true);
+  updater.quitAndInstall = async () => {};
+  assert.equal(await service.quitAndInstall(), true);
+});

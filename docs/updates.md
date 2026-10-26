@@ -13,10 +13,26 @@ Portunus 默认从腾讯云 COS 获取更新，检查更新或下载安装包失
 三个平台启动后检查更新，发现新版后在后台自动下载。下载完成后，所有页面均显示「重启以更新」，设置页也提供同一入口。下载期间可以继续使用应用；下载失败后可在设置页重试。更新状态由主进程保存，切页或重建窗口不会丢失下载进度或待安装版本。
 
 - Windows：点击「重启以更新」后静默运行 NSIS 更新并启动新版，不显示安装向导。首次安装仍可选择目录；已有安装需要管理员权限时，Windows 仍可能显示 UAC 授权。
-- macOS：通过 ZIP 和 Squirrel.Mac 更新并重新启动，不需要重新拖入 DMG。正式自动更新要求应用签名；当前发布流水线未配置 Developer ID 签名，因此还需接入签名并进行实包验证。
+- macOS：ZIP 下载仍由 electron-updater 管理，安装阶段使用独立 Go helper，不经过 Squirrel.Mac。helper 校验内置 Ed25519 公钥对应的更新签名，在可写的应用父目录准备新版，处理隔离属性并进行 ad-hoc 签名。点击「重启以更新」后等待旧应用及其后端退出，再备份旧版、替换并启动新版。新版后端 ready 且 React 页面首次挂载后通过受限 IPC 握手才确认成功；90 秒未确认则停止新版进程组并恢复旧应用。不要求 Apple Developer ID；首次安装的系统放行仍由用户完成。
 - Linux：当前发布 AppImage，更新器替换 AppImage 后重新启动。需要从 AppImage 运行，且文件及所在目录允许当前用户写入。
 
-服务保留 `autoDownload = false`，由自己的检查流程自动调度下载，以确保后台下载同样经过 COS → GitHub 同版本回退。下载完成前拒绝安装；下载中或已就绪时，重复检查不会切换更新源或更换待安装版本。保留已有的正常退出时自动安装行为（`autoInstallOnAppQuit = true`）；Windows 关闭窗口到托盘不等于退出应用。
+服务保留 `autoDownload = false`，由自己的检查流程自动调度下载，以确保后台下载同样经过 COS → GitHub 同版本回退。下载完成前拒绝安装；下载中或已就绪时，重复检查不会切换更新源或更换待安装版本。Windows/Linux 保留正常退出时自动安装行为；macOS 仅在点击「重启以更新」后替换，普通退出不会安装。Windows 关闭窗口到托盘不等于退出应用。
+
+## macOS 独立更新签名
+
+普通退出后，下一次启动会重新验签并复用同版本、同摘要的准备包，避免反复解压留下重复应用副本。只有准备包的签名、应用身份和代码签名仍有效才复用。
+
+首次接入需要手动安装一次包含新 helper 的版本；已发布的 0.5.0 使用旧更新器，不能通过服务端清单让它自动获得新的安装能力。新更新器只接受比当前版本更新的稳定三段版本号、当前 CPU 架构和 `com.portunus.app` 应用标识；当前支持发布的 arm64 包以及未来同架构的 x64 单架构包，不接受 universal 包。
+
+- 仓库 `cmd/portunus-updater/public-key.pem` 是内置验证公钥。私钥仅保存在本机 `~/.config/portunus/update-signing-key.pem`（权限 0600），不进入仓库、安装包或日志；需要单独安全备份。更换公钥需要先让现有客户端通过旧密钥可信地接收新公钥，不能直接替换后继续发布。
+- `build:mac` 的 `afterAllArtifactBuild` 自动生成 `<版本ZIP>.sig`；缺失私钥或私钥与公钥不匹配时构建失败。私钥可通过 `PORTUNUS_UPDATE_SIGNING_KEY`（PEM 文本）或 `PORTUNUS_UPDATE_SIGNING_KEY_FILE` 指定。独立签名命令：`node web/scripts/sign-mac-update.mjs <ZIP路径> <版本> arm64`。
+- GitHub Release workflow 需配置 `PORTUNUS_UPDATE_SIGNING_KEY` 仓库 Secret，值为同一私钥的 PEM 文本。本次本地改造不自动上传私钥；配置完成前 CI 的 macOS 发版会明确失败。
+- 签名绑定协议标识、应用 ID、版本、架构、文件大小和 ZIP 的 SHA-512。更新源提供的 SHA-512 用于传输完整性检查，独立签名防止同时篡改包和清单。更新器只通过 HTTPS 下载签名文件，缺少签名也会触发原有同版本 GitHub 回退。
+- COS 脚本对 0.5.0 之后的 mac ZIP 要求存在匹配的 `.sig` 元数据，签名文件随安装包先上传，最后才发布更新清单。密码学验证在客户端 helper 中执行；上传脚本检查签名字段格式与包摘要，不代替客户端验签。
+
+安装器只使用当前用户权限，不调用 sudo、不更改 Gatekeeper 全局设置。应用父目录必须可写；从只读 DMG 运行时先移到可写安装目录。准备或预检失败会留在当前应用中显示错误，事务诊断保存在应用旁的 `.portunus-update-*/install.log` 和 `result.json`。失败后旧应用无法自动启动时，可从原路径手动打开；备份恢复失败时日志会给出 `Previous.app` 路径。
+
+成功后清理旧应用备份与 ZIP，保留小型事务日志；失败事务保留失败应用供诊断。应用旁保留一个小型锁文件，内核锁随 helper 退出自动释放，不需删除该文件。更新器只替换 `.app`，不备份或回滚用户数据库。新版自身执行的数据迁移若不兼容旧版，应用回滚不能撤销迁移，发布前仍需验证兼容性。异常断电或 SIGKILL 中断替换后的事务恢复尚未自动化，不能将本轮结果视为这些情况已通过。
 
 ## 从本地同步正式版本
 
@@ -82,3 +98,5 @@ python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 客户端更新逻辑：在 `web/` 目录运行 `pnpm test`。离线测试不替代正式安装包的真实下载与安装验证。
+
+独立 helper：`go test ./cmd/portunus-updater`。macOS 实包隔离验收：先在 `web/` 执行 `pnpm run build:go:release`，再运行 `node scripts/mac-update-smoke.mjs`。它创建临时 Electron 应用、本机 HTTPS 更新源、随机端口与独立数据，验证正常更新、包被篡改及启动未确认回滚，不操作正式版或 Dev 安装。验收设计见[macOS 更新测试设计](test-design/2026-10-26-macos-updater.md)。

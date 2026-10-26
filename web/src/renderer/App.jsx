@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Background from './components/Background';
 import Layout from './components/Layout';
@@ -19,6 +19,13 @@ export async function preloadInitialPage(hash) {
   pages[page] = (await pageLoaders[page]()).default;
 }
 
+function ReadyPage({ children }) {
+  useEffect(() => {
+    window.api?.confirmRendererReady?.().catch(() => {});
+  }, []);
+  return children;
+}
+
 export default function App() {
   const { channels: Channels, models: Models, groups: Groups, logs: Logs, clients: Clients, settings: Settings } = pages;
   return (
@@ -27,12 +34,12 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/channels" replace />} />
-          <Route path="channels" element={<Channels />} />
-          <Route path="models" element={<Models />} />
-          <Route path="groups" element={<Groups />} />
-          <Route path="logs" element={<Logs />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="channels" element={<ReadyPage><Channels /></ReadyPage>} />
+          <Route path="models" element={<ReadyPage><Models /></ReadyPage>} />
+          <Route path="groups" element={<ReadyPage><Groups /></ReadyPage>} />
+          <Route path="logs" element={<ReadyPage><Logs /></ReadyPage>} />
+          <Route path="clients" element={<ReadyPage><Clients /></ReadyPage>} />
+          <Route path="settings" element={<ReadyPage><Settings /></ReadyPage>} />
         </Route>
       </Routes>
     </HashRouter>
