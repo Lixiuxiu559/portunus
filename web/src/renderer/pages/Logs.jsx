@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Typography, Button, Card, TextField, Input, Select, ListBox, Label, Tooltip } from '@heroui/react';
+import { Typography, Button, Card, TextField, Input, Select, ListBox, Label } from '@heroui/react';
 import { Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { buildLogParams } from '../utils/logQuery';
@@ -372,15 +372,12 @@ export default function Logs() {
   );
 }
 
+// 单元格整格悬浮说明。用原生 title 而不是逐格 Tooltip/Button：
+// 20 行 × 8 列会创建 160 组 HeroUI 组件，切换页面时造成明显长任务。
 function LogCell({ text, children, className = '' }) {
-  return <Tooltip delay={250}>
-    <Button variant="tertiary" className={`log-cell-tooltip-trigger ${className}`}>
-      {children}
-    </Button>
-    <Tooltip.Content className="max-w-[min(32rem,calc(100vw-2rem))] whitespace-pre-wrap break-words text-sm">
-      {text}
-    </Tooltip.Content>
-  </Tooltip>;
+  return <span title={text} className={`log-cell-tooltip-trigger ${className}`}>
+    {children}
+  </span>;
 }
 
 function StatCard({ label, value, detail }) {

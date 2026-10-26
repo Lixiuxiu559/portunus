@@ -14,7 +14,7 @@
 .logs-filter-field { flex: 1 1 150px; min-width: 128px; max-width: 220px; }
 .logs-table { flex: 1 0 180px; min-height: 180px; border-radius: 16px; font-variant-numeric: tabular-nums; container-type: inline-size; container-name: logs-table; }
 .logs-table [role="grid"] { table-layout: fixed; min-width: 1166px; }
-.log-cell-tooltip-trigger.button { display: block; width: 100%; min-width: 0; height: auto; min-height: 0; padding: 0; border: 0; border-radius: 2px; background: transparent; color: inherit; font: inherit; text-align: center; white-space: normal; cursor: default; }
+.log-cell-tooltip-trigger { display: block; width: 100%; min-width: 0; height: auto; min-height: 0; padding: 0; border: 0; border-radius: 2px; background: transparent; color: inherit; font: inherit; text-align: center; white-space: normal; cursor: default; }
 /* 只有表格真正横向溢出时，才把行操作固定在右侧；颜色沿用表格玻璃与表头底色，避免出现色带。 */
 @container logs-table (max-width: 1165px) {
   .logs-table th:last-child, .logs-table td:last-child { position: sticky; right: 0; background: color-mix(in oklch, var(--surface) 70%, transparent); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)); box-shadow: -1px 0 0 var(--separator); }
