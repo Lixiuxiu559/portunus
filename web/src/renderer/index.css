@@ -251,7 +251,8 @@ body {
 
 /*
  * 背景装饰层（Background.jsx）：
- * 底部大尺寸模糊色块漂浮 + 顶层蒙版压色，形成可感知但不打扰的背景氛围。
+ * 静态模糊色块 + 顶层蒙版压色，保留柔光氛围。
+ * 不常驻动画或 will-change，避免背景变化驱动上方玻璃层每帧重新合成。
  * 蒙版颜色跟随主题，避免遮挡前景内容。
  */
 #root {
@@ -271,8 +272,6 @@ body {
   border-radius: 50%;
   filter: blur(64px);
   opacity: 1;
-  will-change: transform;
-  animation: blob-drift 24s ease-in-out infinite;
 }
 
 .bg-decor .mask {
@@ -857,7 +856,7 @@ html.dark .nav-tabs .nav-liquid-ripple {
 
 /*
  * 暗色下未选中 tab 提亮：全局 --muted（76%L）在实色底上够用，
- * 但玻璃顶栏叠了 accent 染色、色块飘过时背景亮度波动，对比被吃掉。
+ * 但玻璃顶栏叠了 accent 染色与背景柔光，对比被吃掉。
  * hover 从"降透明度"（暗底上是负反馈）改为"提亮到前景色"（暗色模式的正确语义）。
  */
 html.dark .nav-tabs .tabs__tab {
@@ -868,29 +867,6 @@ html.dark .nav-tabs .tabs__tab:not([data-selected="true"]):hover,
 html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) {
   opacity: 1;
   color: var(--foreground);
-}
-
-@keyframes blob-drift {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(6vw, -3vh) scale(1.1);
-  }
-  66% {
-    transform: translate(-4vw, -8vh) scale(0.95);
-  }
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-}
-
-/* 系统开启"减弱动态效果"时，装饰性无限动画（色块漂浮、品牌扫光）停为静态 */
-@media (prefers-reduced-motion: reduce) {
-  .bg-decor .blob,
-  .brand-name {
-    animation: none;
-  }
 }
 
 /*
@@ -997,12 +973,11 @@ html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) 
   background-position: -100px 0;
   -webkit-background-clip: text;
   background-clip: text;
-  animation: brand-shine 4s ease-in-out infinite;
 }
 
-/* 悬停时加速扫光形成循环高亮，基础色也更实 */
+/* 仅悬停时扫光一次；停留不循环，空闲时不触发持续重绘。 */
 .brand-name:hover {
-  animation-duration: 1.4s;
+  animation: brand-shine 1.4s ease-in-out;
   color: color-mix(in oklch, var(--foreground) 78%, transparent);
 }
 
@@ -1014,6 +989,12 @@ html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) 
   70%,
   100% {
     background-position: 160px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-name:hover {
+    animation: none;
   }
 }
 
