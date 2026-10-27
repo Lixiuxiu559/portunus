@@ -8,6 +8,7 @@ export const listQuotaSources = (channelId, options) => request.get(`/channels/$
 export const createQuotaSource = (channelId, data, options) => request.post(`/channels/${channelId}/quota-sources`, data, config(options));
 export const updateQuotaSource = (id, data, options) => request.put(`/quota-sources/${id}`, data, config(options));
 export const deleteQuotaSource = (id, options) => request.delete(`/quota-sources/${id}`, config(options));
+export const detectNewAPIQuota = (data, options) => request.post('/quota/newapi/detect', data, config({ ...options, __silentError: true }));
 export const previewQuotaSource = (data, options) => request.post('/quota-sources/preview', data, config(options));
 export const refreshQuotaSource = (id, options) => request.post(`/quota-sources/${id}/refresh`, undefined, config(options));
 export const getQuotaSummaries = (channelIds, options) => request.get('/quota/summaries', {

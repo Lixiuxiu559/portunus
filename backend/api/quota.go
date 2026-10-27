@@ -17,6 +17,7 @@ func registerQuotaRoutes(r *gin.RouterGroup, service *quota.Service) {
 	a := quotaAPI{service: service}
 	r.GET("/quota/adapters", func(c *gin.Context) { c.JSON(http.StatusOK, quota.Descriptors()) })
 	r.GET("/quota/summaries", a.summaries)
+	r.POST("/quota/newapi/detect", a.detectNewAPIUnits)
 	r.GET("/channels/:id/quota-sources", a.list)
 	r.POST("/channels/:id/quota-sources", a.create)
 	r.PUT("/quota-sources/:id", a.update)
@@ -159,4 +160,19 @@ func (a quotaAPI) summaries(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (a quotaAPI) detectNewAPIUnits(c *gin.Context) {
+	var input struct {
+		QueryBaseURL string `json:"query_base_url"`
+	}
+	if !bindQuota(c, &input) {
+		return
+	}
+	options, err := a.service.DetectNewAPIUnits(c.Request.Context(), input.QueryBaseURL)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"options": options})
 }

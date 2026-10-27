@@ -12,6 +12,11 @@ export function quotaDraft(source, adapter) {
   };
 }
 
+export function switchQuotaAdapter(draft, previous, adapter) {
+  const name = !draft.name.trim() || draft.name === previous?.name ? adapter.name : draft.name;
+  return { ...quotaDraft(null, adapter), name };
+}
+
 export function quotaPayload(draft, source, query = false) {
   const options = cloneConfig(draft.options);
   if (draft.adapter_id === 'custom.balance') options.custom = customPayload(options.custom, draft.customEditors);

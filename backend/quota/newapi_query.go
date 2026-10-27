@@ -224,7 +224,7 @@ func convertNewAPIItem(s ResolvedSource, item *Item) {
 		return
 	}
 	item.Original = &OriginalAmounts{Unit: item.Unit, Remaining: item.Remaining, Used: item.Used, Total: item.Total}
-	ratio, _ := parseDecimal(s.Options.QuotaPerUnit)
+	ratio, _ := parseNewAPIQuotaPerUnit(s.Options.QuotaPerUnit)
 	for _, field := range []**string{&item.Remaining, &item.Used, &item.Total} {
 		if *field != nil {
 			n, _ := parseDecimal(**field)

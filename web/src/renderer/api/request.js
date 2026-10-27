@@ -43,7 +43,7 @@ request.interceptors.response.use(
     if (method === 'get') {
       responseCache.write(url, params, response.data, __cacheGeneration);
     } else if (['post', 'put', 'patch', 'delete'].includes(method)
-      && !['/channels/preview-models', '/channels/resolve', '/channels/test', '/quota-sources/preview'].includes(url)) {
+      && !['/channels/preview-models', '/channels/resolve', '/channels/test', '/quota-sources/preview', '/quota/newapi/detect'].includes(url)) {
       // 渠道/模型/分组相互关联，写成功后统一失效，下一次进入重新加载。
       responseCache.invalidate();
     }
@@ -71,13 +71,13 @@ request.interceptors.response.use(
     const serverMsg = error.response?.data?.error;
     const msg = serverMsg || error.message || '网络错误，请检查后端服务';
 
-    toast.danger(msg, {
+    if (!config?.__silentError) toast.danger(msg, {
       description: httpStatus ? `HTTP ${httpStatus}` : '无法连接到服务器',
     });
 
     const err = new Error(msg);
     err.status = httpStatus;
-    console.error('[HTTP Error]', err.message);
+    if (!config?.__silentError) console.error('[HTTP Error]', err.message);
     return Promise.reject(err);
   },
 );

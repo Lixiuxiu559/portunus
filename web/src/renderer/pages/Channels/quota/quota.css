@@ -76,3 +76,6 @@
   .quota-editor-footer { gap: 8px; }
   .quota-editor-footer .button { padding-inline: 12px; font-size: 12px; }
 }
+
+.quota-detection { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.quota-detection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

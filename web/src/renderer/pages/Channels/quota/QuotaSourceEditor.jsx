@@ -4,6 +4,7 @@ import AppSelect from '../../../components/AppSelect';
 import CustomQuotaEditor from './CustomQuotaEditor';
 import useQuotaDraft from './useQuotaDraft';
 import { QuotaSourceState } from './QuotaSummary';
+import { newAPIDetectionTarget } from './newAPIDetection';
 import { canKeepQuotaToken } from './quotaModel';
 
 export default function QuotaSourceEditor({ channelId, source, adapters, onSaved, onCommitted, onCancel }) {
@@ -31,7 +32,7 @@ export default function QuotaSourceEditor({ channelId, source, adapters, onSaved
       {draft.adapter_id === 'newapi.account' && <p className="quota-help">同时查询钱包和订阅。请使用账户 Access Token，模型调用 Key 不适用；新版站点需授权个人资料与钱包读取权限。换算规则不明确时，请保留原始 QUOTA 单位。</p>}
       <div className="quota-form-grid">
       <label>来源名称<input required value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-      <label>查询根地址<input required type="url" value={draft.query_base_url} onChange={(event) => patch({ query_base_url: event.target.value, ...(draft.adapter_id === 'custom.balance' ? { token: '', clearToken: false } : {}) })} /></label>
+      <label>查询根地址<input required type="url" value={draft.query_base_url} onBlur={state.detect} onChange={(event) => patch({ query_base_url: event.target.value, ...(draft.adapter_id === 'custom.balance' ? { token: '', clearToken: false } : {}) })} /></label>
       </div>
       <p className="quota-help">凭据将发送到：{draft.query_base_url || '请填写查询地址'}。查询地址独立于渠道推理地址。</p>
       </section>
@@ -48,6 +49,12 @@ export default function QuotaSourceEditor({ channelId, source, adapters, onSaved
       {draft.adapter_id === 'custom.balance' && <CustomQuotaEditor draft={draft} patch={patch} methods={adapter?.request_methods} />}
       {!!adapter?.fields?.length && <section className="quota-form-section">
       <div className="quota-section-title"><span>03</span><h3>查询参数</h3></div>
+      {draft.adapter_id === 'newapi.account' && <div className="quota-detection">
+        <div className="quota-detection-actions"><Button type="button" variant="secondary" size="sm" isPending={state.detection.status === 'loading'} isDisabled={!!pending || state.detection.status === 'loading' || !newAPIDetectionTarget(draft)} onPress={state.retryDetection}>自动识别</Button>
+          {state.detection.status === 'success' && !state.detection.applied && <Button type="button" variant="secondary" size="sm" isDisabled={!!pending} onPress={state.applyDetection}>使用识别结果</Button>}
+        </div>
+        <p className="quota-help" role="status">{state.detection.status === 'loading' ? '正在读取站点公开配置…' : state.detection.status === 'error' ? '无法自动识别，已保留手动配置。可直接填写或继续使用现有值。' : state.detection.status === 'success' ? `识别结果：每展示单位对应额度 ${state.detection.options.quota_per_unit}，展示单位 ${state.detection.options.display_unit}。${state.detection.applied ? '已填入当前草稿，尚未保存。' : '已保留手动配置。'}` : '填写查询根地址后自动尝试识别，无需查询 Token；失败时保留手动配置。'}</p>
+      </div>}
       <div className="quota-form-grid">
       {(adapter?.fields || []).map((field) => <label key={field.key}>{field.label}
         <input required={field.required} value={draft.options[field.key] ?? ''} onChange={(event) => patch({ options: { ...draft.options, [field.key]: event.target.value } })} />

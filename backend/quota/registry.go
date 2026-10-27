@@ -93,11 +93,11 @@ func validateNewAPIOptions(o QueryOptions) error {
 		}
 		return nil
 	}
-	r, err := parseDecimal(o.QuotaPerUnit)
+	r, err := parseNewAPIQuotaPerUnit(o.QuotaPerUnit)
 	if err != nil || r.Sign() <= 0 {
-		return fmt.Errorf("每单位额度必须是正数")
+		return fmt.Errorf("每单位额度必须是正数或有效正数分数")
 	}
-	if len(o.DisplayUnit) == 0 || len(o.DisplayUnit) > 24 || strings.TrimSpace(o.DisplayUnit) != o.DisplayUnit || strings.ContainsAny(o.DisplayUnit, "\r\n\t") {
+	if !validNewAPIDisplayUnit(o.DisplayUnit) {
 		return fmt.Errorf("换算时必须填写有效展示单位")
 	}
 	return nil
