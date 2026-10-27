@@ -29,6 +29,7 @@ export default function QuotaSourceEditor({ channelId, source, adapters, onSaved
       </select></label>
       </div>
       {adapter?.description && <p className="text-xs text-muted">{adapter.description}</p>}
+      {draft.adapter_id === 'newapi.account' && <p className="quota-help">同时查询钱包和订阅。请使用账户 Access Token，模型调用 Key 不适用；新版站点需授权个人资料与钱包读取权限。换算规则不明确时，请保留原始 QUOTA 单位。</p>}
       <div className="quota-form-grid">
       <label>来源名称<input required value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
       <label>查询根地址<input required type="url" value={draft.query_base_url} onChange={(event) => patch({ query_base_url: event.target.value, ...(draft.adapter_id === 'custom.balance' ? { token: '', clearToken: false } : {}) })} /></label>

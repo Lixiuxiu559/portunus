@@ -1,13 +1,16 @@
+import { newAPIHasPartialFailure } from './newAPIQuotaModel';
+import { quotaCardPresentation } from './quotaCardModel';
+import QuotaCardBalance from './QuotaCardBalance';
 import { RefreshCw, Settings2, Wallet } from 'lucide-react';
 import QuotaItems from './QuotaItems';
 import './quota-summary.css';
-import { quotaStatus, visibleSnapshot, formatQuotaTime, formatQuotaRelativeTime, quotaValue } from './quotaModel';
+import { quotaStatus, visibleSnapshot, formatQuotaTime, formatQuotaRelativeTime } from './quotaModel';
 
 export function QuotaSourceState({ view, details = false }) {
   const snapshot = visibleSnapshot(view);
   return <div className="flex flex-col gap-2">
     <div className="text-xs text-muted" role="status">
-      {view?.in_progress ? '正在更新…' : quotaStatus[view?.status] || '状态未知'}
+      {view?.in_progress ? '正在更新…' : (newAPIHasPartialFailure(snapshot) ? '部分查询成功' : quotaStatus[view?.status]) || '状态未知'}
       {view?.last_success_at && <span title={formatQuotaTime(view.last_success_at)}> · 上次查询 {formatQuotaRelativeTime(view.last_success_at)}</span>}
     </div>
     {snapshot && <QuotaItems snapshot={snapshot} details={details} />}
@@ -26,34 +29,29 @@ function failureLabel(failure) {
 function CompactSource({ source, onConfigure, onRefresh, pending, refreshError }) {
   const view = source.state;
   const snapshot = visibleSnapshot(view);
-  const items = snapshot?.items || [];
+  const card = quotaCardPresentation(source.adapter_id, snapshot);
   const failure = refreshError || (view?.failure?.category === 'cancelled' ? null : view?.failure);
   const busy = Boolean(pending || view?.in_progress);
   const cooling = view?.next_allowed_at && new Date(view.next_allowed_at).getTime() > Date.now();
   const refreshTitle = !source.enabled ? '先在余额查询设置中启用此来源' : cooling ? `可再次查询：${formatQuotaTime(view.next_allowed_at)}` : busy ? '正在更新余额' : '刷新余额';
   const summary = source.enabled ? quotaStatus[view?.status] || '尚未查询' : '查询已关闭';
-  const heading = items.length ? items.every((item) => item.kind === 'balance' && item.unit?.kind === 'money') ? '账户余额' : '可用额度' : '余额查询';
   return <section className="quota-compact-source" aria-label={source.name}>
     <div className="quota-compact-heading">
-      <span className="quota-compact-name" title={source.name}>{heading}</span>
+      <span className="quota-compact-name" title={source.name}>{card.heading}</span>
       <div className="quota-compact-actions">
         <button type="button" className="quota-icon-button" aria-label={`刷新 ${source.name}`} title={refreshTitle}
           disabled={!source.enabled || busy || Boolean(cooling)} onClick={() => { onRefresh?.(source)?.catch(() => {}); }}>
           <RefreshCw size={13} className={busy ? 'quota-refresh-spinning' : ''} aria-hidden="true" />
         </button>
-        <button type="button" className="quota-icon-button" title="余额查询设置" aria-label="余额查询设置" onClick={onConfigure}><Settings2 size={14} aria-hidden="true" /></button>
+        <button type="button" className="quota-icon-button" title="查看余额详情与查询设置" aria-label="查看余额详情与查询设置" onClick={onConfigure}><Settings2 size={14} aria-hidden="true" /></button>
       </div>
     </div>
-    {!!items.length && <div className="quota-compact-values">
-      {items.slice(0, 2).map((item) => <div className="quota-compact-amount" key={item.id} title={`${item.label}：${quotaValue(item)}`}>
-        {items.length > 1 && <span>{item.label}</span>}<strong>{quotaValue(item)}</strong>
-      </div>)}
+    <QuotaCardBalance rows={card.rows} lastSuccessAt={view?.last_success_at} />
+    {card.notice && <p className="quota-card-notice" role="status">{card.notice}</p>}
+    {(failure || !card.rows.length || card.moreCount > 0) && <div className="quota-compact-meta" role="status">
+      {failure ? <span className="quota-compact-failure" title={failure.message || String(failure)}>{failureLabel(failure)}</span> : !card.rows.length && <span>{busy ? '正在查询…' : summary}</span>}
+      {card.moreCount > 0 && <button type="button" className="quota-more-items" onClick={onConfigure}>查看全部 {card.moreCount} 项</button>}
     </div>}
-    <div className="quota-compact-meta" role="status">
-      {failure ? <span className="quota-compact-failure" title={failure.message || String(failure)}>{failureLabel(failure)}</span> : !items.length && <span>{busy ? '正在查询…' : summary}</span>}
-      {view?.last_success_at && <span title={`上次查询成功：${formatQuotaTime(view.last_success_at)}`}>{failure ? '上次查询 ' : ''}{formatQuotaRelativeTime(view.last_success_at)}</span>}
-      {items.length > 2 && <button type="button" className="quota-more-items" onClick={onConfigure}>查看全部 {items.length} 项</button>}
-    </div>
   </section>;
 }
 

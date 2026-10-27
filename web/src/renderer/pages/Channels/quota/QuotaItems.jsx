@@ -1,6 +1,8 @@
+import NewAPIQuota from './NewAPIQuota';
 import { quotaValue, formatQuotaTime } from './quotaModel';
 
 export default function QuotaItems({ snapshot, details = false }) {
+  if (snapshot?.newapi) return <NewAPIQuota snapshot={snapshot} />;
   return <div className="quota-items">{(snapshot?.items || []).map((item) => <div key={item.id} className="quota-item">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <span>{item.label}</span><strong className="font-medium tabular-nums">{quotaValue(item)}</strong>

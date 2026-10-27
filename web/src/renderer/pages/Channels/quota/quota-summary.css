@@ -12,6 +12,10 @@
 .quota-icon-button:focus-visible, .quota-empty-link:focus-visible, .quota-more-items:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .quota-icon-button:disabled { cursor: default; opacity: .45; background: transparent; }
 .quota-compact-values { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.quota-compact-body { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.quota-compact-body > .quota-compact-values, .quota-compact-body > .quota-compact-amount { flex: 1; min-width: 0; }
+.quota-compact-time { flex-shrink: 0; white-space: nowrap; font-size: 10px; line-height: 16px; color: var(--muted); }
+.quota-compact-amount small { margin-left: 5px; color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: normal; }
 .quota-compact-amount { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
 .quota-compact-amount > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .quota-compact-amount strong { font-size: 20px; font-weight: 600; line-height: 28px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
@@ -25,6 +29,48 @@
 .quota-empty-link:hover { color: var(--accent); }
 .quota-empty-link:disabled { cursor: default; }
 .quota-summary-error { color: var(--muted); font-size: 11px; }
+.quota-card-notice { color: var(--warning, var(--accent)); font-size: 11px; line-height: 1.6; margin: 0; }
 .quota-refresh-spinning { animation: quota-refresh-spin 1s linear infinite; }
 @keyframes quota-refresh-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .quota-refresh-spinning { animation: none; } }
+
+/* NewAPI 详情：钱包与订阅分别展示。 */
+.newapi-query-notice { color: var(--warning, var(--accent)); font-size: 11px; line-height: 1.6; margin: 0; }
+.newapi-account-overview { display: flex; flex-direction: column; gap: 18px; padding-top: 8px; min-width: 0; }
+.newapi-overview-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
+.newapi-billing-tag, .newapi-active-tag { color: var(--accent); background: color-mix(in oklch, var(--accent) 9%, transparent); border: 1px solid color-mix(in oklch, var(--accent) 18%, transparent); border-radius: 99px; padding: 3px 9px; font-size: 11px; white-space: nowrap; }
+.newapi-wallet-panel { border: 1px solid var(--separator); border-radius: 14px; background: var(--surface-secondary); padding: 16px 18px; }
+.newapi-wallet-title { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.newapi-wallet-panel > strong { display: block; margin-top: 8px; font-size: 30px; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.newapi-wallet-panel small, .newapi-subscription-remaining small { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 6px; }
+.newapi-wallet-panel > p { margin-top: 7px; color: var(--muted); font-size: 11px; }
+.newapi-wallet-panel > .newapi-query-notice { color: var(--warning, var(--accent)); }
+.newapi-subscriptions-title { margin-bottom: 12px; }
+.newapi-subscriptions-title h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.newapi-subscriptions-title h3 > span { display: grid; place-items: center; min-width: 20px; height: 20px; border-radius: 6px; background: var(--surface-secondary); color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.newapi-subscriptions-title p { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.newapi-subscription-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.newapi-subscription-card { min-width: 0; padding: 15px; border: 1px solid var(--separator); border-radius: 12px; background: var(--surface-secondary); }
+.newapi-subscription-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.newapi-subscription-heading h4 { font-size: 13px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.newapi-subscription-id { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.newapi-active-tag { flex-shrink: 0; padding: 2px 7px; font-size: 10px; }
+.newapi-subscription-remaining { margin-top: 14px; }
+.newapi-subscription-remaining > span { display: block; color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+.newapi-subscription-remaining strong { font-size: 23px; line-height: 1.25; font-weight: 600; letter-spacing: -.025em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.newapi-usage { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+.newapi-usage-track { flex: 1; height: 4px; border-radius: 99px; background: var(--separator); overflow: hidden; }
+.newapi-usage-track > div { height: 100%; border-radius: inherit; background: var(--accent); }
+.newapi-usage > span { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.newapi-subscription-stats { margin-top: 10px; font-size: 10px; color: var(--muted); }
+.newapi-subscription-stats > div { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 3px; }
+.newapi-subscription-stats dd { text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.newapi-subscription-dates { border-top: 1px solid var(--separator); padding-top: 9px; margin-top: 12px; font-size: 10px; line-height: 1.65; color: var(--muted); }
+.newapi-subscription-dates p { display: flex; gap: 5px; align-items: center; }
+.newapi-subscription-dates .newapi-reset-due { color: var(--warning, var(--accent)); }
+.newapi-original { margin-top: 9px; font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
+.newapi-original summary { cursor: pointer; }
+.newapi-original p { margin-top: 5px; }
+.newapi-no-subscriptions { padding: 20px; border: 1px dashed var(--separator); border-radius: 12px; text-align: center; color: var(--muted); font-size: 12px; }
+.newapi-observation-note { font-size: 10px; line-height: 1.7; color: var(--muted); margin: 0; }
+@media (max-width: 640px) { .newapi-subscription-grid { grid-template-columns: 1fr; } }
