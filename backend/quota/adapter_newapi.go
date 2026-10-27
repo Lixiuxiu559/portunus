@@ -9,7 +9,7 @@ import (
 type newAPIAdapter struct{}
 
 func (newAPIAdapter) Describe() Descriptor {
-	return Descriptor{ID: "newapi.account", Name: "NewAPI 账户额度", Description: "使用独立账号 Access Token；未配置换算时展示原始额度单位", ProviderIDs: []string{"newapi"}, CredentialModes: []string{"dedicated"}, Fields: []Field{{Key: "user_id", Label: "用户 ID", Required: true}, {Key: "quota_per_unit", Label: "每展示单位对应额度", Help: "可选正数，按站点配置填写，无默认换算"}, {Key: "display_unit", Label: "展示单位", Help: "填写换算比例时必填，例如 CNY 或 credits"}}, SourceURL: "https://docs.newapi.pro/en/docs/api/management/user-management/user-self-get"}
+	return Descriptor{ID: "newapi.account", Name: "New API 钱包与订阅", Description: "使用独立账号 Access Token 查询钱包和生效中订阅；按站点配置显式换算额度", ProviderIDs: []string{"newapi"}, CredentialModes: []string{"dedicated"}, Fields: []Field{{Key: "user_id", Label: "用户 ID", Required: true}, {Key: "quota_per_unit", Label: "每展示单位对应额度", Help: "可选正数，按站点配置填写，无默认换算"}, {Key: "display_unit", Label: "展示单位", Help: "填写换算比例时必填，例如 CNY 或 credits"}}, SourceURL: "https://docs.newapi.pro/en/docs/api/management/user-management/user-self-get"}
 }
 func (a newAPIAdapter) Validate(s Source) error {
 	if err := validateAdapterSource(s, a.Describe()); err != nil {
@@ -65,7 +65,7 @@ func (newAPIAdapter) Parse(s ResolvedSource, _ http.Header, b []byte) (*Snapshot
 			unit.Kind = "money"
 		}
 	}
-	item := balanceItem("account_quota", "账户额度", unit.Code, remaining)
+	item := balanceItem("account_quota", "钱包额度", unit.Code, remaining)
 	item.Unit = unit
 	item.Used = used
 	item.Original = original

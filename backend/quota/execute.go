@@ -26,18 +26,50 @@ func Execute(ctx context.Context, doer HTTPDoer, adapter Adapter, source Resolve
 	if adapter == nil {
 		return nil, &Failure{Code: "unsupported_adapter", Category: "configuration", Message: "不支持此额度查询适配器"}
 	}
+	if a, ok := adapter.(newAPIAdapter); ok {
+		return executeNewAPI(ctx, doer, a, source)
+	}
 	spec, err := adapter.BuildRequest(source)
 	if err != nil {
-		return nil, &Failure{Code: "invalid_configuration", Category: "configuration", Message: "查询地址、凭据或参数无效"}
+		return nil, configurationFailure()
 	}
-	if !validRequestMethod(adapter.Describe(), spec) {
-		return nil, &Failure{Code: "invalid_configuration", Category: "configuration", Message: "额度查询只允许读取请求"}
+	budget := maxResponseBytes
+	body, headers, status, failure := executeRequest(ctx, doer, adapter.Describe(), spec, &budget)
+	if failure != nil {
+		return nil, failure
+	}
+	snapshot, failure := adapter.Parse(source, headers, body)
+	if failure != nil {
+		failure.UpstreamStatus = status
+		return nil, failure
+	}
+	if !validateSnapshot(snapshot) {
+		failure = invalidResponse()
+		failure.UpstreamStatus = status
+		return nil, failure
+	}
+	return snapshot, nil
+}
+func configurationFailure() *Failure {
+	return &Failure{Code: "invalid_configuration", Category: "configuration", Message: "查询地址、凭据或参数无效"}
+}
+
+// All requests, including multipart account reads, share the same bounded transport.
+func executeRequest(ctx context.Context, doer HTTPDoer, descriptor Descriptor, spec RequestSpec, budget *int) ([]byte, http.Header, int, *Failure) {
+	if ctx.Err() != nil {
+		return nil, nil, 0, requestFailure(ctx, ctx.Err(), "network_error", "额度查询连接失败")
+	}
+	if *budget <= 0 {
+		return nil, nil, 0, &Failure{Code: "response_too_large", Category: "invalid_response", Message: "上游额度响应超过大小限制"}
+	}
+	if !validRequestMethod(descriptor, spec) {
+		return nil, nil, 0, configurationFailure()
 	}
 	requestCtx, requestCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer requestCancel()
 	req, err := http.NewRequestWithContext(requestCtx, spec.Method, spec.URL, bytes.NewReader(spec.Body))
 	if err != nil {
-		return nil, &Failure{Code: "invalid_configuration", Category: "configuration", Message: "无法构造额度查询请求"}
+		return nil, nil, 0, &Failure{Code: "invalid_configuration", Category: "configuration", Message: "无法构造额度查询请求"}
 	}
 	req.Header = spec.Headers.Clone()
 	if doer == nil {
@@ -57,47 +89,40 @@ func Execute(ctx context.Context, doer HTTPDoer, adapter Adapter, source Resolve
 		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
 		}
-		return nil, requestFailure(requestCtx, err, "network_error", "额度查询连接失败")
+		return nil, nil, 0, requestFailure(requestCtx, err, "network_error", "额度查询连接失败")
 	}
 	if resp == nil {
-		return nil, &Failure{Code: "invalid_response", Category: "invalid_response", Message: "上游没有返回有效响应"}
+		return nil, nil, 0, &Failure{Code: "invalid_response", Category: "invalid_response", Message: "上游没有返回有效响应"}
 	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, httpFailure(resp.StatusCode, resp.Header)
+		return nil, nil, resp.StatusCode, httpFailure(resp.StatusCode, resp.Header)
 	}
 	if resp.Body == nil {
-		return nil, invalidResponse()
+		return nil, nil, resp.StatusCode, invalidResponse()
 	}
-	if resp.ContentLength > maxResponseBytes {
-		return nil, &Failure{Code: "response_too_large", Category: "invalid_response", Message: "上游额度响应超过大小限制", UpstreamStatus: resp.StatusCode}
+	if resp.ContentLength > int64(*budget) {
+		return nil, nil, 0, &Failure{Code: "response_too_large", Category: "invalid_response", Message: "上游额度响应超过大小限制", UpstreamStatus: resp.StatusCode}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	limit := *budget
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1))
+	*budget = max(0, *budget-len(body))
 	if err != nil {
 		f := requestFailure(requestCtx, err, "response_read_error", "读取上游额度响应失败")
 		f.UpstreamStatus = resp.StatusCode
-		return nil, f
+		return nil, nil, resp.StatusCode, f
 	}
-	if len(body) > maxResponseBytes {
-		return nil, &Failure{Code: "response_too_large", Category: "invalid_response", Message: "上游额度响应超过大小限制", UpstreamStatus: resp.StatusCode}
+	if len(body) > limit {
+		return nil, nil, 0, &Failure{Code: "response_too_large", Category: "invalid_response", Message: "上游额度响应超过大小限制", UpstreamStatus: resp.StatusCode}
 	}
 	if requestCtx.Err() != nil {
-		return nil, requestFailure(requestCtx, requestCtx.Err(), "network_error", "额度查询连接失败")
+		return nil, nil, 0, requestFailure(requestCtx, requestCtx.Err(), "network_error", "额度查询连接失败")
 	}
-	snapshot, failure := adapter.Parse(source, resp.Header, body)
-	if failure != nil {
-		failure.UpstreamStatus = resp.StatusCode
-		return nil, failure
-	}
-	if !validateSnapshot(snapshot) {
-		failure = invalidResponse()
-		failure.UpstreamStatus = resp.StatusCode
-		return nil, failure
-	}
-	return snapshot, nil
+	return body, resp.Header, resp.StatusCode, nil
 }
+
 func requestFailure(ctx context.Context, err error, code, message string) *Failure {
 	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
 		return &Failure{Code: "cancelled", Category: "cancelled", Message: "额度查询已取消"}

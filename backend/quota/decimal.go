@@ -99,7 +99,11 @@ func balanceItem(id, label, code string, remaining *string) Item {
 	return Item{ID: id, Label: label, Kind: "balance", Scope: "account", Unit: Unit{Kind: "money", Code: code}, Remaining: remaining, LimitState: "unknown"}
 }
 func validateSnapshot(s *Snapshot) bool {
-	if s == nil || len(s.Items) == 0 || len(s.Items) > 100 {
+	maxItems := 100
+	if s != nil && s.NewAPI != nil {
+		maxItems++ // 100 subscriptions plus the independently queried wallet.
+	}
+	if s == nil || len(s.Items) > maxItems || (len(s.Items) == 0 && (s.NewAPI == nil || (s.NewAPI.Wallet.Status != "ok" && s.NewAPI.Subscriptions.Status != "ok"))) {
 		return false
 	}
 	seen := map[string]bool{}

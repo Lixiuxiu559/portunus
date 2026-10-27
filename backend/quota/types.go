@@ -113,13 +113,41 @@ type Item struct {
 	Total           *string          `json:"total,omitempty"`
 	UsedPercent     *float64         `json:"used_percent,omitempty"`
 	LimitState      string           `json:"limit_state"`
+	ExpiresAt       *time.Time       `json:"expires_at,omitempty"`
+	SubscriptionID  string           `json:"subscription_id,omitempty"`
+	PlanID          string           `json:"plan_id,omitempty"`
 	ResetsAt        *time.Time       `json:"resets_at,omitempty"`
 	SourceUpdatedAt *time.Time       `json:"source_updated_at,omitempty"`
 	AccountStatus   string           `json:"account_status,omitempty"`
 	Original        *OriginalAmounts `json:"original,omitempty"`
 }
 type Snapshot struct {
-	Items []Item `json:"items"`
+	Items  []Item        `json:"items"`
+	NewAPI *NewAPIStatus `json:"newapi,omitempty"`
+}
+
+// QueryPartStatus distinguishes an explicit empty response from an unreadable endpoint.
+type QueryPartStatus struct {
+	Status  string   `json:"status"`
+	Failure *Failure `json:"failure,omitempty"`
+}
+type NewAPIStatus struct {
+	BillingPreference   string                     `json:"billing_preference"`
+	Wallet              QueryPartStatus            `json:"wallet"`
+	Subscriptions       QueryPartStatus            `json:"subscriptions"`
+	Plans               *QueryPartStatus           `json:"plans,omitempty"`
+	SubscriptionSummary *NewAPISubscriptionSummary `json:"subscription_summary,omitempty"`
+	AccountSummary      *Item                      `json:"account_summary,omitempty"`
+}
+
+// NewAPISubscriptionSummary aggregates subscriptions only, never wallet quota.
+type NewAPISubscriptionSummary struct {
+	Count          int        `json:"count"`
+	UnlimitedCount int        `json:"unlimited_count"`
+	Remaining      *string    `json:"remaining,omitempty"`
+	Unit           Unit       `json:"unit"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	ResetsAt       *time.Time `json:"resets_at,omitempty"`
 }
 type Failure struct {
 	Code              string `json:"code"`

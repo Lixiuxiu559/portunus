@@ -385,6 +385,13 @@ func (s *Service) applyResult(st *State, src Source, snapshot *Snapshot, failure
 		st.ConsecutiveFailures = 0
 		st.NextAllowedAt = nil
 		st.NextScheduledAt = nextRegular(src, now)
+		if seconds := newAPIRetryAfter(snapshot); seconds > 0 {
+			next := now.Add(time.Duration(seconds) * time.Second)
+			st.NextAllowedAt = &next
+			if st.NextScheduledAt != nil && st.NextScheduledAt.Before(next) {
+				st.NextScheduledAt = &next
+			}
+		}
 		return
 	}
 	if failure == nil {
@@ -403,13 +410,7 @@ func (s *Service) applyResult(st *State, src Source, snapshot *Snapshot, failure
 	}
 	st.ConsecutiveFailures++
 	if failure.Category == "rate_limited" {
-		seconds := failure.RetryAfterSeconds
-		if seconds <= 0 {
-			seconds = 60
-		}
-		if seconds > 3600 {
-			seconds = 3600
-		}
+		seconds := rateLimitDelay(failure)
 		next := now.Add(time.Duration(seconds) * time.Second)
 		st.NextAllowedAt = &next
 		if src.AutoRefreshMinutes > 0 {
@@ -429,4 +430,12 @@ func (s *Service) applyResult(st *State, src Source, snapshot *Snapshot, failure
 			st.NextScheduledAt = &next
 		}
 	}
+}
+
+func rateLimitDelay(failure *Failure) int64 {
+	seconds := failure.RetryAfterSeconds
+	if seconds <= 0 {
+		seconds = 60
+	}
+	return min(seconds, 3600)
 }

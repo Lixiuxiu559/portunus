@@ -70,14 +70,70 @@ func decodeQuotaSource(t *testing.T, w *httptest.ResponseRecorder) quota.SourceV
 	return src
 }
 
+func quotaNewAPIBodies() map[string]string {
+	reset := time.Now().Add(time.Hour).Unix()
+	return map[string]string{
+		"/prefix/api/user/self":          `{"success":true,"data":{"quota":0,"used_quota":6643841489}}`,
+		"/prefix/api/subscription/self":  fmt.Sprintf(`{"success":true,"data":{"billing_preference":"subscription_first","subscriptions":[{"subscription":{"id":11,"plan_id":3,"amount_total":100000000,"amount_used":0,"status":"active","start_time":1,"end_time":4102444800,"next_reset_time":%d}},{"subscription":{"id":12,"plan_id":3,"amount_total":50000000,"amount_used":49999999,"status":"active","start_time":1,"end_time":4102444800,"next_reset_time":%d}}]}}`, reset, reset),
+		"/prefix/api/subscription/plans": `{"success":true,"data":[{"plan":{"id":3,"title":"月度套餐"}}]}`,
+	}
+}
+
+func assertQuotaNewAPIAccount(t *testing.T, snapshot *quota.Snapshot) {
+	t.Helper()
+	if snapshot == nil || snapshot.NewAPI == nil || len(snapshot.Items) != 3 {
+		t.Fatalf("missing wallet or independent subscriptions: %+v", snapshot)
+	}
+	items := map[string]quota.Item{}
+	for _, item := range snapshot.Items {
+		items[item.ID] = item
+	}
+	for id, remaining := range map[string]string{"account_quota": "0", "subscription:11": "100000000", "subscription:12": "1"} {
+		item, ok := items[id]
+		if !ok || item.Remaining == nil || *item.Remaining != remaining || item.Unit.Code != "QUOTA" {
+			t.Fatalf("%s: %+v, want remaining %s QUOTA", id, item, remaining)
+		}
+		if id != "account_quota" && (item.PlanID != "3" || item.Label != "月度套餐") {
+			t.Fatalf("same-plan subscription lost its identity or title: %+v", item)
+		}
+	}
+	// Assert the public JSON contract used by the channel card as well as the detail items.
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var public struct {
+		NewAPI struct {
+			BillingPreference string `json:"billing_preference"`
+			Summary           *struct {
+				Count          int        `json:"count"`
+				UnlimitedCount int        `json:"unlimited_count"`
+				Remaining      string     `json:"remaining"`
+				Unit           quota.Unit `json:"unit"`
+				ExpiresAt      *time.Time `json:"expires_at"`
+				ResetsAt       *time.Time `json:"resets_at"`
+			} `json:"subscription_summary"`
+		} `json:"newapi"`
+	}
+	if err = json.Unmarshal(encoded, &public); err != nil {
+		t.Fatal(err)
+	}
+	summary := public.NewAPI.Summary
+	if public.NewAPI.BillingPreference != "subscription_first" || summary == nil || summary.Count != 2 || summary.UnlimitedCount != 0 || summary.Remaining != "100000001" || summary.Unit.Code != "QUOTA" || summary.ExpiresAt == nil || summary.ResetsAt == nil {
+		t.Fatalf("incorrect subscription-only aggregate: %s", encoded)
+	}
+}
+
 func TestQuotaAPIPreviewSaveRefreshAndSecrets(t *testing.T) {
 	calls := 0
+	bodies := quotaNewAPIBodies()
 	client := quotaHTTPFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
-		if r.URL.String() != "https://station.example/prefix/api/user/self" || r.Header.Get("Authorization") != "Bearer quota-private-token" || r.Header.Get("New-Api-User") != "42" {
+		body, ok := bodies[r.URL.Path]
+		if !ok || r.URL.Scheme != "https" || r.URL.Host != "station.example" || r.Method != http.MethodGet || r.Header.Get("Authorization") != "Bearer quota-private-token" || r.Header.Get("New-Api-User") != "42" {
 			t.Errorf("bad query target/auth: %s", r.URL.Path)
 		}
-		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"success":true,"data":{"group":"default","quota":1000000,"used_quota":500000}}`))}, nil
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 	})
 	r, _, ch := quotaFixture(t, client)
 	token := "quota-private-token"
@@ -92,9 +148,14 @@ func TestQuotaAPIPreviewSaveRefreshAndSecrets(t *testing.T) {
 	preview := quota.PreviewInput{SourceInput: in, ChannelID: ch.ID, SourceID: src.ID}
 	preview.Credentials = nil
 	w = quotaRequest(t, r, "POST", "/api/quota-sources/preview", preview, 200)
-	if !strings.Contains(w.Body.String(), "1000000") || calls != 1 {
+	var previewView quota.View
+	if err := json.Unmarshal(w.Body.Bytes(), &previewView); err != nil {
+		t.Fatal(err)
+	}
+	if previewView.Status != "fresh" || calls != 3 {
 		t.Fatalf("raw preview: %s", w.Body.String())
 	}
+	assertQuotaNewAPIAccount(t, previewView.Snapshot)
 	var stateCount int64
 	shared.DB.Model(&quota.State{}).Count(&stateCount)
 	if stateCount != 0 {
@@ -106,19 +167,133 @@ func TestQuotaAPIPreviewSaveRefreshAndSecrets(t *testing.T) {
 	in.ExpectedRevision = src.ConfigRevision
 	src = decodeQuotaSource(t, quotaRequest(t, r, "PUT", fmt.Sprintf("/api/quota-sources/%d", src.ID), in, 200))
 	quotaRequest(t, r, "PUT", fmt.Sprintf("/api/quota-sources/%d", src.ID), in, 409)
+	if calls != 3 {
+		t.Fatal("saving configuration sent an upstream query")
+	}
 	src = decodeQuotaSource(t, quotaRequest(t, r, "POST", fmt.Sprintf("/api/quota-sources/%d/refresh", src.ID), nil, 200))
-	if src.State.Snapshot == nil || src.State.Status != "fresh" || calls != 2 {
+	if src.State.Snapshot == nil || src.State.Status != "fresh" || calls != 6 {
 		t.Fatalf("refresh: %+v calls=%d", src.State, calls)
 	}
+	assertQuotaNewAPIAccount(t, src.State.Snapshot)
 	quotaRequest(t, r, "GET", fmt.Sprintf("/api/quota/summaries?channel_ids=%d", ch.ID), nil, 200)
 	quotaRequest(t, r, "GET", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), nil, 200)
-	if calls != 2 {
+	if calls != 6 {
 		t.Fatal("cache read sent network request")
 	}
 	quotaRequest(t, r, "DELETE", fmt.Sprintf("/api/quota-sources/%d", src.ID), nil, 200)
 	shared.DB.Model(&quota.State{}).Count(&stateCount)
 	if stateCount != 0 {
 		t.Fatal("source delete orphaned state")
+	}
+}
+
+func TestQuotaAPINewAPIPartialRateLimitPreservesDataAndCooldown(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		limited   map[string]string
+		wait      time.Duration
+		itemCount int
+		calls     int
+	}{
+		{"wallet", map[string]string{"/prefix/api/user/self": "120"}, 120 * time.Second, 2, 3},
+		{"subscriptions", map[string]string{"/prefix/api/subscription/self": "120"}, 120 * time.Second, 1, 2},
+		{"plans", map[string]string{"/prefix/api/subscription/plans": "120"}, 120 * time.Second, 3, 3},
+		{"longest wait", map[string]string{"/prefix/api/user/self": "120", "/prefix/api/subscription/plans": "240"}, 240 * time.Second, 2, 3},
+		{"default wait", map[string]string{"/prefix/api/subscription/self": ""}, time.Minute, 1, 2},
+		{"bounded wait", map[string]string{"/prefix/api/subscription/self": "7200"}, time.Hour, 1, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			limited := true
+			bodies := quotaNewAPIBodies()
+			client := quotaHTTPFunc(func(req *http.Request) (*http.Response, error) {
+				calls++
+				body, ok := bodies[req.URL.Path]
+				if !ok {
+					t.Fatalf("unexpected upstream path %s", req.URL.Path)
+				}
+				if req.Header.Get("Authorization") != "Bearer quota-private-token" || req.Header.Get("New-Api-User") != "42" || req.Method != http.MethodGet {
+					t.Fatal("wrong query credentials or method")
+				}
+				if retry, hit := tc.limited[req.URL.Path]; limited && hit {
+					return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": {retry}}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			r, _, ch := quotaFixture(t, client)
+			token := "quota-private-token"
+			in := quota.SourceInput{Name: "站点账户", AdapterID: "newapi.account", Enabled: true, AutoRefreshMinutes: 5, QueryBaseURL: "https://station.example/prefix", CredentialMode: "dedicated", Credentials: &quota.CredentialPatch{Token: &token}, Options: quota.QueryOptions{UserID: "42"}}
+			src := decodeQuotaSource(t, quotaRequest(t, r, "POST", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), in, 201))
+			before := time.Now()
+			refreshPath := fmt.Sprintf("/api/quota-sources/%d/refresh", src.ID)
+			src = decodeQuotaSource(t, quotaRequest(t, r, "POST", refreshPath, nil, 200))
+			after := time.Now()
+			if calls != tc.calls || src.State.Snapshot == nil || src.State.Failure != nil || src.State.NextAllowedAt == nil || len(src.State.Snapshot.Items) != tc.itemCount {
+				t.Fatalf("partial read lost usable data or cooldown: %+v calls=%d", src.State, calls)
+			}
+			if src.State.NextAllowedAt.Before(before.Add(tc.wait)) || src.State.NextAllowedAt.After(after.Add(tc.wait)) {
+				t.Fatalf("cooldown %s outside expected %s window", src.State.NextAllowedAt, tc.wait)
+			}
+			info := src.State.Snapshot.NewAPI
+			if info == nil {
+				t.Fatal("missing per-section query status")
+			}
+			parts := map[string]*quota.QueryPartStatus{"/prefix/api/user/self": &info.Wallet, "/prefix/api/subscription/self": &info.Subscriptions, "/prefix/api/subscription/plans": info.Plans}
+			for path := range tc.limited {
+				part := parts[path]
+				if part == nil || part.Status != "error" || part.Failure == nil || part.Failure.Category != "rate_limited" {
+					t.Fatalf("missing partial rate-limit status for %s: %+v", path, part)
+				}
+			}
+			var stored quota.State
+			if err := shared.DB.First(&stored, "source_id = ?", src.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.NextScheduledAt == nil || stored.NextScheduledAt.Before(*src.State.NextAllowedAt) {
+				t.Fatal("automatic query scheduled before cooldown expires")
+			}
+			quotaRequest(t, r, "POST", refreshPath, nil, 429)
+			w := quotaRequest(t, r, "GET", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), nil, 200)
+			var list []quota.SourceView
+			if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || len(list) != 1 || list[0].State.Snapshot == nil || list[0].State.NextAllowedAt == nil || len(list[0].State.Snapshot.Items) != tc.itemCount {
+				t.Fatalf("cache did not preserve partial data and cooldown: %s", w.Body.String())
+			}
+			quotaRequest(t, r, "GET", fmt.Sprintf("/api/quota/summaries?channel_ids=%d", ch.ID), nil, 200)
+			if calls != tc.calls {
+				t.Fatal("cooldown retry or cached read sent another upstream request")
+			}
+			// Advance only the persisted cooldown, without waiting or rewriting a real source.
+			if err := shared.DB.Model(&quota.State{}).Where("source_id = ?", src.ID).Update("next_allowed_at", time.Now().Add(-time.Second)).Error; err != nil {
+				t.Fatal(err)
+			}
+			limited = false
+			src = decodeQuotaSource(t, quotaRequest(t, r, "POST", refreshPath, nil, 200))
+			if src.State.NextAllowedAt != nil || src.State.Failure != nil || calls != tc.calls+3 {
+				t.Fatalf("successful retry did not clear cooldown: %+v calls=%d", src.State, calls)
+			}
+			assertQuotaNewAPIAccount(t, src.State.Snapshot)
+		})
+	}
+}
+
+func TestQuotaAPINewAPIBothPrimaryReadsFail(t *testing.T) {
+	calls := 0
+	r, _, ch := quotaFixture(t, quotaHTTPFunc(func(req *http.Request) (*http.Response, error) {
+		calls++
+		status := http.StatusUnauthorized
+		if req.URL.Path == "/api/subscription/self" {
+			status = http.StatusNotFound
+		} else if req.URL.Path != "/api/user/self" {
+			t.Fatalf("unexpected upstream request %s", req.URL.Path)
+		}
+		return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	}))
+	token := "quota-private-token"
+	in := quota.SourceInput{Name: "站点账户", AdapterID: "newapi.account", Enabled: true, QueryBaseURL: "https://station.example", CredentialMode: "dedicated", Credentials: &quota.CredentialPatch{Token: &token}, Options: quota.QueryOptions{UserID: "42"}}
+	src := decodeQuotaSource(t, quotaRequest(t, r, "POST", fmt.Sprintf("/api/channels/%d/quota-sources", ch.ID), in, 201))
+	src = decodeQuotaSource(t, quotaRequest(t, r, "POST", fmt.Sprintf("/api/quota-sources/%d/refresh", src.ID), nil, 200))
+	if calls != 2 || src.State.Snapshot != nil || src.State.LastSuccessAt != nil || src.State.Failure == nil || src.State.Failure.Category != "authentication" || src.State.Failure.UpstreamStatus != 401 {
+		t.Fatalf("complete failure was incorrectly published as partial success: %+v calls=%d", src.State, calls)
 	}
 }
 
