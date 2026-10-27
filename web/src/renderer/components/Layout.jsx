@@ -8,6 +8,7 @@ import logo from '../assets/logo.png';
 import { useUpdater } from '../hooks/useUpdater';
 import useLiquidNav from '../hooks/useLiquidNav';
 import { getNavBlock } from '../utils/navGuard';
+import { preparePage } from '../pageResources';
 import '../workspace.css';
 
 export const tabs = [
@@ -57,7 +58,7 @@ export default function Layout() {
           <Tabs className="nav-tabs w-fit whitespace-nowrap" selectedKey={current.id} onSelectionChange={handleTabChange}>
             <Tabs.ListContainer>
               <Tabs.List aria-label="导航" className="flex-nowrap" ref={liquid.listRef}>
-                {tabs.map((tab) => <Tabs.Tab id={tab.id} key={tab.id}>{tab.label}<Tabs.Indicator /></Tabs.Tab>)}
+                {tabs.map((tab) => <Tabs.Tab id={tab.id} key={tab.id} onHoverStart={() => preparePage(tab.id)} onFocus={() => preparePage(tab.id)}>{tab.label}<Tabs.Indicator /></Tabs.Tab>)}
               </Tabs.List>
             </Tabs.ListContainer>
           </Tabs>
