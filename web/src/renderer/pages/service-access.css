@@ -137,9 +137,7 @@
 .key-manager-heading p { color: var(--muted); font-size: 12px; line-height: 20px; margin-top: 5px; }
 .key-count { font-size: 11px; padding: 0 8px; line-height: 22px; border: 1px solid var(--separator); border-radius: 6px; font-weight: 500; color: var(--muted); }
 .key-manager-filters { display: flex; gap: 10px; align-items: center; padding: 0 24px 20px; }
-.key-search { display: flex; align-items: center; gap: 8px; width: 280px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--separator); background: var(--surface); border-radius: 8px; color: var(--muted); }
-.key-search input { min-width: 0; width: 100%; outline: none; font-size: 13px; color: var(--foreground); background: transparent; }
-.key-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.key-search { width: 280px; }
 .key-status-filter { width: 132px; flex-shrink: 0; }
 .key-status-trigger { min-height: 36px; height: 36px; padding-inline: 12px; border-radius: 8px; font-size: 12px; }
 .key-filter-note { margin-left: auto; color: var(--muted); font-size: 12px; }

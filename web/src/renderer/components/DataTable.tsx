@@ -7,9 +7,9 @@
  *
  * copy 字段：设置为 true 时，单元格内容旁会显示复制图标，hover 时可见，点击可复制文本到剪贴板。
  */
-import { useState, useCallback, memo, type ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Table, Spinner, Button } from '@heroui/react';
-import { Copy, Check } from 'lucide-react';
+import CopyButton from './CopyButton';
 import PageSkeleton from './PageSkeleton';
 
 /* ──────────── 类型定义 ──────────── */
@@ -50,47 +50,6 @@ export interface DataTableProps<T = Record<string, unknown>> {
   ariaLabel?: string;
   /** 额外 className */
   className?: string;
-}
-
-/* ──────────── 复制按钮子组件 ──────────── */
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // 降级方案
-      const input = document.createElement('input');
-      input.value = text;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }
-  }, [text]);
-
-  return (
-    <span className="inline-flex items-center gap-1">
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="inline-flex size-5 items-center justify-center rounded text-muted/60 transition-colors hover:text-foreground cursor-pointer"
-        aria-label="复制"
-      >
-        {copied ? (
-          <Check className="size-3.5 text-success" />
-        ) : (
-          <Copy className="size-3.5" />
-        )}
-      </button>
-    </span>
-  );
 }
 
 /* ──────────── DataTable 主组件 ──────────── */
@@ -172,7 +131,7 @@ export default memo(function DataTable<T extends Record<string, unknown>>({
                         {col.copy ? (
                           <span className="group/cell inline-flex items-center gap-1">
                             <span>{display}</span>
-                            <CopyButton text={String(cellValue ?? '')} />
+                            <CopyButton value={String(cellValue ?? '')} />
                           </span>
                         ) : (
                           display

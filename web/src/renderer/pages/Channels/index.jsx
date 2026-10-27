@@ -1,6 +1,7 @@
 import { lazy, useEffect, useMemo, useState } from 'react';
 import { Button, Typography, Card, Chip, toast } from '@heroui/react';
-import { Plus, Trash2, RefreshCw, Pencil, RotateCw, Search, X } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Pencil, RotateCw, Search } from 'lucide-react';
+import SearchField from '../../components/SearchField';
 import ProviderIcon from '../../components/ProviderIcon';
 import IconButton from '../../components/IconButton';
 import ExpandEditor from '../../components/ExpandEditor';
@@ -74,11 +75,7 @@ export default function Channels() {
     <div data-page-ready={!loading} className="channel-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="channel-toolbar">
         {(loading || (!loadError && channels.length > 0)) && <>
-          <label className="channel-search">
-            <Search className="size-4 shrink-0" aria-hidden="true" />
-            <input type="search" aria-label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={(event) => setSearch(event.target.value)} />
-            {search && <button type="button" aria-label="清空渠道搜索" onClick={() => setSearch('')}><X className="size-4" /></button>}
-          </label>
+          <SearchField type="search" className="channel-search" label="搜索渠道" placeholder="搜索名称、地址或厂商" value={search} onChange={setSearch} onClear={() => setSearch('')} clearLabel="清空渠道搜索" />
           <span className="channel-count" role="status">{loading ? '加载中…' : search.trim() ? `${visibleChannels.length} / ${channels.length} 个渠道` : `${channels.length} 个渠道`}</span>
         </>}
         <div className="channel-actions">

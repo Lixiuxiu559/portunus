@@ -1,16 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Typography, toast } from '@heroui/react';
-import { Check, Copy, ExternalLink, Info } from 'lucide-react';
+import { Typography, toast } from '@heroui/react';
+import { ExternalLink, Info } from 'lucide-react';
+import CopyButton from '../../components/CopyButton';
+import { copyWithFeedback } from '../../utils/clipboard';
 
 export async function copy(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success('已复制');
-    return true;
-  } catch {
-    toast.danger('复制失败，请手动选择并复制');
-    return false;
-  }
+  return copyWithFeedback(text, { notify: toast });
 }
 
 function usePrefersReducedMotion() {
@@ -64,14 +59,7 @@ function useRevealText(text, revealKey, { speed = 22, maxDuration = 900 } = {}) 
 }
 
 export function CopyValue({ label, value, display = value, disabled = false, actions = null, wrap = false, revealKey = 0 }) {
-  // 复制成功后就地显示对勾，避免连续复制多个值的时候只能靠 toast 确认
-  const [copied, setCopied] = useState(false);
   const { shown, typing } = useRevealText(display, revealKey);
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 1600);
-    return () => clearTimeout(timer);
-  }, [copied]);
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 py-3">
       <div className="min-w-0 flex-1">
@@ -80,9 +68,7 @@ export function CopyValue({ label, value, display = value, disabled = false, act
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {actions}
-        <Button isIconOnly size="sm" variant="tertiary" aria-label={copied ? `${label}已复制` : `复制${label}`} isDisabled={disabled} onPress={async () => { if (await copy(value)) setCopied(true); }}>
-          {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-        </Button>
+        <CopyButton value={value} label={`复制${label}`} disabled={disabled} />
       </div>
     </div>
   );
@@ -93,9 +79,7 @@ export function CodeSample({ title, code, preview = code, disabled = false }) {
     <div className="overflow-hidden rounded-xl border border-separator bg-background/60">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-secondary/70 px-4 py-2">
         <span className="text-xs text-muted">{title}</span>
-        <Button size="sm" variant="tertiary" aria-label={`复制${title}`} isDisabled={disabled} onPress={() => copy(code)}>
-          <Copy className="size-3.5" />复制
-        </Button>
+        <CopyButton value={code} label={`复制${title}`} text="复制" iconOnly={false} disabled={disabled} />
       </div>
       <pre className="service-code m-0 overflow-auto p-4 text-xs leading-6 select-text"><code>{preview}</code></pre>
     </div>

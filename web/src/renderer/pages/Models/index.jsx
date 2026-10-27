@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Typography, Card, toast, Select, ListBox, TextField, Input } from '@heroui/react';
-import { Plus, Trash2, X, Search } from 'lucide-react';
+import { Button, Typography, Card, toast, Select, ListBox } from '@heroui/react';
+import { Plus, Trash2, Search } from 'lucide-react';
+import SearchField from '../../components/SearchField';
+import { formatRelativeTime, formatDateTime } from '../../utils/dateTime';
 import CreateModelModal from './CreateModelModal';
 import DeleteModelModal from './DeleteModelModal';
 import { listModels, createModel, deleteModel, listChannels } from '../../api';
@@ -130,8 +132,7 @@ export default function Models() {
   return (
     <div data-page-ready={!loading} className="model-page flex flex-col flex-1 min-h-0 min-w-0">
       <div className="model-filters flex flex-wrap items-center gap-2 mb-3 shrink-0">
-        <TextField size="sm" aria-label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" className="w-56" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}><Input /></TextField>
-        {draftName && <IconButton size="sm" label="清除名称筛选" onClick={() => { setDraftName(''); performSearch(draftChannel, '', 1); }}><X className="size-3.5" /></IconButton>}
+        <SearchField label="按模型名称筛选" value={draftName} onChange={setDraftName} placeholder="按名称筛选" onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} onClear={() => { setDraftName(''); performSearch(draftChannel, '', 1); }} clearLabel="清除名称筛选" />
         <Select size="sm" selectedKey={draftChannel} onSelectionChange={handleChannelChange} className="w-52">
           <Select.Trigger aria-label="按上游渠道筛选" aria-labelledby={null}><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover ><ListBox aria-label="上游渠道">
@@ -160,7 +161,7 @@ export default function Models() {
               const channel = channelMap[m.channel_id];
               const channelName = channel?.name || m.channel_id;
               const channelType = channel?.type || 'generic';
-              const updated = formatRelativeTime(m.updated_at);
+              const updated = formatRelativeTime(m.updated_at, Date.now(), '');
               return <Card key={m.id} className="gap-3 p-4">
                 <Card.Header className="flex-row items-center justify-between gap-3 shrink-0">
                   <div className="flex min-w-0 items-center gap-3">
@@ -169,7 +170,7 @@ export default function Models() {
                     </span>
                     <div className="min-w-0">
                       <Typography className="block truncate font-mono text-sm font-medium" title={m.name}>{m.name}</Typography>
-                      <Typography type="body-xs" className="block truncate text-muted" title={`${channelName}${updated ? ` · ${formatFullTime(m.updated_at)}` : ''}`}>
+                      <Typography type="body-xs" className="block truncate text-muted" title={`${channelName}${updated ? ` · ${formatDateTime(m.updated_at, '')}` : ''}`}>
                         {channelName}{updated ? ` · ${updated}` : ''}
                       </Typography>
                     </div>
@@ -201,24 +202,4 @@ export default function Models() {
       />
     </div>
   );
-}
-
-// 模型记录最近一次变更的粗略时间；缺失或非法值不显示，避免伪造状态。
-function formatRelativeTime(value) {
-  const time = new Date(value).getTime();
-  if (!Number.isFinite(time)) return '';
-  const diff = Date.now() - time;
-  if (diff < 60_000) return '刚刚';
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 60) return `${minutes} 分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
-  return new Date(value).toLocaleDateString('zh-CN');
-}
-
-function formatFullTime(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', { hour12: false });
 }

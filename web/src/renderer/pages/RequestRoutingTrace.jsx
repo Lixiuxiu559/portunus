@@ -3,6 +3,7 @@ import { Button, Spinner } from '@heroui/react';
 import { getRoutingTrace } from '../api';
 import { createAttemptLoader } from '../utils/requestAttempts';
 import { logChannelLabel } from '../utils/logDetails';
+import { formatDateTime } from '../utils/dateTime';
 import { routingCoverage, routingEventDetails, routingFinalCandidate, routingLabel } from '../utils/routingTrace';
 
 export default function RequestRoutingTrace({ requestId, channels }) {
@@ -38,7 +39,7 @@ export default function RequestRoutingTrace({ requestId, channels }) {
                 <dt>最终停止原因</dt><dd>{routingLabel('stop', trace.stop_reason)}{trace.stop_err_kind && ` · ${routingLabel('reason', trace.stop_err_kind)}（${trace.stop_err_kind}）`}</dd>
                 <dt>网关状态 / 交付</dt><dd>{trace.status > 0 ? trace.status : '未记录状态'} / {trace.delivery_started === true ? '已开始交付' : trace.delivery_started === false ? '未开始交付' : '未记录'}</dd>
                 <dt>显式 HTTP 尝试</dt><dd>{trace.http_attempts ?? '未记录'} 次</dd>
-                <dt>开始 / 结束</dt><dd>{trace.started_at ? new Date(trace.started_at).toLocaleString('zh-CN') : '未记录'} / {trace.finished_at ? new Date(trace.finished_at).toLocaleString('zh-CN') : '未记录'}</dd>
+                <dt>开始 / 结束</dt><dd>{formatDateTime(trace.started_at)} / {formatDateTime(trace.finished_at)}</dd>
               </dl>
               {trace.schema_version !== 1 && <p className="text-xs text-muted mt-3">诊断版本 {String(trace.schema_version ?? '未记录')}，部分事件可能尚未识别，保留原值展示。</p>}
               <ol className="request-attempt-list request-routing-events">{(Array.isArray(trace.events) ? trace.events : []).map((event, index) => <li key={`${event.sequence}:${index}`} className="request-attempt-row">

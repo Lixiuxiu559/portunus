@@ -1,4 +1,5 @@
 import { cloneConfig, customEditors, customPayload, defaultCustom } from './customQuotaModel.js';
+import { formatDateTime, formatRelativeTime } from '../../../utils/dateTime.js';
 
 export function quotaDraft(source, adapter) {
   const options = cloneConfig(source?.options || (adapter?.id === 'custom.balance' ? { custom: defaultCustom() } : {}));
@@ -40,19 +41,12 @@ export function quotaValue(item) {
 }
 export function formatQuotaTime(value) {
   if (!value) return '尚无记录';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString('zh-CN');
+  return formatDateTime(value, '时间未知');
 }
 
 // 只表达上次读取的时间，不把缓存新鲜度说成上游余额过期。
 export function formatQuotaRelativeTime(value, now = Date.now()) {
-  const at = Date.parse(value);
-  if (!value || !Number.isFinite(at)) return '尚未查询';
-  const minutes = Math.max(0, Math.floor((now - at) / 60000));
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes} 分钟前`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时前`;
-  return `${Math.floor(minutes / 1440)} 天前`;
+  return formatRelativeTime(value, now, '尚未查询');
 }
 
 // 每轮请求、草稿修改与关闭都递增代次，取消未必能阻止已到达的响应。

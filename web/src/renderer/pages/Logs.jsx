@@ -10,6 +10,7 @@ import { listLogs, getLogStats, listChannels } from '../api';
 import { errKindLabels, logChannelLabel } from '../utils/logDetails';
 import LogDetailModal from './LogDetailModal';
 import { getCachedResponse } from '../api/responseCache';
+import { formatDate, formatDateTime, formatTime } from '../utils/dateTime';
 import './logs.css';
 
 const successOptions = [
@@ -130,9 +131,9 @@ export default function Logs() {
         if (!val) return <span className="block text-center text-xs text-muted">—</span>;
         const date = new Date(val);
         return (
-          <LogCell text={date.toLocaleString('zh-CN', { hour12: false })} className="whitespace-nowrap font-mono text-xs">
-            <span className="block text-muted">{date.toLocaleDateString('zh-CN')}</span>
-            <span className="block">{date.toLocaleTimeString('zh-CN', { hour12: false })}</span>
+          <LogCell text={formatDateTime(date)} className="whitespace-nowrap font-mono text-xs">
+            <span className="block text-muted">{formatDate(date)}</span>
+            <span className="block">{formatTime(date)}</span>
           </LogCell>
         );
       },

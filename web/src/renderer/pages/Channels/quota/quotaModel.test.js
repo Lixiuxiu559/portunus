@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { headersWithoutToken } from './customQuotaModel.js';
 import assert from 'node:assert/strict';
-import { quotaDraft, quotaPayload, quotaValue, visibleSnapshot, createRequestGate, createCachePoller, canKeepQuotaToken, formatQuotaRelativeTime } from './quotaModel.js';
+import { quotaDraft, quotaPayload, quotaValue, visibleSnapshot, createRequestGate, createCachePoller, canKeepQuotaToken, formatQuotaRelativeTime, formatQuotaTime } from './quotaModel.js';
 
 const adapter = { id: 'fixture.balance', name: '测试余额', default_base_url: 'https://example.test', credential_modes: ['inherit_channel_key', 'dedicated'] };
 
@@ -198,4 +198,12 @@ test('查询时间以相对时间展示，正常旧记录不被称作账户过�
  assert.equal(formatQuotaRelativeTime('2026-10-22T08:00:00Z',now),'刚刚');
  assert.equal(formatQuotaRelativeTime(undefined,now),'尚未查询');
  assert.equal(formatQuotaRelativeTime('invalid',now),'尚未查询');
+});
+
+test('余额时间复用统一格式并保留未查询与非法值的专属文案', () => {
+ const value=new Date(2026,9,27,0,0,0);
+ assert.equal(formatQuotaTime(value),'2026/10/27 00:00:00');
+ assert.equal(formatQuotaTime(undefined),'尚无记录');
+ assert.equal(formatQuotaTime('invalid'),'时间未知');
+ assert.equal(formatQuotaRelativeTime(value,value.getTime()+30*24*60*60_000),'2026/10/27');
 });

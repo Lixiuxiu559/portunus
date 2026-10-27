@@ -5,6 +5,7 @@ import { Download, RotateCw, CheckCircle, Tag, ExternalLink, RefreshCw } from 'l
 import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
 import { getCachedResponse } from '../api/responseCache';
+import { formatDateTime } from '../utils/dateTime';
 import './settings.css';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
@@ -134,7 +135,7 @@ export default function Settings() {
             <div className="settings-row">
               <Typography className="settings-label">上次同步时间</Typography>
               <Typography type="body-sm" className="settings-value">
-                {lastSyncAt > 0 ? new Date(lastSyncAt * 1000).toLocaleString() : '从未同步'}
+                {lastSyncAt > 0 ? formatDateTime(lastSyncAt * 1000) : '从未同步'}
               </Typography>
             </div>
 

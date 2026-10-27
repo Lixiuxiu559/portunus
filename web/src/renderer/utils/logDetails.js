@@ -1,3 +1,5 @@
+import { writeClipboardText } from './clipboard.js';
+
 export const errKindLabels = {
   client_cancel: '用户取消', upstream_error: '上游错误', watchdog_timeout: '流静默超时',
   stream_interrupted: '流中断', convert_error: '转换失败', network: '网络错误',
@@ -21,5 +23,5 @@ export function logErrorSummary(record) {
 // 让调用方仅在浏览器确认写入后显示成功，权限失败向上传递。
 export async function copyLogText(text, clipboard) {
   if (!text || !clipboard?.writeText) throw new Error('剪贴板不可用');
-  await clipboard.writeText(text);
+  await writeClipboardText(text, { clipboard, document: null });
 }

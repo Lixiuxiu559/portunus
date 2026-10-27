@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Button, Modal, TextField, Input, Label, Dropdown, Select, ListBox } from '@heroui/react';
 import ConfirmModal from '../../components/ConfirmModal';
-import { Copy, Eye, EyeOff, MoreHorizontal, Plus, Search, KeyRound, ArrowUpRight, Pencil, RotateCcw, Ban, Trash2, Play } from 'lucide-react';
+import { Eye, EyeOff, MoreHorizontal, Plus, KeyRound, ArrowUpRight, Pencil, RotateCcw, Ban, Trash2, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { copy } from './shared';
+import SearchField from '../../components/SearchField';
+import CopyButton from '../../components/CopyButton';
+import { formatDate } from '../../utils/dateTime';
 
 function NameForm({ target, onCreate, onRename, onClose }) {
   const [name, setName] = useState(target?.name || '');
@@ -51,7 +53,7 @@ export default function APIKeyControls({ apiKeys, busy, onCreate, onRename, onRe
       <Button variant="primary" isDisabled={busy} onPress={() => setEditor({ target: null })}><Plus className="size-4" />新建 API Key</Button>
     </div>
     <div className="key-manager-filters">
-      <label className="key-search"><Search className="size-4" /><input aria-label="搜索 API Key 名称" placeholder="搜索名称…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+      <SearchField className="key-search" label="搜索 API Key 名称" placeholder="搜索名称…" value={search} onChange={setSearch} onClear={() => setSearch('')} clearLabel="清空 API Key 搜索" />
       <Select aria-label="API Key 状态" className="key-status-filter" selectedKey={status} onSelectionChange={(key) => { if (key !== null) setStatus(String(key)); }}>
         <Select.Trigger aria-label="API Key 状态" aria-labelledby={null} className="key-status-trigger"><Select.Value /><Select.Indicator /></Select.Trigger>
         <Select.Popover><ListBox aria-label="API Key 状态">
@@ -70,9 +72,9 @@ export default function APIKeyControls({ apiKeys, busy, onCreate, onRename, onRe
           <td><span className={`key-status-badge${key.revoked ? ' is-revoked' : ''}`}><i />{key.revoked ? '已禁用' : '有效'}</span></td>
           <td><div className="key-secret-cell"><code>{visibleKeys[key.id] && !key.revoked ? key.key : `sk-••••••••${(key.key || '').slice(-4)}`}</code>{!key.revoked && <>
             <Button isIconOnly size="sm" variant="tertiary" aria-label={`${visibleKeys[key.id] ? '隐藏' : '显示'} ${key.name} 密钥`} onPress={() => setVisibleKeys((current) => ({ ...current, [key.id]: !current[key.id] }))}>{visibleKeys[key.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</Button>
-            <Button isIconOnly size="sm" variant="tertiary" aria-label={`复制 ${key.name} 密钥`} onPress={() => copy(key.key)}><Copy className="size-3.5" /></Button>
+            <CopyButton value={key.key} label={`复制 ${key.name} 密钥`} />
           </>}</div></td>
-          <td><time className="key-created" dateTime={key.created_at}>{new Date(key.created_at).toLocaleDateString('zh-CN')}</time></td>
+          <td><time className="key-created" dateTime={key.created_at}>{formatDate(key.created_at)}</time></td>
           <td><div className="key-row-actions">
             <Link className="key-usage-link" to={`/logs?api_key_id=${key.id}`}>用量<ArrowUpRight className="size-3.5" /></Link>
             {!key.revoked && <Button size="sm" variant="secondary" isDisabled={busy} onPress={() => onConnect(key.id)}>接入</Button>}
