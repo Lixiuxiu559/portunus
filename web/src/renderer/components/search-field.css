@@ -1,8 +1,10 @@
-.search-field { display: flex; align-items: center; gap: 8px; width: 224px; max-width: 100%; min-width: 0; min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--field-radius); color: var(--field-placeholder); background: var(--field-background); }
-.search-field:focus-within { outline: 2px solid color-mix(in oklch, var(--accent) 40%, transparent); outline-offset: 1px; }
-.search-field input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; color: var(--field-foreground); font-size: 14px; }
-.search-field input::placeholder { color: var(--field-placeholder); }
-.search-field input::-webkit-search-cancel-button { display: none; }
-.search-field button { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0; color: var(--muted); cursor: pointer; border-radius: 8px; }
-.search-field button:hover { color: var(--accent); background: color-mix(in oklch, var(--accent) 8%, transparent); }
-.search-field button:focus-visible { outline: 2px solid var(--accent); }
+/* 不复用 HeroUI 的 search-field 类，避免继承它的纵向字段容器布局。 */
+.portunus-search { display: flex; flex-direction: row; align-items: center; gap: 8px; width: 224px; max-width: 100%; min-width: 0; min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--field-radius); color: var(--field-placeholder); background: var(--field-background); }
+.portunus-search:focus-within { outline: 2px solid color-mix(in oklch, var(--accent) 40%, transparent); outline-offset: 1px; }
+.portunus-search > svg { flex-shrink: 0; }
+.portunus-search input { flex: 1 1 0; width: 0; min-width: 0; background: transparent; border: 0; outline: none; color: var(--field-foreground); font-size: 14px; }
+.portunus-search input::placeholder { color: var(--field-placeholder); }
+.portunus-search input::-webkit-search-cancel-button { display: none; }
+.portunus-search button { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0; color: var(--muted); cursor: pointer; border-radius: 8px; }
+.portunus-search button:hover { color: var(--accent); background: color-mix(in oklch, var(--accent) 8%, transparent); }
+.portunus-search button:focus-visible { outline: 2px solid var(--accent); }

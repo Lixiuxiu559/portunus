@@ -1160,11 +1160,9 @@ html.dark .nav-tabs .tabs__tab[data-hovered="true"]:not([data-selected="true"]) 
 .mm-label { font-size: 14px; font-weight: 600; color: var(--fg); }
 .mm-key { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: "tnum"; }
 .mm-select-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
-.mm-select-wrap::after { content: ""; position: absolute; right: 12px; top: 50%; width: 8px; height: 8px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-50%) rotate(45deg); pointer-events: none; }
-.mm-select { width: 100%; min-width: 0; height: 36px; padding: 0 32px 0 12px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; appearance: none; -webkit-appearance: none; }
 .mm-input { width: 100%; height: 36px; padding: 0 12px; font-size: 13px; font-family: var(--font-mono); background: var(--field); color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; }
-.mm-select:focus, .mm-input:focus { border-color: var(--accent); outline: none; }
-.mm-select:focus-visible, .mm-input:focus-visible, .view-tab:focus-visible, .mm-1m input:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: transparent; }
+.mm-input:focus { border-color: var(--accent); outline: none; }
+.mm-input:focus-visible, .view-tab:focus-visible, .mm-1m input:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: transparent; }
 .mm-input:disabled { opacity: .55; cursor: not-allowed; }
 .mm-na { font-size: 13px; color: var(--muted); text-align: center; user-select: none; }
 .mm-model { display: flex; align-items: center; gap: 16px; min-width: 0; }
@@ -1438,3 +1436,6 @@ html.dark .expand-editor__panel {
 .skeleton-content-fields { display: flex; flex-direction: column; gap: 16px; }
 .skeleton-field { width: 50%; height: 40px; }
 .skeleton-code { width: 100%; height: 160px; border-radius: 12px; }
+
+.mm-model-choice .app-choice-label { font-size: 11px; color: var(--muted); }
+.mm-model-choice .app-choice-value { font-family: var(--font-mono); }

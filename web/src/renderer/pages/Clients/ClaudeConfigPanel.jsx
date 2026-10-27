@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Chip, Input, Label, TextField, Typography, toast } from '@heroui/react';
 import { Eye, EyeOff, FolderInput, Info } from 'lucide-react';
+import AppSelect from '../../components/AppSelect';
 import CodeEditor from '../../components/CodeEditor';
 import ConfirmModal from '../../components/ConfirmModal';
 import { ClaudeMark } from '../../components/BrandMarks';
@@ -191,19 +192,9 @@ export default function ClaudeConfigPanel({ groups, apiKey, serverUrl, onDirtyCh
     return (
       <div className="mm-model">
         <div className="mm-select-wrap">
-          <select
-            className="mm-select"
-            aria-label={`${slot.label} 请求模型`}
-            value={m.base}
-            onChange={(event) => {
-              const value = event.target.value;
-              setSlot(slot.id, value === '' ? { base: '', name: '' } : { base: value, name: value });
-            }}
-          >
-            <option value="">— 不映射 —</option>
-            {dangling && <option value={m.base} disabled>{m.base}（分组不存在）</option>}
-            {modelOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          <AppSelect label={`${slot.label} 请求模型`} className="mm-model-choice" value={m.base}
+            options={[{ id: '', name: '— 不映射 —' }, ...(dangling ? [{ id: m.base, name: `${m.base}（分组不存在）`, disabled: true }] : []), ...modelOptions.map((o) => ({ id: o.id, name: o.label }))]}
+            onChange={(value) => setSlot(slot.id, value === '' ? { base: '', name: '' } : { base: value, name: value })} />
         </div>
         {slot.has1m !== false ? (
           <label className="mm-1m">

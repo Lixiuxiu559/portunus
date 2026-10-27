@@ -1,0 +1,16 @@
+.app-choice { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.app-choice-label { font-size: 13px; line-height: 20px; color: var(--foreground); font-weight: 500; }
+.app-choice-trigger { width: 100%; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--separator); border-radius: 12px; background: var(--field-background, var(--surface)); color: var(--foreground); font-size: 13px; line-height: 20px; box-shadow: none; }
+.app-choice-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.app-choice-trigger[data-focus-visible], .app-choice-trigger[data-focus-within] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app-choice[data-disabled] .app-choice-trigger, fieldset:disabled .app-choice-trigger { opacity: .5; cursor: not-allowed; }
+.app-choice-popover { width: var(--trigger-width); min-width: var(--trigger-width); max-width: min(480px, calc(100vw - 32px)); padding: 4px; border: 1px solid var(--separator); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 36px #0002; }
+.app-choice-list { max-height: 280px; overflow-y: auto; padding: 0; }
+.app-choice-option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 20px; }
+.app-choice-option-name { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.app-choice-option[data-focused], .app-choice-option[data-hovered] { background: var(--default); }
+.app-choice-option[data-focus-visible] { outline: 2px solid var(--accent); outline-offset: -2px; }
+.app-choice-option[data-disabled] { opacity: .5; }
+.app-choice-empty { display: block; padding: 10px; font-size: 12px; color: var(--muted); }
+.app-choice-input-group { display: flex; align-items: center; padding: 0 8px 0 12px; }
+.app-choice-input-group .app-choice-input { width: 100%; min-width: 0; min-height: 38px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-size: 13px; }

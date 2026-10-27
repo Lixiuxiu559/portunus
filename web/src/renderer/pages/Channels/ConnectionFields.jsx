@@ -1,14 +1,9 @@
-import { useId } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
+import AppSelect from '../../components/AppSelect';
 import ChannelIconPicker from '../../components/ChannelIconPicker';
 import FieldHelp from './FieldHelp';
 import { validateChannelCapacity } from './channelDraft';
-
-function Choice({ label, value, options, onChange, disabled = false }) {
-  const id = useId();
-  return <div className="channel-select-field"><label htmlFor={id}>{label}</label><select id={id} aria-label={label} value={value || ''} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></div>;
-}
 
 // 添加与编辑共用同一字段布局和后端预设目录。
 export default function ConnectionFields({ state, editing = false }) {
@@ -41,11 +36,11 @@ export default function ConnectionFields({ state, editing = false }) {
       <div className="channel-block-content">
         {state.presetError && <div role="alert" className="channel-form-error">预设加载失败：{state.presetError}<Button type="button" size="sm" variant="secondary" onPress={() => state.loadPresets()}>重试</Button></div>}
         <div className="channel-fields-grid">
-          <Choice label="厂商预设" value={draft.provider_id} options={providerOptions} disabled={!presets.length} onChange={(id) => {
+          <AppSelect label="厂商预设" value={draft.provider_id} options={providerOptions} disabled={!presets.length} onChange={(id) => {
             const next = presets.find((item) => item.id === id);
             if (next) chooseProfile(next, next.profiles.find((item) => item.id === next.default_profile) || next.profiles[0]);
           }} />
-          <Choice label="接口协议" value={draft.profile_id || 'current'} options={profileOptions} disabled={!profiles.length} onChange={(id) => chooseProfile(preset, profiles.find((item) => item.id === id))} />
+          <AppSelect label="接口协议" value={draft.profile_id || 'current'} options={profileOptions} disabled={!profiles.length} onChange={(id) => chooseProfile(preset, profiles.find((item) => item.id === id))} />
           <TextField isRequired name="base_url" value={draft.base_url} onChange={(base_url) => patch({ base_url })} autoComplete="off" className="channel-field-full" validate={(value) => !value?.trim() ? '请填写 API 地址' : null}>
             <Label>API 地址</Label><Input placeholder="https://api.example.com/v1" /><FieldError />
           </TextField>
@@ -71,11 +66,11 @@ export default function ConnectionFields({ state, editing = false }) {
           {editing && <p>思考内容兼容会为缺少历史思考内容的工具调用补齐兼容字段；若中转服务不接受此字段，可以关闭。</p>}
         </FieldHelp></div>
         <div className="channel-fields-grid">
-          <Choice label="限流范围" value={draft.rate_limit_scope} options={[{ id: 'model', name: '按模型' }, { id: 'channel', name: '整条渠道' }]} onChange={(rate_limit_scope) => patch({ rate_limit_scope })} />
+          <AppSelect label="限流范围" value={draft.rate_limit_scope} options={[{ id: 'model', name: '按模型' }, { id: 'channel', name: '整条渠道' }]} onChange={(rate_limit_scope) => patch({ rate_limit_scope })} />
           <TextField isRequired name="max_concurrent_requests" value={draft.max_concurrent_requests} onChange={(max_concurrent_requests) => patch({ max_concurrent_requests })} validate={validateChannelCapacity}>
             <Label>并发上限</Label><Input inputMode="numeric" placeholder="0 表示不限制" /><FieldError />
           </TextField>
-          <div className="channel-field-full"><Choice label="模型发现方式" value={discovery} options={[{ id: 'api', name: '从上游获取' }, { id: 'manual', name: '手动填写' }]} disabled={profile?.model_discovery === 'manual'} onChange={(model_discovery) => patch({ connection_options: { schema_version: 1, model_discovery }, auto_sync: model_discovery === 'manual' ? false : draft.auto_sync })} /></div>
+          <div className="channel-field-full"><AppSelect label="模型发现方式" value={discovery} options={[{ id: 'api', name: '从上游获取' }, { id: 'manual', name: '手动填写' }]} disabled={profile?.model_discovery === 'manual'} onChange={(model_discovery) => patch({ connection_options: { schema_version: 1, model_discovery }, auto_sync: model_discovery === 'manual' ? false : draft.auto_sync })} /></div>
         </div>
         <label className="channel-toggle-row"><span>自动同步模型</span><input type="checkbox" checked={draft.auto_sync} disabled={discovery === 'manual'} onChange={(event) => patch({ auto_sync: event.target.checked })} /></label>
         {editing && <label className="channel-toggle-row"><span>思考内容兼容</span><input type="checkbox" checked={draft.thinking_compat} onChange={(event) => patch({ thinking_compat: event.target.checked })} /></label>}

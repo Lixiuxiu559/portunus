@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@heroui/react';
+import AppSelect from '../../../components/AppSelect';
 import CustomQuotaEditor from './CustomQuotaEditor';
 import useQuotaDraft from './useQuotaDraft';
 import { QuotaSourceState } from './QuotaSummary';
@@ -24,9 +25,7 @@ export default function QuotaSourceEditor({ channelId, source, adapters, onSaved
       <section className="quota-form-section">
       <div className="quota-section-title"><span>01</span><h3>基本信息</h3></div>
       <div className="quota-form-grid">
-      <label>查询类型<select required value={draft.adapter_id} onChange={(event) => state.chooseAdapter(event.target.value)}>
-        {adapters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select></label>
+      <AppSelect label="查询类型" required value={draft.adapter_id} options={adapters} onChange={state.chooseAdapter} disabled={!!pending && pending !== 'preview'} />
       </div>
       {adapter?.description && <p className="text-xs text-muted">{adapter.description}</p>}
       {draft.adapter_id === 'newapi.account' && <p className="quota-help">同时查询钱包和订阅。请使用账户 Access Token，模型调用 Key 不适用；新版站点需授权个人资料与钱包读取权限。换算规则不明确时，请保留原始 QUOTA 单位。</p>}
@@ -38,9 +37,7 @@ export default function QuotaSourceEditor({ channelId, source, adapters, onSaved
       </section>
       <section className="quota-form-section">
       <div className="quota-section-title"><span>02</span><h3>查询凭据</h3></div>
-      <label>查询凭据<select value={draft.credential_mode} onChange={(event) => state.chooseCredential(event.target.value)}>
-        {(adapter?.credential_modes || []).map((mode) => <option key={mode} value={mode}>{mode === 'inherit_channel_key' ? '继承当前渠道 Key' : mode === 'none' ? '无鉴权' : '专用查询 Token'}</option>)}
-      </select></label>
+      <AppSelect label="查询凭据" value={draft.credential_mode} options={(adapter?.credential_modes || []).map((mode) => ({ id: mode, name: mode === 'inherit_channel_key' ? '继承当前渠道 Key' : mode === 'none' ? '无鉴权' : '专用查询 Token' }))} onChange={state.chooseCredential} disabled={!!pending && pending !== 'preview'} />
       {draft.adapter_id === 'custom.balance' && source?.has_token && !keepToken && <p className="text-xs text-muted">查询目标已变更，请重新填写专用 Token。</p>}
       {draft.credential_mode === 'dedicated' && <>
         <label>专用 Token<input type="password" autoComplete="new-password" value={draft.token} disabled={draft.clearToken}

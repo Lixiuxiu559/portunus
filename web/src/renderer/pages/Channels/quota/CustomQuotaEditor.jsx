@@ -1,8 +1,9 @@
+import AppSelect from '../../../components/AppSelect';
 import { customItem } from './customQuotaModel';
 
 const unitKinds = [['money', '金额'], ['count', '次数 / 积分'], ['tokens', 'Token'], ['percent', '百分比']];
 function UnitEditor({ value, onChange, prefix }) {
-  return <div className="quota-form-grid"><label>{prefix}类型<select value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value })}>{unitKinds.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+  return <div className="quota-form-grid"><AppSelect label={`${prefix}类型`} value={value.kind} onChange={(kind) => onChange({ ...value, kind })} options={unitKinds.map(([id, name]) => ({ id, name }))} />
     <label>{prefix}代码<input required placeholder="如 CNY、USD、credits" value={value.code} onChange={(e) => onChange({ ...value, code: e.target.value })} /></label></div>;
 }
 function ConditionEditor({ title, value, text, onChange, onText }) {
@@ -28,7 +29,7 @@ export default function CustomQuotaEditor({ draft, patch, methods }) {
     <section className="quota-form-section">
     <div className="quota-section-title"><span>03</span><h3>请求配置</h3></div>
     <p className="text-xs text-muted">仅配置只读余额查询接口。POST 会按配置发送，不要填写充值、扣费或修改账户的接口。</p>
-    <div className="quota-form-grid"><label>请求方法<select value={config.request.method} onChange={(e) => request({ method: e.target.value })}>{(methods || ['GET', 'POST']).map((method) => <option key={method}>{method}</option>)}</select></label>
+    <div className="quota-form-grid"><AppSelect label="请求方法" value={config.request.method} onChange={(method) => request({ method })} options={(methods || ['GET', 'POST']).map((id) => ({ id, name: id }))} />
       <label>站内请求路径<input required placeholder="/user/balance" value={config.request.path} onChange={(e) => request({ path: e.target.value })} /></label></div>
     <label>请求头（JSON 对象）<textarea rows="4" spellCheck="false" value={texts.headers} onChange={(e) => editors({ headers: e.target.value })} /></label>
     <p className="text-xs text-muted">专用 Token 填写在上方密码框，请求头使用 {'{{token}}'} 占位符。不要在请求头、路径、查询参数或请求体中填写真实密钥；Token 占位符只允许用于请求头。</p>
@@ -45,8 +46,8 @@ export default function CustomQuotaEditor({ draft, patch, methods }) {
         patch({ options: { ...draft.options, custom: { ...config, items: config.items.map((row, i) => i === index ? { ...row, id } : row) } }, customEditors: { ...texts, unlimited: { ...texts.unlimited, [id]: texts.unlimited[item.id] ?? 'true' } } });
       }} /></label><label>显示名称<input required value={item.label} onChange={(e) => itemChange(index, { label: e.target.value })} /></label></div>
       <details className="quota-advanced"><summary>额度类型与归属</summary>
-      <div className="quota-form-grid"><label>额度类型<select value={item.kind} onChange={(e) => itemChange(index, { kind: e.target.value })}><option value="balance">余额</option><option value="spending_limit">消费限额</option><option value="usage_window">周期用量</option></select></label>
-        <label>归属范围<select value={item.scope} onChange={(e) => itemChange(index, { scope: e.target.value })}><option value="account">账户</option><option value="api_key">API Key</option><option value="plan">套餐</option></select></label></div>
+      <div className="quota-form-grid"><AppSelect label="额度类型" value={item.kind} onChange={(kind) => itemChange(index, { kind })} options={[{ id: 'balance', name: '余额' }, { id: 'spending_limit', name: '消费限额' }, { id: 'usage_window', name: '周期用量' }]} />
+        <AppSelect label="归属范围" value={item.scope} onChange={(scope) => itemChange(index, { scope })} options={[{ id: 'account', name: '账户' }, { id: 'api_key', name: 'API Key' }, { id: 'plan', name: '套餐' }]} /></div>
       </details>
       <UnitEditor prefix="显示单位" value={item.unit} onChange={(unit) => itemChange(index, { unit })} />
       <div className="quota-amount-paths">

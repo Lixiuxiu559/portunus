@@ -1,13 +1,13 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
+import AppComboBox from '../../components/AppComboBox';
 import FieldHelp from './FieldHelp';
 
 export default function CallTestPanel({ state, existing = [] }) {
   const [model, setModel] = useState('');
   const [stream, setStream] = useState(false);
   const [limit, setLimit] = useState('32');
-  const listId = useId();
   const { pending, results } = state;
   const change = (setter) => (value) => { state.clearResult('test'); setter(value); };
   const result = results.test;
@@ -18,8 +18,7 @@ export default function CallTestPanel({ state, existing = [] }) {
     <div className="channel-block-content">
       <div className="channel-model-subheading"><span className="channel-test-warning">可能消耗上游额度</span><FieldHelp title="调用验证"><p>点击验证按钮后，会向当前草稿连接发送一次指定模型请求。输出上限不代表总消耗上限。</p><p>每次只验证一个模型，不自动重试或轮测。未保存配置不影响正式调用，验证结果只代表本次请求。</p></FieldHelp></div>
       <div className="channel-fields-grid">
-        <TextField value={model} onChange={change(setModel)}><Label>测试模型</Label><Input placeholder="上游模型名" list={listId} /></TextField>
-        <datalist id={listId}>{models.map((name) => <option key={name} value={name} />)}</datalist>
+        <AppComboBox label="测试模型" value={model} onChange={change(setModel)} options={models} placeholder="上游模型名" />
         <TextField value={limit} onChange={change(setLimit)} isInvalid={!validLimit}><Label>最大输出 Token</Label><Input type="number" min="1" max="128" step="1" /><FieldError>请输入 1–128 的整数</FieldError></TextField>
       </div>
       <label className="channel-toggle-row"><span>流式验证</span><input type="checkbox" checked={stream} onChange={(event) => change(setStream)(event.target.checked)} /></label>
