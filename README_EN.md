@@ -58,7 +58,6 @@ Combine models from different providers into a group named for its purpose, such
 | Routing strategy | How it works | When to use it |
 | --- | --- | --- |
 | Manual | Uses the model you select | Keep a preferred model and switch on demand |
-| Round-robin | Distributes requests across group members in turn | Spread calls across multiple providers |
 | Failover | Tries models in priority order, moving on after failure | Add backup providers to a daily workflow |
 
 Retries, timeout handling, and circuit breaking help reduce disruption from upstream failures. Drag to reorder priorities. Once a streaming response has started reaching the client, an interruption cannot be replayed or switched seamlessly. Renaming a group changes its client model name; changing members preserves that group endpoint.
@@ -99,7 +98,7 @@ If your system blocks the first launch, see [Installation help](#installation-he
 
 ### 2. Add a channel and create a group
 
-In Upstream Channels, choose a provider preset and protocol, enter the endpoint and API key, then fetch and select models or enter their names manually before saving. See the [upstream-channel guide (Chinese)](docs/upstream-channels.md). On the Model Groups home page, select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order.
+In Upstream Channels, choose a provider preset and protocol, enter the endpoint and API key, then fetch and select models or enter their names manually before saving. See the [upstream-channel guide (Chinese)](docs/upstream-channels.md). Then open Groups to select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order. The app opens on Channels by default, with navigation in this order: Channels, Models, Groups, Logs, Access, Settings.
 
 ### 3. Connect clients and applications
 

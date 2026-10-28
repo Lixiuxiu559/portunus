@@ -9,7 +9,7 @@ Portunus 是本地运行的多上游 API 聚合网关，将渠道模型组织为
 - 模块路径：`github.com/Lixiuxiu559/portunus`
 - Go 版本：`1.26.6`
 - 技术栈：Gin + GORM（SQLite 起步，保留换 MySQL/PostgreSQL 能力）
-- 前端：Electron + React + Vite，默认进入模型分组；管理 API 仅允许本机连接访问。
+- 前端：Electron + React + Vite，默认进入渠道；管理 API 仅允许本机连接访问。
 
 架构详见 `ARCHITECTURE.md`。
 
