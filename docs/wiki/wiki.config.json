@@ -9,19 +9,16 @@
         "CLAUDE.md",
         "docs/product/PRODUCT.md",
         "docs/product/DEVELOPMENT.md",
-        "docs/promotion/product-intro.md",
-        "ARCHITECTURE.md",
         "web/src/renderer/App.jsx",
         "web/src/renderer/pageResources.js",
         "web/src/renderer/components/Layout.jsx"
       ],
-      "docs": ["docs/wiki/README.md", "docs/wiki/concepts.md"]
+      "docs": ["docs/wiki/README.md"]
     },
     {
       "id": "concepts",
       "sources": [
         "docs/product/PRODUCT.md",
-        "ARCHITECTURE.md",
         "backend/group",
         "backend/router",
         "backend/gateway/gateway.go",
@@ -39,8 +36,7 @@
         "go.mod",
         "backend/shared",
         "backend/api",
-        "backend/cron",
-        "ARCHITECTURE.md"
+        "backend/cron"
       ],
       "docs": ["docs/wiki/modules/runtime/README.md"]
     },
@@ -52,7 +48,15 @@
         "backend/model",
         "backend/group",
         "backend/router",
-        "docs/upstream-channels.md",
+        "backend/api/channel.go",
+        "backend/api/channel_connection.go",
+        "backend/api/model.go",
+        "backend/api/group.go",
+        "backend/api/deletion_impact.go",
+        "backend/api/channel_test.go",
+        "backend/api/deletion_impact_test.go",
+        "backend/api/group_creation_test.go",
+        "backend/api/group_strategy_test.go",
         "docs/product/PRODUCT.md"
       ],
       "docs": ["docs/wiki/modules/resources/README.md"]
@@ -65,8 +69,7 @@
         "backend/resource",
         "backend/upstream",
         "backend/shared/config.go",
-        "backend/shared/upstream_attempt.go",
-        "ARCHITECTURE.md"
+        "backend/shared/upstream_attempt.go"
       ],
       "docs": ["docs/wiki/modules/gateway/README.md"]
     },
@@ -76,8 +79,7 @@
         "backend/quota",
         "backend/api/quota.go",
         "web/src/renderer/pages/Channels/quota",
-        "web/src/renderer/api/quota.js",
-        "docs/channel-quota.md"
+        "web/src/renderer/api/quota.js"
       ],
       "docs": ["docs/wiki/modules/quota/README.md"]
     },
@@ -95,9 +97,7 @@
         "web/src/renderer/pages/Logs.jsx",
         "web/src/renderer/pages/RequestAttemptTimeline.jsx",
         "web/src/renderer/pages/RequestRoutingTrace.jsx",
-        "web/src/renderer/api/log.js",
-        "docs/call-records.md",
-        "ARCHITECTURE.md"
+        "web/src/renderer/api/log.js"
       ],
       "docs": ["docs/wiki/modules/observability/README.md"]
     },
@@ -109,6 +109,8 @@
         "web/scripts",
         "web/package.json",
         "web/electron-builder.dev.cjs",
+        "web/vite.config.mjs",
+        ".github/workflows",
         "docs/product/DEVELOPMENT.md",
         "docs/product/PRODUCT.md"
       ],

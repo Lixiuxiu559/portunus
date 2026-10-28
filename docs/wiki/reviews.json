@@ -2,44 +2,33 @@
   "version": 1,
   "modules": {
     "index": {
-      "reviewedAt": "2026-10-27T12:36:55.099Z",
-      "reviewer": "Claude Code",
+      "reviewedAt": "2026-10-28T09:10:54.851Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
       "decision": "no-change",
-      "reason": "首页与导航口径已在上一轮同步；本轮删除整改未改变入口页结论",
+      "reason": "已核对中英文 README 架构链接移除及旧架构来源清理，本模块知识不变",
       "evidence": [
-        "README.md",
-        "docs/product/PRODUCT.md",
-        "web/src/renderer/App.jsx",
         "docs/wiki/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "README.md": {
-          "sha256": "bc496a703a06f9bf0ce795a11d4bbe927f08087495d501505556810af3e91798",
+          "sha256": "953c66aaca0431ed2e7286819c774b0aec396321b8c8d4ad8c282b65ff2b86a0",
           "mode": "100644"
         },
         "README_EN.md": {
-          "sha256": "8b525d240400fb1b2431b4ac23027ba27bd396f1bdc3ca21b80b3a2319111de1",
+          "sha256": "5268032bf27a7c027a01063ce40a78a96a3779d81d7294ae21f65a47199c2c7f",
           "mode": "100644"
         },
         "CLAUDE.md": {
-          "sha256": "4075e7ed04f7db795904f167d2c0dcbc54e0e3159356ce3c44f419e472d1bf49",
+          "sha256": "8ece8eb17d70cb1e235fbb693d5f0d8c133a53447602df589ace3679419952a2",
           "mode": "100644"
         },
         "docs/product/PRODUCT.md": {
-          "sha256": "534b2cbe12f63290a3718a3fe1e413ab93d211bc67e9aba93b411b34caf9a075",
+          "sha256": "62d0b49992bec227113ea12afacc6d464fbf33022f54d6d75524f9543be577f1",
           "mode": "100644"
         },
         "docs/product/DEVELOPMENT.md": {
           "sha256": "cedf46873ba1abaddfe8c2a85d0f17a5a763a966da233f746d5896343142ed58",
-          "mode": "100644"
-        },
-        "docs/promotion/product-intro.md": {
-          "sha256": "70f9d72424575a9ee601104cb8e127c371cb71f3f66ea5f842b8e488960408c8",
-          "mode": "100644"
-        },
-        "ARCHITECTURE.md": {
-          "sha256": "6d0e368099daa58917eb857dc483bdac13cb567ee713955a00d8ee7debeecd2e",
           "mode": "100644"
         },
         "web/src/renderer/App.jsx": {
@@ -57,33 +46,23 @@
       },
       "docSnapshot": {
         "docs/wiki/README.md": {
-          "sha256": "0c05a8e0c17b02f2a17ee01e337e71f9f0afcae11c51952b9bd021645f7c18f1",
-          "mode": "100644"
-        },
-        "docs/wiki/concepts.md": {
-          "sha256": "c63d44c802d24cf258ddaed9be32d29a014ce07396332f4db2e9ccfa15e2ea1f",
+          "sha256": "6a8767566a73220820777e2e7da1fc7ba6421071455459123b72609aa2fcc0ef",
           "mode": "100644"
         }
       }
     },
     "concepts": {
-      "reviewedAt": "2026-10-27T12:36:55.178Z",
-      "reviewer": "Claude Code",
-      "decision": "updated",
-      "reason": "概念页待确认项由完整预览缺口改为仅缺全量反向引用目录",
+      "reviewedAt": "2026-10-28T09:10:54.918Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "decision": "no-change",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/group/group.go",
-        "docs/product/PRODUCT.md",
         "docs/wiki/concepts.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "docs/product/PRODUCT.md": {
-          "sha256": "534b2cbe12f63290a3718a3fe1e413ab93d211bc67e9aba93b411b34caf9a075",
-          "mode": "100644"
-        },
-        "ARCHITECTURE.md": {
-          "sha256": "6d0e368099daa58917eb857dc483bdac13cb567ee713955a00d8ee7debeecd2e",
+          "sha256": "62d0b49992bec227113ea12afacc6d464fbf33022f54d6d75524f9543be577f1",
           "mode": "100644"
         },
         "backend/group/deletion_impact.go": {
@@ -141,23 +120,20 @@
       },
       "docSnapshot": {
         "docs/wiki/concepts.md": {
-          "sha256": "c63d44c802d24cf258ddaed9be32d29a014ce07396332f4db2e9ccfa15e2ea1f",
+          "sha256": "d224352a2dc5234f98101b17497bdce32fe2b02d8ddadb886210fb984128b68b",
           "mode": "100644"
         }
       }
     },
     "runtime": {
-      "reviewedAt": "2026-10-27T12:56:06.062Z",
-      "reviewer": "Claude Code",
-      "decision": "updated",
-      "reason": "管理路由与删除实现有调整，已核对预览与删除同源判断",
+      "reviewedAt": "2026-10-28T09:10:54.991Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "decision": "no-change",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/api/api.go",
-        "backend/api/deletion_impact.go",
-        "main.go",
         "docs/wiki/modules/runtime/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "main.go": {
           "sha256": "3f0cd2e15c1153d2dd47530cee58065f30a49974775fef1151016186596b5140",
@@ -378,31 +354,24 @@
         "backend/cron/cron.go": {
           "sha256": "08371bdd0b9085336425ff5f7e1c7e6b43a4843e129cb5edbad52f735ad1f7f6",
           "mode": "100644"
-        },
-        "ARCHITECTURE.md": {
-          "sha256": "6d0e368099daa58917eb857dc483bdac13cb567ee713955a00d8ee7debeecd2e",
-          "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/runtime/README.md": {
-          "sha256": "7bc29c3db4ab515e297bf9b2a89044325a74a58886b6863de44f2850dcc967b1",
+          "sha256": "c003f67281a9ef017c63f010fd6552f4cc73c2027cf26b8853d3571ae832b837",
           "mode": "100644"
         }
       }
     },
     "resources": {
-      "reviewedAt": "2026-10-27T12:56:05.997Z",
-      "reviewer": "Claude Code",
-      "decision": "updated",
-      "reason": "评审后修正：删除入口只保留事务版本、预览与删除的余额来源判断同源",
+      "reviewedAt": "2026-10-28T09:10:55.064Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "decision": "no-change",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/group/deletion_impact.go",
-        "backend/model/service.go",
-        "docs/upstream-channels.md",
         "docs/wiki/modules/resources/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "backend/channel/channel.go": {
           "sha256": "89d33ebbd831602e929db625680a59bf20fe6171bf561502fe4506b3ab852a60",
@@ -520,33 +489,63 @@
           "sha256": "b4c8f8e89265de89658cc74385ac8246b00506a00de17bbb9317f801f689a299",
           "mode": "100644"
         },
-        "docs/upstream-channels.md": {
-          "sha256": "7c5081b0448761b3226059534331879d6f4909dbc652074ec73241167b72a282",
+        "backend/api/channel.go": {
+          "sha256": "e64c900dfa2921043be0a07f61b543dc4023e32dcfdaee935b40a0bf3bfbfafe",
+          "mode": "100644"
+        },
+        "backend/api/channel_connection.go": {
+          "sha256": "432466946ba607803f262ec9268890b6eb3c3bba4ef69fb81f81ef943c3d023d",
+          "mode": "100644"
+        },
+        "backend/api/model.go": {
+          "sha256": "47d2180a87dfbc648a00935bab439abc068e13568f21350aef616ff4394c051f",
+          "mode": "100644"
+        },
+        "backend/api/group.go": {
+          "sha256": "12ab2614f859537159d5bc3c00fd8ef50765f4305c9ab5deda70ccafdb30906a",
+          "mode": "100644"
+        },
+        "backend/api/deletion_impact.go": {
+          "sha256": "2cc4a5a9931360ab268d7ffd7294acf93520218b972e475389e9caeca775cb13",
+          "mode": "100644"
+        },
+        "backend/api/channel_test.go": {
+          "sha256": "610e37b488e84b24c474aafb96e94b73d4ff1b691cebab6f1279ebdaa004537b",
+          "mode": "100644"
+        },
+        "backend/api/deletion_impact_test.go": {
+          "sha256": "5978ef386c6ae1c69531540bc2754c618ab31cc8d4e8288186a639a45c7364c4",
+          "mode": "100644"
+        },
+        "backend/api/group_creation_test.go": {
+          "sha256": "d89d8556db4a010c4264c051ce474489b621283a09279a04ec06f2230f273344",
+          "mode": "100644"
+        },
+        "backend/api/group_strategy_test.go": {
+          "sha256": "4c3b684a5f762b8ee42cfd25e5a3a0b987d7ea41a08dc3d5e8373476f2d7cff6",
           "mode": "100644"
         },
         "docs/product/PRODUCT.md": {
-          "sha256": "534b2cbe12f63290a3718a3fe1e413ab93d211bc67e9aba93b411b34caf9a075",
+          "sha256": "62d0b49992bec227113ea12afacc6d464fbf33022f54d6d75524f9543be577f1",
           "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/resources/README.md": {
-          "sha256": "082467ecb06d439ee0238a236c5690cd517ae7b6028df2cc297627699f1ed63e",
+          "sha256": "b3bc2e7d6ec49fb26f68378d95898b00ca82e8e86a67be04573bc828702b722d",
           "mode": "100644"
         }
       }
     },
     "gateway": {
-      "reviewedAt": "2026-10-27T12:36:55.376Z",
-      "reviewer": "Claude Code",
+      "reviewedAt": "2026-10-28T09:10:55.150Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
       "decision": "no-change",
-      "reason": "仅架构文档导航措辞变化，网关链路与边界未变",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/gateway/gateway.go",
-        "ARCHITECTURE.md",
         "docs/wiki/modules/gateway/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "backend/gateway/apikey_test.go": {
           "sha256": "d8c5d8ed789ec018daf39ed4ab5eacd7887ce3332e40267dff16c4afd5b08f63",
@@ -1003,30 +1002,24 @@
         "backend/shared/upstream_attempt.go": {
           "sha256": "cc7867c5e43e82e97b9d8b0ee2668ecb0ce34333dbadd3b7c5acb9a990589745",
           "mode": "100644"
-        },
-        "ARCHITECTURE.md": {
-          "sha256": "6d0e368099daa58917eb857dc483bdac13cb567ee713955a00d8ee7debeecd2e",
-          "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/gateway/README.md": {
-          "sha256": "ad5e030f0b57d899b6a00652128392779ba1bdcb2ec3d05105f09defae582c0e",
+          "sha256": "8bfb1ba1e0b0d9ff2e2c1cf889a9ed935e94388a2dc78c6437e4ba5699a25adb",
           "mode": "100644"
         }
       }
     },
     "quota": {
-      "reviewedAt": "2026-10-27T12:36:55.520Z",
-      "reviewer": "Claude Code",
+      "reviewedAt": "2026-10-28T09:10:55.233Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
       "decision": "no-change",
-      "reason": "配置指纹变化，余额来源与调度实现本轮未改",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/quota/registry.go",
-        "docs/channel-quota.md",
         "docs/wiki/modules/quota/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "backend/quota/adapter_custom.go": {
           "sha256": "353366f3791544e83fd1dd0a4105b4003cea767bc0b48a2673e5a3e60515852a",
@@ -1231,30 +1224,24 @@
         "web/src/renderer/api/quota.js": {
           "sha256": "147de46bb1a9bc1750ddfb0bd6c92f1892b6ccfb801f0be76339256c2ccf90a7",
           "mode": "100644"
-        },
-        "docs/channel-quota.md": {
-          "sha256": "b6a18fa1ad2befc6e265b38b86364b85cff58a7f79e3138de66b1628bde9a512",
-          "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/quota/README.md": {
-          "sha256": "344fefb4e1acfcc7dcb0e7abaf891c6f615174383907b921b1e336e836fe8365",
+          "sha256": "ba80de3d4f0871286bbcb3146207ee240cd90bd957cfd7900638d3cf90f753b7",
           "mode": "100644"
         }
       }
     },
     "observability": {
-      "reviewedAt": "2026-10-27T12:36:55.455Z",
-      "reviewer": "Claude Code",
+      "reviewedAt": "2026-10-28T09:10:55.299Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
       "decision": "no-change",
-      "reason": "仅架构文档措辞变化，日志与尝试口径未变",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "backend/shared/log.go",
-        "ARCHITECTURE.md",
         "docs/wiki/modules/observability/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "backend/shared/log.go": {
           "sha256": "e2da99d1b0210dda6221aac0f85ce30d8b2264f21d930258f80ee034027cde31",
@@ -1303,35 +1290,24 @@
         "web/src/renderer/api/log.js": {
           "sha256": "54f1a2d4616a7de5fef2a615a984b8c30f5e7515112e77e743fb2e49fbae0e9f",
           "mode": "100644"
-        },
-        "docs/call-records.md": {
-          "sha256": "d753c452eb86c5aca24de69b3115bf028d3569886e901eda1ebacb70c2208fcb",
-          "mode": "100644"
-        },
-        "ARCHITECTURE.md": {
-          "sha256": "6d0e368099daa58917eb857dc483bdac13cb567ee713955a00d8ee7debeecd2e",
-          "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/observability/README.md": {
-          "sha256": "4647d9c08f5a0ccfd337c088673881273ae944afee612d0f662438b044d4fe2a",
+          "sha256": "6d8961cb880d71657f7fc4b573fd5aa4418418669baba1bb5ccf007a1e0d426e",
           "mode": "100644"
         }
       }
     },
     "desktop": {
-      "reviewedAt": "2026-10-27T12:56:06.156Z",
-      "reviewer": "Claude Code",
-      "decision": "updated",
-      "reason": "删除弹窗改为共用影响展示组件，页面与构建边界未变",
+      "reviewedAt": "2026-10-28T09:10:55.405Z",
+      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "decision": "no-change",
+      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
       "evidence": [
-        "web/src/main/runtime-profile.js",
-        "web/src/renderer/App.jsx",
-        "docs/product/DEVELOPMENT.md",
         "docs/wiki/modules/desktop/README.md"
       ],
-      "configDigest": "e90579cb0a65bec16b0248ba8ad1e8a35bd688aec1e340412db87ecfd494b1c1",
+      "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
       "sourceSnapshot": {
         "web/src/main/app-config.js": {
           "sha256": "7adff0e445f1cbca21c120576ebfd486b20f933d05871bb20d45280dc64da21c",
@@ -2181,18 +2157,30 @@
           "sha256": "4d0e963c0cb6d44f685abd0a14efe43159c0969fcf1e2700be85bce34762b2ed",
           "mode": "100644"
         },
+        "web/vite.config.mjs": {
+          "sha256": "46d190129fa28865463da94cdf5484523f9aca1272666fdd1fccc3a241939e19",
+          "mode": "100644"
+        },
+        ".github/workflows/ci.yml": {
+          "sha256": "f55f37dd1aa03fffb60f9ffc922fc9d04230b4d028d40a171b23f777007edc9d",
+          "mode": "100644"
+        },
+        ".github/workflows/release.yml": {
+          "sha256": "2139ff0a754055d96a0e7a70e7ef84ec6d385abfc836820b721291d95267de8f",
+          "mode": "100644"
+        },
         "docs/product/DEVELOPMENT.md": {
           "sha256": "cedf46873ba1abaddfe8c2a85d0f17a5a763a966da233f746d5896343142ed58",
           "mode": "100644"
         },
         "docs/product/PRODUCT.md": {
-          "sha256": "534b2cbe12f63290a3718a3fe1e413ab93d211bc67e9aba93b411b34caf9a075",
+          "sha256": "62d0b49992bec227113ea12afacc6d464fbf33022f54d6d75524f9543be577f1",
           "mode": "100644"
         }
       },
       "docSnapshot": {
         "docs/wiki/modules/desktop/README.md": {
-          "sha256": "865f63d1b2f7cc9671c33c38a8a1777a6a1411e3bfcc25b192ea1d2a9949b532",
+          "sha256": "9427ab9fe3f35d62cb4b219e0cbc43a24a81149b79989a37551dafae4fd3a8ca",
           "mode": "100644"
         }
       }

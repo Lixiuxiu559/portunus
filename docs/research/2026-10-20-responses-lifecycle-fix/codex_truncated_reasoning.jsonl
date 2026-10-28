@@ -1,6 +1,0 @@
-{"type":"thread.started","thread_id":"01a159ac-9eaa-77c3-8661-b1cc1926b4c5"}
-{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `probe3` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}
-{"type":"turn.started"}
-{"type":"item.completed","item":{"id":"item_1","type":"reasoning","text":"We need answer in Chinese numbers 1..1000 each on own line, no explanation, no tool. Need be careful exactly 1000 lines. Token budget enough ~ maybe 5k tokens. Must not omit. Let's generate sequentially. Need every number one per line, no commas. We can output. Ensure exactly 1-1000 no skipping. This is tedious. Let's methodically count blocks of 100. I need avoid errors. Could structure mentally with blank? No each number line, no explanation. Blank lines might technically violate? They ask each number own line, no explanation. Better no blanks, continuous"}}
-{"type":"error","message":"stream disconnected before completion: Incomplete response returned, reason: max_output_tokens"}
-{"type":"turn.failed","error":{"message":"stream disconnected before completion: Incomplete response returned, reason: max_output_tokens"}}

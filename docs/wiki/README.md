@@ -1,48 +1,51 @@
-# Portunus 项目知识库
+# Portunus 开发知识库
 
 ## 文档信息
 
 | 字段 | 内容 |
 |---|---|
-| 适用范围 | 当前仓库的产品边界、核心对象、后端模块、桌面运行与开发约定 |
+| 适用范围 | 当前仓库的产品边界、公共概念及六个开发知识模块的入口 |
 | 事实状态 | 部分核验 |
-| 核验基线 | `9bf6dbb506d2448d1564ebc2ffc7f5a3940cd372`；2026-10-27 工作区源码与文档 |
-| 核验时间 | 2026-10-27 |
+| 核验基线 | `b44d75a788f8aa5ef0ad024273d4bf5dd8c95c7e`（`dev`）；2026-10-28 工作区 |
+| 核验时间 | 2026-10-28 |
 
 ## 项目概览
 
-Portunus 是本地运行的多上游 API 聚合网关：保存上游渠道及其模型，把跨渠道模型组成分组，再以分组名向客户端提供统一 `model`。主要交付形态为 Electron 桌面应用，Go 后端提供管理面 `/api` 和服务面 `/v1`。
+Portunus 是本地运行的多上游 API 聚合网关。渠道保存一个上游账户的连接和凭据，模型目录保存该渠道的可用资源，分组再把这些资源组合成客户端使用的稳定 `model`。Go 后端同时提供管理面 `/api` 和服务面 `/v1`，主要交付形态是 Electron 桌面应用。
 
-- 当前代码支持 `manual`、`failover` 两种路由策略；旧轮询策略不属于当前接口能力。
-- 服务入口为 Chat Completions、Responses、Messages 与模型列表；Gemini 当前是上游协议，不是独立客户端生成入口。
-- 本地保存配置、令牌和调用观测；没有多用户、团队权限、按调用方配额或公网托管承诺。
-- 不提供价格配置、调用费用计算或费用统计。余额查询只用于观测，不参与路由。
-- 本 Wiki 描述源码基线，不等同于已发布安装包、生产部署或所有上游均已实测。
+当前客户端生成入口是 Chat Completions、Responses 和 Messages；上游协议包括 OpenAI Chat、OpenAI Responses、Anthropic 与 Gemini。Gemini 不是独立的客户端生成入口。分组只支持 `manual`（手动）和 `failover`（固定顺序故障转移），不提供轮询、权重或费用路由。架构知识以本 Wiki 为统一入口。产品定义见 `docs/product/PRODUCT.md`，组件依赖与数据流由下方各模块按当前代码维护。
+
+产品不提供价格配置、默认价格套用、调用费用计算或费用统计；历史价格、货币和费用列仅为存储兼容保留。余额查询只用于观测，不参与选路。模型发现成功不等于真实生成调用通过，一次真实调用成功也不能推广为所有模型和协议均已验证。
 
 ## 阅读导航
 
-- [核心概念与跨模块规则](concepts.md)：先区分渠道模型、分组名、两类凭据及不同观测计数。
-- [运行入口与公共基础设施](modules/runtime/README.md)：启动装配、数据库、管理/服务边界和定时任务。
-- [渠道、模型与分组](modules/resources/README.md)：连接解析、选择性导入、同步与路由候选。
-- [网关与协议转换](modules/gateway/README.md)：请求链路、故障处置、显式 HTTP 尝试及转换边界。
-- [余额与额度](modules/quota/README.md)：独立查询来源、缓存、调度与 NewAPI 单位识别。
-- [调用观测](modules/observability/README.md)：日志、关联归并、尝试链和切换诊断。
-- [桌面与开发环境](modules/desktop/README.md)：Dev/正式隔离、sidecar、页面和构建命令。
+- [核心概念与跨模块规则](concepts.md)：区分渠道模型与分组名、上游密钥与服务令牌，以及日志、HTTP 尝试和请求关联项。
+- [运行入口与公共基础设施](modules/runtime/README.md)：Go 启动装配、配置与数据库、管理接口访问边界、定时维护。
+- [渠道、模型与分组](modules/resources/README.md)：连接解析、选择性导入、模型同步、路由候选和删除级联。
+- [网关与协议转换](modules/gateway/README.md)：服务鉴权、relay、转换、流式交付与失败控制。
+- [余额与额度](modules/quota/README.md)：独立来源、适配器、缓存、有界调度和前端查询语义。
+- [调用观测](modules/observability/README.md)：日志归并、显式 HTTP 尝试、切换诊断及统计边界。
+- [桌面与开发工程](modules/desktop/README.md)：Electron 进程、Dev/正式隔离、页面、构建、发布与更新。
 
 ## 知识覆盖
 
-本版覆盖以上七个知识页面的入口和跨模块约束，不逐行复述实现。协议转换只记录主链路与已核对的边界，完整字段映射以源码和专项研究为准。历史验证报告仅在其原基线、环境与测试范围内有效。
+本版覆盖概览、核心对象、后端运行、资源管理、生成网关、额度查询、调用观测和桌面工程。构建与发布位于桌面模块，本地定时维护位于运行模块，调用排障位于观测模块；项目不是面向公网集群的部署系统，因此没有虚构集群、服务等级或已演练的灾备流程。
 
-产品定义见[产品文档](../product/PRODUCT.md)，实现总览见[架构说明](../../../ARCHITECTURE.md)，开发与发布边界见[开发说明](../product/DEVELOPMENT.md)。`docs/research/` 保存调查与验证证据，不是当前能力清单的替代品。
+渠道和模型删除已包含只读影响预览与确认后的事务级联清理，具体保留项和激活项规则以[资源模块](modules/resources/README.md)为准。协议转换记录主链路和修改边界，不代替逐字段源码。
 
-现行文档已按代码统一界面口径：默认进入 `/channels`，导航顺序为渠道、模型、分组、日志、接入、设置；路由策略只保留手动和故障转移。产品文档、README 与宣传底稿已同步，历史研究报告仍保留其原基线。
+维护知识与代码的对应关系见 [wiki.config.json](wiki.config.json)，复核声明见 [reviews.json](reviews.json)。架构知识以本 Wiki 为唯一活跃入口，不再单独维护 `ARCHITECTURE.md`。`freshness` 只比较已映射来源、文档及配置的指纹，不能判断语义是否正确。当前没有为 Wiki 接入自动监听、定时同步或合并门禁；使用本库前应运行技能提供的 `freshness`，开发收尾核对实际 diff 后再保存相应模块的复核声明。命令格式：
+
+```bash
+node <wiki技能目录>/scripts/wiki.mjs freshness --root <项目根> --config docs/wiki/wiki.config.json
+node <wiki技能目录>/scripts/wiki.mjs check --root <项目根> --wiki docs/wiki --config docs/wiki/wiki.config.json
+```
 
 ## 依据与核验
 
-2026-10-27 通过 CodeGraph 读取 `main.go`、`backend/api`、`backend/gateway`、`backend/group`、`backend/router`、`backend/channel`、`backend/upstream`、`backend/model`、`backend/quota`、`backend/shared`、`backend/cron` 的相关入口，以及 Electron 的运行身份、sidecar、页面路由和构建脚本；另对照上述产品、架构及专题文档。各页面列出实际使用的来源。
+入口核对 `README.md`、`CLAUDE.md`、`docs/product/PRODUCT.md`、`docs/product/DEVELOPMENT.md`，并以 `web/src/renderer/App.jsx`、`pageResources.js`、`components/Layout.jsx` 验证默认 `/channels` 和六页导航；以 `backend/gateway/gateway.go`、`backend/router/router.go`、`backend/api/local_access.go` 核对服务入口、路由和管理边界。架构正文统一维护于本 Wiki，不再使用独立 `ARCHITECTURE.md`。
 
-本次仅进行知识初始化与静态来源核对，没有执行 Go/前端测试、真实上游调用、桌面启动或发布包验证。结构检查配置见 `wiki.config.json`，复核记录只代表声明时的文件指纹和已说明的核对范围。
+本次为源码初始化与静态核验，没有扩大历史验证结论的适用范围。主 Agent 于 2026-10-28 执行并通过 `go test ./...`、`go vet ./...`、前端 245 项测试及 `pnpm --dir web run typecheck`；没有启动正式或 Dev 桌面应用，没有访问真实上游、读取业务凭据或验证安装包。
 
 ## 待确认项
 
-1. 本次未核实已发布 Release 的实际版本内容、线上 CI 状态、生产部署版本或全量真实上游兼容性。
+无。GitHub 线上检查、真实上游能力和安装包状态均属于需要在相应环境验证的事项，不阻碍本 Wiki 描述当前源码。

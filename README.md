@@ -219,4 +219,4 @@ pnpm run build:win   # Windows EXE / ZIP（x64）
 
 ---
 
-[上游接入](./docs/upstream-channels.md) · [余额与额度](./docs/channel-quota.md) · [产品定义与阶段计划](./docs/product/PRODUCT.md) · [更新分发说明](./docs/updates.md) · [架构与设计](./ARCHITECTURE.md) · [技术研究](./docs/research) · [版本更新](https://github.com/Lixiuxiu559/portunus/releases) · [问题与建议](https://github.com/Lixiuxiu559/portunus/issues)
+[产品定义与阶段计划](./docs/product/PRODUCT.md) · [版本更新](https://github.com/Lixiuxiu559/portunus/releases) · [问题与建议](https://github.com/Lixiuxiu559/portunus/issues)

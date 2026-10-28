@@ -1,5 +1,0 @@
-{"type":"thread.started","thread_id":"01a15980-a877-7fc3-a180-422c42049923"}
-{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `probe3` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}
-{"type":"turn.started"}
-{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"OK"}}
-{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0}}

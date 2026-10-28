@@ -1,8 +1,0 @@
-data: {"type":"response.created","response":{"id":"r1","object":"response","status":"in_progress","model":"probe3","output":null}}
-
-data: {"type":"response.output_text.delta","delta":"OK"}
-
-data: {"type":"response.completed","response":{"id":"r1","object":"response","status":"completed","model":"probe3","output":null,"usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11,"input_tokens_details":{"cached_tokens":0}}}}
-
-data: [DONE]
-

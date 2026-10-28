@@ -233,8 +233,8 @@ P0 选择管理路径仅本机可访问，对其他设备只开放需鉴权的�
 - 本文：产品定义、对象关系、页面职责、范围、优先级、验收标准；定位已确认，作为统一依据；以第 0 节标记本轮完成范围。
 - README：面向新用户，讲清价值、安装、最短接入路径，引用本文，不堆砌实现细节。
 - 应用内接入指南：面向使用者，维护可复制的协议和客户端配置、验证与排障。
-- ARCHITECTURE.md：记录当前实现、服务边界、模块与数据流，避免将计划写成事实。
-- docs/research/：保留方案取证、协议研究和真实测试证据，不充当产品首页。
+- docs/wiki/：记录当前实现、服务边界、模块与数据流，避免将计划写成事实；历史设计文档不再作为活跃架构入口。
+- docs/research/：已按当前文档整理决策删除；后续证据保留在实际交付或验证位置，不充当产品首页。
 - docs/promotion/product-intro.md：宣传稿从产品定义派生；已校准“前端暂缓”“同步全量覆盖”“全协议可用”“假死快速切换”等过时或过度承诺的表述。
 
 P0 已同步页面、文档和管理接口访问边界；本轮进一步撤出计价能力，保留历史数据和用户运行配置。具体验证结果以对应实施交付记录为准。
@@ -260,7 +260,7 @@ P0 已同步页面、文档和管理接口访问边界；本轮进一步撤出�
 | 平台关窗与后端生命周期 | `web/src/main/main.js:138`、`:219`、`:243` |
 | 预算真实验证与 Responses 完成语义 | `docs/research/2026-10-20-token-budget-real-regression/README.md`；`backend/protocol/responses.go:679` |
 | CI 与发布前检查 | `.github/workflows/ci.yml`；`.github/workflows/release.yml` |
-| 现有定位与过时表述 | `README.md`；`ARCHITECTURE.md`；`docs/promotion/product-intro.md` |
+| 现有定位与历史表述 | `README.md`；`docs/wiki/`；`docs/promotion/product-intro.md` |
 
 后续待确认项：跨设备 LAN 实机验证；配置不完整分组的 API 公布契约；用户对后台驻留与多调用方授权的需求优先级。本轮保留 `/v1/models` 现有公布规则，不将非空组等同于已验证可调用。
 

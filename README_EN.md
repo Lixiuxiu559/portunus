@@ -217,4 +217,4 @@ Artifacts are written to `web/dist-electron/`. Tag and manual release workflows 
 
 ---
 
-[Product definition and roadmap](./docs/product/PRODUCT.md) · [Update distribution](./docs/updates.md) · [Architecture and design](./ARCHITECTURE.md) · [Technical research](./docs/research) · [Release notes](https://github.com/Lixiuxiu559/portunus/releases) · [Issues and suggestions](https://github.com/Lixiuxiu559/portunus/issues)
+[Product definition and roadmap](./docs/product/PRODUCT.md) · [Release notes](https://github.com/Lixiuxiu559/portunus/releases) · [Issues and suggestions](https://github.com/Lixiuxiu559/portunus/issues)

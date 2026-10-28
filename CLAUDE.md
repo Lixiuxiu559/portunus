@@ -11,7 +11,7 @@ Portunus 是本地运行的多上游 API 聚合网关，将渠道模型组织为
 - 技术栈：Gin + GORM（SQLite 起步，保留换 MySQL/PostgreSQL 能力）
 - 前端：Electron + React + Vite，默认进入渠道；管理 API 仅允许本机连接访问。
 
-架构详见 `ARCHITECTURE.md`。
+架构与开发知识统一维护在 [开发知识库](docs/wiki/README.md)，各模块的实现入口、依赖和修改影响以对应模块页面及当前代码为准。
 
 ## 分支约定
 
@@ -56,7 +56,7 @@ backend/
   shared    跨模块公共：配置、数据库、APIKey、日志/尝试实体与查询
 ```
 
-依赖方向以 `ARCHITECTURE.md` 为准；上游连接为 `channel → upstream → protocol`，模型发现和生成均从已保存渠道取得连接。`quota` 独立，不导入生成／路由模块，由 main 注入最小渠道读取函数。模块间用外键 ID 关联，避免包级循环依赖。
+依赖方向详见[运行入口与公共基础设施](docs/wiki/modules/runtime/README.md)和各模块文档；上游连接为 `channel → upstream → protocol`，模型发现和生成均从已保存渠道取得连接。`quota` 独立，不导入生成／路由模块，由 main 注入最小渠道读取函数。模块间用外键 ID 关联，避免包级循环依赖。
 
 一次调用的数据流：
 
