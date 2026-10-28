@@ -14,7 +14,7 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
-// 本文件是失败处置的唯一权威（领域词条见 CONTEXT.md「失败处置」）：
+// 本文件是失败处置的唯一权威（领域知识见 docs/wiki/modules/gateway/README.md）：
 // 一次上游尝试失败的错误值 → failDecision（重试 / 两档假死 / 熔断喂法 /
 // 归因 errKind / 客户端状态码与错误类别）。此前同一 error 被 isRetryable、
 // isStall、熔断记账 defer、状态码裁决、classifyErr、writeRelayError 六处

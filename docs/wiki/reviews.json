@@ -538,11 +538,13 @@
       }
     },
     "gateway": {
-      "reviewedAt": "2026-10-28T09:10:55.150Z",
-      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "reviewedAt": "2026-10-28T09:46:16.079Z",
+      "reviewer": "Kimi 主 Agent（实际 diff 复核）",
       "decision": "no-change",
-      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
+      "reason": "已核对 fail.go 与 usage.go 仅将 CONTEXT 注释改指现有网关 Wiki；失败处置、用量归一和 Wiki 正文均无变化",
       "evidence": [
+        "backend/gateway/fail.go",
+        "backend/protocol/usage.go",
         "docs/wiki/modules/gateway/README.md"
       ],
       "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
@@ -600,7 +602,7 @@
           "mode": "100644"
         },
         "backend/gateway/fail.go": {
-          "sha256": "d8de084390c8e3375744df269759b148e94235678afa18188b66be118d7ed0b1",
+          "sha256": "c4412bee6fee36c3c2ca263d8e68abc39391be58efb4a5f0c9cf207b4699abc4",
           "mode": "100644"
         },
         "backend/gateway/fail_test.go": {
@@ -968,7 +970,7 @@
           "mode": "100644"
         },
         "backend/protocol/usage.go": {
-          "sha256": "22be653db3dfa000862baa9ae3a84c3b0d3de92b97ec1a7dfe7c446355b8a971",
+          "sha256": "90b707523215935354a8af33d11ff0e8273b7e9b0ebfa96b2e823bb82769c2ac",
           "mode": "100644"
         },
         "backend/protocol/usage_test.go": {
@@ -1300,11 +1302,14 @@
       }
     },
     "desktop": {
-      "reviewedAt": "2026-10-28T09:10:55.405Z",
-      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "reviewedAt": "2026-10-28T09:46:16.161Z",
+      "reviewer": "Kimi 主 Agent（实际 diff 复核）",
       "decision": "no-change",
-      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
+      "reason": "已核对 sidecar 与 server-address 仅将 CONTEXT 注释改指现有桌面 Wiki；状态机、地址规则和 Wiki 正文均无变化",
       "evidence": [
+        "web/src/main/server-address.js",
+        "web/src/main/sidecar.js",
+        "web/src/main/sidecar.test.js",
         "docs/wiki/modules/desktop/README.md"
       ],
       "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
@@ -1378,7 +1383,7 @@
           "mode": "100644"
         },
         "web/src/main/server-address.js": {
-          "sha256": "45ff2f9a6b0c35617801836796b110930e6c8d306717e567bfcd758525bee456",
+          "sha256": "f415b0bbff64d56c7f1a466dcf27cacee033b9cde561dc71a06fc8897251b916",
           "mode": "100644"
         },
         "web/src/main/server-address.test.js": {
@@ -1386,11 +1391,11 @@
           "mode": "100644"
         },
         "web/src/main/sidecar.js": {
-          "sha256": "1f8cde16deee7f377a2e63c6aa67f607f94ad898ec35a8651a2e93cd1f3f0b1b",
+          "sha256": "32f0c5b9742f7adcfe3225b123b5aa25a2823380785b90b01a5b389d7cf8e5cc",
           "mode": "100644"
         },
         "web/src/main/sidecar.test.js": {
-          "sha256": "a8c4f97777a8f3e18b43850771699110faae22ca972ceb8fa9afd2872399c5ad",
+          "sha256": "289a3918937004a14166eaf5c877a32a70addeaaa3ab271d49779b17816bd2f9",
           "mode": "100644"
         },
         "web/src/main/tray.js": {

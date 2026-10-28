@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-// 本文件是「X → canonical Usage」归一数学的唯一权威（领域词条见 CONTEXT.md「用量归一」）：
+// 本文件是「X → canonical Usage」归一数学的唯一权威（用量口径见 docs/wiki/modules/gateway/README.md）：
 // 各协议的原始用量结构在此统一换算为 Usage（PromptTokens 表示非缓存输入，
 // 缓存读 / 写单独计）。此前同一段扣缓存数学在 anthropic.go / anthropic_stream.go /
 // stream.go / gemini.go / responses.go 各写一份，已发生两处漂移（gemini 流式不扣
