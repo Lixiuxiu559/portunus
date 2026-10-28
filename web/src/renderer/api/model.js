@@ -18,6 +18,11 @@ export function createModel(data) {
   return request.post('/models', data);
 }
 
+/** 删除影响预览（只读）：受影响分组、移除成员与激活项清除标记 */
+export function getModelDeletionImpact(id, options) {
+  return request.get(`/models/${id}/deletion-impact`, options);
+}
+
 /** 删除模型 */
 export function deleteModel(id) {
   return request.delete(`/models/${id}`);

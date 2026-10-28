@@ -16,6 +16,7 @@ import (
 	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
 	"github.com/Lixiuxiu559/portunus/backend/protocol"
+	grouprouting "github.com/Lixiuxiu559/portunus/backend/router"
 	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
@@ -43,7 +44,7 @@ func setupCascadeTest(t *testing.T) {
 }
 
 func TestDeleteChannelCascades(t *testing.T) {
-	setupCascadeTest(t)
+	setupDeletionTest(t)
 
 	// 渠道 c1 及两个模型
 	ch := channel.Channel{Name: "c1", Type: protocol.ProviderOpenAI, BaseURL: "http://x", Key: "k"}
@@ -90,6 +91,23 @@ func TestDeleteChannelCascades(t *testing.T) {
 	if err := shared.DB.Create(&it3).Error; err != nil {
 		t.Fatalf("建分组项 it3 失败: %v", err)
 	}
+
+	// failover 分组 g2 同时引用 m2 与 m3，用于验证删除 c1 后剩余顺序不变
+	g2 := group.Group{Name: "g2", Strategy: group.StrategyFailover}
+	if err := shared.DB.Create(&g2).Error; err != nil {
+		t.Fatalf("建分组 g2 失败: %v", err)
+	}
+	it4 := group.GroupItem{GroupID: g2.ID, ModelID: m2.ID, Priority: 0}
+	it5 := group.GroupItem{GroupID: g2.ID, ModelID: m3.ID, Priority: 1}
+	if err := shared.DB.Create(&it4).Error; err != nil {
+		t.Fatalf("建分组项 it4 失败: %v", err)
+	}
+	if err := shared.DB.Create(&it5).Error; err != nil {
+		t.Fatalf("建分组项 it5 失败: %v", err)
+	}
+
+	// 历史调用日志不随渠道删除清理
+	logRow := seedDeletionLog(t)
 
 	// 删除渠道 c1
 	gin.SetMode(gin.TestMode)
@@ -139,6 +157,42 @@ func TestDeleteChannelCascades(t *testing.T) {
 	}
 	if it3Count != 1 {
 		t.Errorf("其他渠道的分组项 it3 被误删")
+	}
+
+	// 断言：分组保留、failover 剩余成员顺序不变，历史日志保留
+	var groupCount, g2ItemCount int64
+	if err := shared.DB.Model(&group.Group{}).Where("id IN ?", []int64{g.ID, g2.ID}).Count(&groupCount).Error; err != nil {
+		t.Fatalf("查分组失败: %v", err)
+	}
+	if groupCount != 2 {
+		t.Errorf("删除渠道后分组数 = %d, want 2（分组必须保留）", groupCount)
+	}
+	if err := shared.DB.Model(&group.GroupItem{}).Where("group_id = ?", g2.ID).Count(&g2ItemCount).Error; err != nil {
+		t.Fatalf("查 g2 成员失败: %v", err)
+	}
+	if g2ItemCount != 1 {
+		t.Errorf("g2 剩余成员数 = %d, want 1", g2ItemCount)
+	}
+	loaded, err := group.GetByName("g2")
+	if err != nil {
+		t.Fatalf("加载 g2 失败: %v", err)
+	}
+	if len(loaded.Items) != 1 || loaded.Items[0].ID != it5.ID || loaded.Items[0].Priority != 1 {
+		t.Errorf("g2 剩余成员或优先级被改动: %+v", loaded.Items)
+	}
+	targets, err := grouprouting.Resolve(loaded)
+	if err != nil {
+		t.Fatalf("删除 c1 后 g2 Resolve 失败: %v", err)
+	}
+	if len(targets) != 1 || targets[0].Model.Name != "m3" {
+		t.Errorf("g2 删除后应只解析 m3: %+v", targets)
+	}
+	var logCount int64
+	if err := shared.LogDB.Model(&shared.Log{}).Where("id = ?", logRow.ID).Count(&logCount).Error; err != nil {
+		t.Fatalf("查历史日志失败: %v", err)
+	}
+	if logCount != 1 {
+		t.Errorf("历史日志被删除，count = %d", logCount)
 	}
 }
 

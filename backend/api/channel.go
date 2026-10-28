@@ -18,6 +18,7 @@ func registerChannelRoutes(r *gin.RouterGroup) {
 	g := r.Group("/channels")
 	g.GET("", listChannels)
 	g.GET("/:id", getChannel)
+	g.GET("/:id/deletion-impact", previewChannelDeletionImpact)
 	g.POST("", createChannel)
 	g.POST("/preview-models", previewChannelModels)
 	g.POST("/resolve", resolveChannelConnection)

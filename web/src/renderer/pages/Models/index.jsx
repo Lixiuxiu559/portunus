@@ -85,8 +85,10 @@ export default function Models() {
       setLoadError(false);
       // 内容整体替换后回到列表顶部，避免停留在上一页的滚动位置
       listRef.current?.scrollTo({ top: 0 });
+      return true;
     } catch {
       if (models.length === 0) setLoadError(true); // 无数据时进错误态而非伪造空态
+      return false;
     } finally {
       setRefreshState(false);
     }
@@ -121,12 +123,19 @@ export default function Models() {
     await performSearch(queryChannel, queryName, 1);
   };
 
-  const handleDelete = async (m) => {
-    await deleteModel(m.id);
+  // 删除与刷新分开：performSearch 自己吞掉异常，因此用返回值判断刷新是否真的成功，
+  // 不能把已完成的删除改写为失败，也不能静默留下已删除的行。
+  const handleDelete = async (target) => {
+    await deleteModel(target.id);
+  };
+
+  const refreshAfterDelete = async () => {
     toast.success('模型已删除');
     // 刷新当前页：删掉当前页最后一条时自动回退到上一页
     const nextPage = models.length === 1 && page > 1 ? page - 1 : page;
-    await performSearch(queryChannel, queryName, nextPage);
+    if (!(await performSearch(queryChannel, queryName, nextPage))) {
+      toast.warning('模型已删除，但列表刷新失败，请稍后重试');
+    }
   };
 
   return (
@@ -198,7 +207,8 @@ export default function Models() {
         model={deleteTarget}
         isOpen={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        onDeleted={handleDelete}
+        onDelete={handleDelete}
+        onDeleted={refreshAfterDelete}
       />
     </div>
   );

@@ -129,9 +129,10 @@ func Update(id int64, req UpdateRequest) (*Model, error) {
 	return &m, nil
 }
 
-// Delete 删除模型。
-func Delete(id int64) error {
-	return shared.DB.Delete(&Model{}, id).Error
+// DeleteTx 在事务中删除单个模型。级联清理由调用方在同一事务内完成；
+// 不提供非事务删除入口，避免绕过分组成员清理造成悬挂引用。
+func DeleteTx(tx *gorm.DB, id int64) error {
+	return tx.Delete(&Model{}, id).Error
 }
 
 // DeleteByChannelTx 在事务中删除指定渠道下的全部模型。

@@ -28,6 +28,11 @@ export function updateChannel(id, data) {
   return request.put(`/channels/${id}`, data);
 }
 
+/** 删除影响预览（只读）：受影响分组、模型数量与余额来源提示 */
+export function getChannelDeletionImpact(id, options) {
+  return request.get(`/channels/${id}/deletion-impact`, options);
+}
+
 /** 删除渠道 */
 export function deleteChannel(id) {
   return request.delete(`/channels/${id}`);

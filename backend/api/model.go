@@ -5,8 +5,11 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
+	"github.com/Lixiuxiu559/portunus/backend/group"
 	"github.com/Lixiuxiu559/portunus/backend/model"
+	"github.com/Lixiuxiu559/portunus/backend/shared"
 )
 
 // registerModelRoutes 注册模型 CRUD 路由。
@@ -14,6 +17,7 @@ func registerModelRoutes(r *gin.RouterGroup) {
 	g := r.Group("/models")
 	g.GET("", listModels)
 	g.GET("/:id", getModel)
+	g.GET("/:id/deletion-impact", previewModelDeletionImpact)
 	g.POST("", createModel)
 	g.PUT("/:id", updateModel)
 	g.DELETE("/:id", deleteModel)
@@ -87,13 +91,25 @@ func updateModel(c *gin.Context) {
 	c.JSON(http.StatusOK, m.ToResponse())
 }
 
+// deleteModel 在事务中删除模型及其全部分组成员，并清除指向这些成员的激活项。
+// 允许删除被引用模型，不自动补位；分组与历史日志保留。
 func deleteModel(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
 		return
 	}
-	if err := model.Delete(id); err != nil {
+	err := shared.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		var target model.Model
+		if err := tx.Select("id").First(&target, id).Error; err != nil {
+			return err
+		}
+		if err := group.DeleteItemsByModelIDsTx(tx, []int64{id}); err != nil {
+			return err
+		}
+		return model.DeleteTx(tx, id)
+	})
+	if err != nil {
 		respondError(c, err)
 		return
 	}
