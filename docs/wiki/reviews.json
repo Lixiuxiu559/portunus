@@ -126,11 +126,12 @@
       }
     },
     "runtime": {
-      "reviewedAt": "2026-10-28T09:10:54.991Z",
-      "reviewer": "Kimi 主 Agent（文档迁移与最终差异复核）",
+      "reviewedAt": "2026-10-30T10:13:35.462Z",
+      "reviewer": "Kimi 主 Agent（对照 config.go 复核）",
       "decision": "no-change",
-      "reason": "已核对最终架构入口迁移与来源清理，本模块知识不变",
+      "reason": "已核对配置默认值变化由网关承受，运行页只描述装配与定时任务，正文无需变化",
       "evidence": [
+        "backend/shared/config.go",
         "docs/wiki/modules/runtime/README.md"
       ],
       "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
@@ -152,11 +153,11 @@
           "mode": "100644"
         },
         "backend/shared/config.go": {
-          "sha256": "d6aea4157069bc5960a7542dfffc0e5e59b29e6b6614e488573adc080b52231c",
+          "sha256": "3614e72752277bbc2b5da34d55850417bf607e051424e7b552e732a96cb81add",
           "mode": "100644"
         },
         "backend/shared/config_conversion_test.go": {
-          "sha256": "fe0989d89361d96ab2a3d37cf8cacf9cf746bb7efcaad3fae29ee368ed061a22",
+          "sha256": "2dad481ed3fe6e2b05a14adf58709a26a660aee307cb4edb4320934be72e7a34",
           "mode": "100644"
         },
         "backend/shared/config_rate_limit_test.go": {
@@ -164,7 +165,7 @@
           "mode": "100644"
         },
         "backend/shared/config_request_limits_test.go": {
-          "sha256": "f06d382b1dda56bb3984b025675e07d1181f8f839ed30b411f8090c8eb70a527",
+          "sha256": "c569ad44ed579f9e5f0467f5daa4dff7c7e0dcc76a7c7fe2b1b319d967f1a168",
           "mode": "100644"
         },
         "backend/shared/config_resource_test.go": {
@@ -538,13 +539,12 @@
       }
     },
     "gateway": {
-      "reviewedAt": "2026-10-28T09:46:16.079Z",
-      "reviewer": "Kimi 主 Agent（实际 diff 复核）",
-      "decision": "no-change",
-      "reason": "已核对 fail.go 与 usage.go 仅将 CONTEXT 注释改指现有网关 Wiki；失败处置、用量归一和 Wiki 正文均无变化",
+      "reviewedAt": "2026-10-30T10:13:35.383Z",
+      "reviewer": "Kimi 主 Agent（对照 config.go 复核）",
+      "decision": "updated",
+      "reason": "配置默认值调整：首内容期限改为240秒、等响应头/首包改为120秒，已同步网关页",
       "evidence": [
-        "backend/gateway/fail.go",
-        "backend/protocol/usage.go",
+        "backend/shared/config.go",
         "docs/wiki/modules/gateway/README.md"
       ],
       "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
@@ -998,7 +998,7 @@
           "mode": "100644"
         },
         "backend/shared/config.go": {
-          "sha256": "d6aea4157069bc5960a7542dfffc0e5e59b29e6b6614e488573adc080b52231c",
+          "sha256": "3614e72752277bbc2b5da34d55850417bf607e051424e7b552e732a96cb81add",
           "mode": "100644"
         },
         "backend/shared/upstream_attempt.go": {
@@ -1008,7 +1008,7 @@
       },
       "docSnapshot": {
         "docs/wiki/modules/gateway/README.md": {
-          "sha256": "8bfb1ba1e0b0d9ff2e2c1cf889a9ed935e94388a2dc78c6437e4ba5699a25adb",
+          "sha256": "ab44d36653db36727bf7e6fd5c562dbb6f53a5afb11ee8a22ca7a795615edddf",
           "mode": "100644"
         }
       }
@@ -1302,14 +1302,13 @@
       }
     },
     "desktop": {
-      "reviewedAt": "2026-10-28T09:46:16.161Z",
-      "reviewer": "Kimi 主 Agent（实际 diff 复核）",
+      "reviewedAt": "2026-10-30T10:13:35.551Z",
+      "reviewer": "Kimi 主 Agent（对照 diff 复核）",
       "decision": "no-change",
-      "reason": "已核对 sidecar 与 server-address 仅将 CONTEXT 注释改指现有桌面 Wiki；状态机、地址规则和 Wiki 正文均无变化",
+      "reason": "已核对模型映射下拉仅隐藏标签并对齐高度，桌面模块知识未涉及该控件细节",
       "evidence": [
-        "web/src/main/server-address.js",
-        "web/src/main/sidecar.js",
-        "web/src/main/sidecar.test.js",
+        "web/src/renderer/components/AppSelect.jsx",
+        "web/src/renderer/pages/Clients/ClaudeConfigPanel.jsx",
         "docs/wiki/modules/desktop/README.md"
       ],
       "configDigest": "d21611d809c4f6d8b2d5f48ca94d7d27644c386197a0ab7f41e33651764d5584",
@@ -1547,7 +1546,7 @@
           "mode": "100644"
         },
         "web/src/renderer/components/AppSelect.jsx": {
-          "sha256": "5e9aeee7b8c779f54c917b61cd7989198dcc89443b6c1e8a8eeb13d9e27a5f3a",
+          "sha256": "8303a9d9fb061a18b4466197259ef43d057dcc7420e1dcc7b7e004c35d005c73",
           "mode": "100644"
         },
         "web/src/renderer/components/AsyncContent.jsx": {
@@ -1655,7 +1654,7 @@
           "mode": "100644"
         },
         "web/src/renderer/index.css": {
-          "sha256": "58a8b51983f5130fa92e7f44cb50e7227652fcdcb9534919dc487c3fdaa810a8",
+          "sha256": "34f5323b156f32da0ce67a15c40cebd14313b97bb434e0b9df57e7aa2f246a47",
           "mode": "100644"
         },
         "web/src/renderer/index.html": {
@@ -1835,7 +1834,7 @@
           "mode": "100644"
         },
         "web/src/renderer/pages/Clients/ClaudeConfigPanel.jsx": {
-          "sha256": "7849fcd35678f75ced56fcacc145de775c07d5c4f54b21c2d0884e511d4756b1",
+          "sha256": "a6a2b5598d5884a99aafed5c614a79d04b3f55683d0fc1824ffc173bcbc686af",
           "mode": "100644"
         },
         "web/src/renderer/pages/Clients/ConnectionCard.jsx": {

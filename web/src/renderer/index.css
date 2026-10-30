@@ -1437,5 +1437,5 @@ html.dark .expand-editor__panel {
 .skeleton-field { width: 50%; height: 40px; }
 .skeleton-code { width: 100%; height: 160px; border-radius: 12px; }
 
-.mm-model-choice .app-choice-label { font-size: 11px; color: var(--muted); }
+.mm-model-choice .app-choice-trigger { min-height: 36px; padding: 0 12px; }
 .mm-model-choice .app-choice-value { font-family: var(--font-mono); }

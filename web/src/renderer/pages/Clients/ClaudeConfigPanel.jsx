@@ -192,7 +192,7 @@ export default function ClaudeConfigPanel({ groups, apiKey, serverUrl, onDirtyCh
     return (
       <div className="mm-model">
         <div className="mm-select-wrap">
-          <AppSelect label={`${slot.label} 请求模型`} className="mm-model-choice" value={m.base}
+          <AppSelect label={`${slot.label} 请求模型`} className="mm-model-choice" hideLabel value={m.base}
             options={[{ id: '', name: '— 不映射 —' }, ...(dangling ? [{ id: m.base, name: `${m.base}（分组不存在）`, disabled: true }] : []), ...modelOptions.map((o) => ({ id: o.id, name: o.label }))]}
             onChange={(value) => setSlot(slot.id, value === '' ? { base: '', name: '' } : { base: value, name: value })} />
         </div>
