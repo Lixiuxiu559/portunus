@@ -8,6 +8,11 @@
 # 技能评估工作区（演练报告/评分数据，非技能本体）
 .claude/skills/release-workspace/
 
+# 本地环境变量（COS 发版同步凭证等）
+.env
+__pycache__/
+*.pyc
+
 # 运行时数据（本地数据库、配置）
 # 只忽略根目录的 data/（SQLite），避免误伤 .claude/skills 下各技能的 data/ 参考资料
 /data/

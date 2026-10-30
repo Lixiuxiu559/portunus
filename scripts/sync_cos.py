@@ -175,12 +175,30 @@ def prune_old_versions(client, tag):
     print(f"旧版本清理完成：删除 {len(stale)} 个文件", flush=True)
 
 
+def load_env_file(path=None):
+    """Load repo-root .env for local CLI use; existing environment always wins."""
+    env_path = path or Path(__file__).resolve().parent.parent / ".env"
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
 def credentials():
     secret_id = os.environ.get("COS_SECRET_ID") or os.environ.get("TENCENTCLOUD_SECRET_ID")
     secret_key = os.environ.get("COS_SECRET_KEY") or os.environ.get("TENCENTCLOUD_SECRET_KEY")
     if not secret_id or not secret_key:
         if not sys.stdin.isatty():
-            raise ValueError("本机尚未配置 COS 凭证。请在本地终端运行脚本，按隐藏提示输入密钥；不要发送到聊天或写入仓库。")
+            raise ValueError("本机尚未配置 COS 凭证。请在本地终端运行脚本，或在仓库 .env 中填写 COS_SECRET_ID / COS_SECRET_KEY；不要发送到聊天或写入仓库。")
         secret_id = secret_id or getpass.getpass("COS SecretId（输入隐藏）：")
         secret_key = secret_key or getpass.getpass("COS SecretKey（输入隐藏）：")
     if not secret_id.strip() or not secret_key.strip():
@@ -250,4 +268,5 @@ def main(args):
 
 
 if __name__ == "__main__":
+    load_env_file()
     main(sys.argv[1:])

@@ -7,7 +7,7 @@ description: Portunus 发版流程：升版本号、打 tag、触发 GitHub Acti
 
 把仓库当前代码做成 Windows + macOS 安装包并发布。核心链路：
 
-**前置检查 → 定版本号 → push + tag（闸 1）→ 盯 CI → 更新说明 + draft 验收（闸 2）→ publish**
+**前置检查 → 定版本号 → push + tag（闸 1）→ 盯 CI → 更新说明 + draft 验收（闸 2）→ publish → 同步 COS**
 
 ## 硬约束（违反会造成线上更新异常）
 
@@ -39,7 +39,7 @@ push tag 会立刻触发 CI 并最终把包发给客户，属于外向且难撤�
 版本：X.Y.Z（原 A.B.C）
 tag：vX.Y.Z
 待推送提交：<本地领先 origin/main 的提交清单>
-将构建：Windows NSIS (x64) + macOS DMG/ZIP (arm64)
+将构建：Windows NSIS/ZIP (x64) + macOS DMG/ZIP (arm64) + Linux AppImage (x64)
 产物去向：GitHub draft Release（publish 后对客户可见）
 ```
 
@@ -112,6 +112,16 @@ Release 页面要让客户一眼看懂"这版更新了什么"，不能只发一�
 gh release edit vX.Y.Z --draft=false
 ```
 
+### 4.3 同步到 COS（发布后必做）
+
+客户端自动更新以 COS 为主源、GitHub 为备用源；正式版发布后立即执行：
+
+```bash
+scripts/sync-cos.sh --tag vX.Y.Z
+```
+
+脚本会下载并校验 `latest*.yml` 与安装包 SHA-512，先上传安装包、最后发布更新清单，并保留最近 3 个正式版本。凭证从仓库根 `.env` 的 `COS_SECRET_ID` / `COS_SECRET_KEY` 读取（环境变量优先）；`.env` 已被忽略，不要提交。首次运行会自动创建临时 venv 并安装依赖。脚本拒绝非最新正式版，所以必须在 publish 之后运行。
+
 ## 阶段 5：收尾
 
 发布完成后向用户交代客户端获取更新的方式：
@@ -120,4 +130,4 @@ gh release edit vX.Y.Z --draft=false
 - **macOS（已装）**：检测到新版后按钮是"去下载"，浏览器打开 Releases 页手动覆盖（未签名降级路径；买了 Apple 证书切全自动时改动点在 `web/src/main/updater.js` + `useUpdater.js`）。
 - **新客户**：Releases 页下载安装包。
 
-提醒：镜像兜底（`PORTUNUS_UPDATE_MIRROR`，见 `web/src/main/updater.js`）尚未配置，国内客户从 GitHub 下载百兆安装包可能慢；若客户反馈下载体验差，再接镜像方案。
+提醒：COS 已是客户端自动更新的主源（`web/src/main/update-service.js`），每次发版必须执行阶段 4.3 的同步；未同步时客户端会回退 GitHub，国内下载可能慢。

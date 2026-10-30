@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import io
+import os
 from contextlib import redirect_stdout
 from pathlib import Path
 import tempfile
@@ -9,7 +10,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress, create_cos_client, credentials, release_info, download_release, formal_versions, prune_old_versions, main
+from sync_cos import BUCKET, MANIFESTS, check_latest, prepare_files, sync_files, upload_progress, create_cos_client, credentials, load_env_file, release_info, download_release, formal_versions, prune_old_versions, main
 
 
 class SyncTests(unittest.TestCase):
@@ -149,6 +150,19 @@ class SyncTests(unittest.TestCase):
     @patch.dict("os.environ", {"TENCENTCLOUD_SECRET_ID": "local-id", "TENCENTCLOUD_SECRET_KEY": "local-key"}, clear=True)
     def test_tencent_cloud_environment_credentials_are_supported(self):
         self.assertEqual(credentials(), ("local-id", "local-key"))
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_env_file_loads_without_overriding_environment(self):
+        path = self.root / ".env"
+        path.write_text(
+            "# 注释\nCOS_SECRET_ID=file-id\nCOS_SECRET_KEY=\"file-key\"\n",
+            encoding="utf-8",
+        )
+        load_env_file(path)
+        self.assertEqual(credentials(), ("file-id", "file-key"))
+        os.environ["COS_SECRET_ID"] = "shell-id"
+        load_env_file(path)
+        self.assertEqual(os.environ["COS_SECRET_ID"], "shell-id")
 
     @patch("sync_cos.subprocess.check_output")
     def test_prerelease_is_rejected_before_upload(self, output):
