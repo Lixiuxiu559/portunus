@@ -33,7 +33,7 @@ func TestRemovedConversionPolicyIgnored(t *testing.T) {
 			if err != nil {
 				t.Fatalf("已移除策略应作为未知配置忽略: %v", err)
 			}
-			if cfg.Proxy.MaxHTTPAttempts != 4 || cfg.Proxy.FirstContentTimeoutSeconds != 120 {
+			if cfg.Proxy.MaxHTTPAttempts != 4 || cfg.Proxy.FirstContentTimeoutSeconds != 240 {
 				t.Fatalf("请求安全限制发生变化: %+v", cfg.Proxy)
 			}
 			encoded, err := json.Marshal(cfg)

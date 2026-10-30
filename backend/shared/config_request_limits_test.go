@@ -13,12 +13,12 @@ func TestRequestLimitsConfig(t *testing.T) {
 		wantAttempts, wantTimeout           int
 		wantErr                             string
 	}{
-		{name: "缺失文件", wantAttempts: 4, wantTimeout: 120},
-		{name: "旧配置", body: `{"proxy":{"retry_count":1}}`, wantAttempts: 4, wantTimeout: 120},
+		{name: "缺失文件", wantAttempts: 4, wantTimeout: 240},
+		{name: "旧配置", body: `{"proxy":{"retry_count":1}}`, wantAttempts: 4, wantTimeout: 240},
 		{name: "显式配置", body: `{"proxy":{"max_http_attempts":7,"first_content_timeout_seconds":90}}`, wantAttempts: 7, wantTimeout: 90},
-		{name: "零值默认", body: `{"proxy":{"max_http_attempts":0,"first_content_timeout_seconds":0}}`, wantAttempts: 4, wantTimeout: 120},
+		{name: "零值默认", body: `{"proxy":{"max_http_attempts":0,"first_content_timeout_seconds":0}}`, wantAttempts: 4, wantTimeout: 240},
 		{name: "环境覆盖", body: `{"proxy":{"max_http_attempts":7,"first_content_timeout_seconds":90}}`, attemptsEnv: "2", timeoutEnv: "30", wantAttempts: 2, wantTimeout: 30},
-		{name: "环境零值默认", body: `{"proxy":{"max_http_attempts":7,"first_content_timeout_seconds":90}}`, attemptsEnv: "0", timeoutEnv: "0", wantAttempts: 4, wantTimeout: 120},
+		{name: "环境零值默认", body: `{"proxy":{"max_http_attempts":7,"first_content_timeout_seconds":90}}`, attemptsEnv: "0", timeoutEnv: "0", wantAttempts: 4, wantTimeout: 240},
 		{name: "配置负预算", body: `{"proxy":{"max_http_attempts":-1}}`, wantErr: "proxy.max_http_attempts"},
 		{name: "配置负期限", body: `{"proxy":{"first_content_timeout_seconds":-1}}`, wantErr: "proxy.first_content_timeout_seconds"},
 		{name: "环境负预算", body: `{}`, attemptsEnv: "-1", wantErr: "proxy.max_http_attempts"},
@@ -55,7 +55,7 @@ func TestRequestLimitsConfig(t *testing.T) {
 
 func TestDefaultRequestLimits(t *testing.T) {
 	cfg := DefaultProxyConfig()
-	if cfg.MaxHTTPAttempts != 4 || cfg.FirstContentTimeoutSeconds != 120 || cfg.RetryCount != 2 {
+	if cfg.MaxHTTPAttempts != 4 || cfg.FirstContentTimeoutSeconds != 240 || cfg.FirstByteTimeoutSeconds != 120 || cfg.RetryCount != 2 {
 		t.Fatalf("默认配置=%+v", cfg)
 	}
 }

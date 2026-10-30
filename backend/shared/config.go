@@ -32,7 +32,7 @@ type ProxyConfig struct {
 	RetryBackoffBaseMs          int             `json:"retry_backoff_base_ms"`           // 请求重试退避基数；0 使用默认值 200 毫秒
 	RetryBackoffMaxMs           int             `json:"retry_backoff_max_ms"`            // 请求重试退避上限；0 使用默认值 2000 毫秒
 	MaxHTTPAttempts             int             `json:"max_http_attempts"`               // 单个请求的 HTTP 总尝试预算，包含兼容重试；0 使用默认值 4
-	FirstContentTimeoutSeconds  int             `json:"first_content_timeout_seconds"`   // 跨目标累计首内容期限；0 使用默认值 120 秒
+	FirstContentTimeoutSeconds  int             `json:"first_content_timeout_seconds"`   // 跨目标累计首内容期限；0 使用默认值 240 秒
 	ConnectTimeoutSeconds       int             `json:"connect_timeout_seconds"`         // 连接超时
 	FirstByteTimeoutSeconds     int             `json:"first_byte_timeout_seconds"`      // 等响应头 / 流式首包（首个数据事件）超时
 	StreamIdleTimeoutSeconds    int             `json:"stream_idle_timeout_seconds"`     // 流式首包后，上游静默多久掐断（0 禁用）
@@ -52,13 +52,12 @@ func DefaultProxyConfig() ProxyConfig {
 		RetryBackoffBaseMs:          200,
 		RetryBackoffMaxMs:           2000,
 		MaxHTTPAttempts:             4,
-		FirstContentTimeoutSeconds:  120,
+		FirstContentTimeoutSeconds:  240,
 		ConnectTimeoutSeconds:       30,
-		// 等响应头 / 流式首包时限。曾试过 20s：高峰期中转上游排队时正常请求的
-		// 首包也会超 20s（30s~2min 的成功 200 大量存在），20s 误杀慢而正常的请求，
-		// 反而制造额外失败与客户端指数退避，故定 60s（见 gateway/client_wait_test.go
-		// 头注释）。配合假死目标跳过同目标重试 + 熔断快速开路，客户端最多等一个窗口。
-		FirstByteTimeoutSeconds:  60,
+		// 等响应头 / 流式首包时限。中转上游的正常慢响应可能接近或超过 60s，
+		// 放宽到 120s；跨目标累计首内容期限同步保留两个等待窗口（240s）。
+		// 不吐响应头的目标仍跳过同目标重试，并由熔断限制后续探测。
+		FirstByteTimeoutSeconds:  120,
 		StreamIdleTimeoutSeconds: 120,
 		NonStreamTimeoutSeconds:  600,
 		CircuitFailureThreshold:  4,
