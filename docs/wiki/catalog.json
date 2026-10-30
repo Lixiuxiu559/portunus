@@ -1,0 +1,292 @@
+{
+  "version": 2,
+  "title": "Portunus",
+  "language": "zh-CN",
+  "pathLanguage": "zh-CN",
+  "pages": [
+    {
+      "id": "architecture",
+      "title": "系统架构",
+      "path": "系统架构.md",
+      "summary": "说明 Portunus 的进程组成、模块依赖与请求主链路；不展开单模块内部实现和具体配置默认值。",
+      "sources": [
+        "main.go",
+        "go.mod",
+        "backend/router/router.go",
+        "backend/gateway/gateway.go",
+        "backend/gateway/dep.go",
+        "backend/api/api.go",
+        "backend/api/local_access.go",
+        "backend/protocol/provider_registry.go",
+        "backend/shared/config.go",
+        "backend/shared/db.go",
+        "web/src/main/main.js",
+        "web/src/main/sidecar.js",
+        "web/package.json",
+        "docs/product/PRODUCT.md"
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "核心概念",
+      "path": "核心概念.md",
+      "summary": "统一渠道、模型、分组、凭据与调用记录的口径及跨模块边界；不替代各模块的操作步骤与实现细节。",
+      "sources": [
+        "backend/channel/channel.go",
+        "backend/model/model.go",
+        "backend/group/group.go",
+        "backend/shared/apikey.go",
+        "backend/shared/log.go",
+        "backend/shared/upstream_attempt.go",
+        "backend/shared/routing_trace.go",
+        "backend/gateway/gateway.go",
+        "backend/router/router.go",
+        "backend/api/local_access.go",
+        "docs/product/PRODUCT.md"
+      ]
+    },
+    {
+      "id": "local-development",
+      "title": "本地开发与测试",
+      "path": "指南/本地开发与测试.md",
+      "summary": "说明后端与桌面的本地启动、测试命令及 Dev/正式隔离；不覆盖正式打包发布与线上 CI 运行结果。",
+      "sources": [
+        "README.md",
+        "docs/product/DEVELOPMENT.md",
+        "main.go",
+        "go.mod",
+        "web/package.json",
+        "web/vite.config.mjs",
+        "web/scripts/build-go.mjs",
+        "web/scripts/build-dev.mjs",
+        "web/scripts/preview-dev.mjs",
+        "web/src/main/runtime-profile.js",
+        "web/src/main/server-address.js",
+        "web/src/main/sidecar.js",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "request-lifecycle",
+      "title": "一次请求的生命周期",
+      "path": "指南/请求生命周期.md",
+      "summary": "串起 /v1 请求从鉴权、分组解析、目标循环到协议转换、交付与记录的完整链路；不重复各模块的配置项全集。",
+      "sources": [
+        "backend/gateway/gateway.go",
+        "backend/gateway/relay.go",
+        "backend/gateway/upstream.go",
+        "backend/gateway/fail.go",
+        "backend/gateway/stream.go",
+        "backend/gateway/stream_delivery.go",
+        "backend/gateway/log.go",
+        "backend/gateway/attempt.go",
+        "backend/router/router.go",
+        "backend/protocol/convert.go",
+        "backend/protocol/stream.go",
+        "backend/shared/log.go",
+        "backend/shared/upstream_attempt.go"
+      ]
+    },
+    {
+      "id": "release",
+      "title": "构建、发布与更新",
+      "path": "指南/构建发布与更新.md",
+      "summary": "说明安装包构建、CI/Release 工作流、更新签名与客户端更新链路；不证明线上工作流或某个安装包已经验证。",
+      "sources": [
+        "scripts/sync-cos.sh",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "web/package.json",
+        "web/scripts/build-go.mjs",
+        "web/scripts/after-artifacts.cjs",
+        "web/scripts/sign-mac-update.mjs",
+        "web/scripts/mac-update-smoke.mjs",
+        "web/src/main/updater.js",
+        "web/src/main/update-service.js",
+        "web/src/main/mac-update-installer.js",
+        "web/src/main/mac-update-health.js",
+        "web/electron-builder.dev.cjs",
+        "scripts/sync_cos.py"
+      ]
+    },
+    {
+      "id": "runtime",
+      "title": "运行入口与基础设施",
+      "path": "核心模块/运行入口与基础设施.md",
+      "summary": "说明 Go 进程启动、配置与数据库、管理接口边界、API Key、设置和定时维护；不负责渠道业务、网关路由与协议转换。",
+      "sources": [
+        "main.go",
+        "backend/shared/config.go",
+        "backend/shared/db.go",
+        "backend/shared/apikey.go",
+        "backend/shared/setting.go",
+        "backend/shared/error.go",
+        "backend/api/api.go",
+        "backend/api/local_access.go",
+        "backend/api/apikey.go",
+        "backend/api/setting.go",
+        "backend/cron/cron.go",
+        "backend/shared/log_query.go",
+        "go.mod"
+      ]
+    },
+    {
+      "id": "resources",
+      "title": "渠道、模型与分组",
+      "path": "核心模块/渠道模型与分组.md",
+      "summary": "说明渠道接入与连接解析、模型导入和同步、分组策略与删除级联；不执行实际转发、余额查询和日志查询。",
+      "sources": [
+        "backend/channel/channel.go",
+        "backend/channel/service.go",
+        "backend/upstream/presets.go",
+        "backend/upstream/connection.go",
+        "backend/model/model.go",
+        "backend/model/service.go",
+        "backend/model/import.go",
+        "backend/model/sync.go",
+        "backend/group/group.go",
+        "backend/group/service.go",
+        "backend/group/deletion_impact.go",
+        "backend/router/router.go",
+        "backend/api/channel.go",
+        "backend/api/channel_connection.go",
+        "backend/api/model.go",
+        "backend/api/group.go",
+        "backend/api/deletion_impact.go"
+      ]
+    },
+    {
+      "id": "gateway",
+      "title": "网关转发与保护",
+      "path": "核心模块/网关转发与保护.md",
+      "summary": "说明 /v1 入口、目标循环与失败处置、限流冷却、熔断、并发准入和主动验证；不负责协议字段转换和资源 CRUD。",
+      "sources": [
+        "backend/gateway/gateway.go",
+        "backend/gateway/dep.go",
+        "backend/gateway/relay.go",
+        "backend/gateway/fail.go",
+        "backend/gateway/upstream.go",
+        "backend/gateway/request_control.go",
+        "backend/gateway/rate_limit.go",
+        "backend/gateway/circuit_breaker.go",
+        "backend/gateway/breaker_attempt.go",
+        "backend/gateway/channel_concurrency.go",
+        "backend/gateway/routing_diagnostics.go",
+        "backend/gateway/probe.go",
+        "backend/shared/config.go",
+        "backend/resource/limits.go"
+      ]
+    },
+    {
+      "id": "protocol",
+      "title": "协议转换与流式交付",
+      "path": "核心模块/协议转换与流式交付.md",
+      "summary": "说明四种上游协议的请求/响应转换、流式事件与能力映射；不决定选路、重试和资源管理。",
+      "sources": [
+        "backend/protocol/protocol.go",
+        "backend/protocol/provider_registry.go",
+        "backend/protocol/convert.go",
+        "backend/protocol/from_openai.go",
+        "backend/protocol/openai.go",
+        "backend/protocol/anthropic.go",
+        "backend/protocol/gemini.go",
+        "backend/protocol/responses.go",
+        "backend/protocol/native_request.go",
+        "backend/protocol/native_response.go",
+        "backend/protocol/stream.go",
+        "backend/protocol/stream_session.go",
+        "backend/protocol/stream_frame.go",
+        "backend/protocol/stream_replay.go",
+        "backend/protocol/reasoning.go"
+      ]
+    },
+    {
+      "id": "quota",
+      "title": "余额与额度",
+      "path": "核心模块/余额与额度.md",
+      "summary": "说明独立余额来源、适配器、缓存状态、有界调度与前端查询语义；不参与路由、鉴权或调用费用计算。",
+      "sources": [
+        "backend/quota/registry.go",
+        "backend/quota/service.go",
+        "backend/quota/source.go",
+        "backend/quota/execute.go",
+        "backend/quota/view.go",
+        "backend/quota/repository.go",
+        "backend/quota/scheduler.go",
+        "backend/quota/adapter_custom.go",
+        "backend/quota/custom_config.go",
+        "backend/quota/custom_parse.go",
+        "backend/quota/adapter_newapi.go",
+        "backend/quota/newapi_query.go",
+        "backend/quota/newapi_detection.go",
+        "backend/api/quota.go",
+        "web/src/renderer/pages/Channels/quota/QuotaPanel.jsx"
+      ]
+    },
+    {
+      "id": "observability",
+      "title": "调用观测与日志",
+      "path": "核心模块/调用观测与日志.md",
+      "summary": "说明调用日志、显式 HTTP 尝试、路由诊断的写入与查询口径及保留清理；不把记录数当作客户端请求数或成功率。",
+      "sources": [
+        "backend/shared/log.go",
+        "backend/shared/log_query.go",
+        "backend/shared/log_requests.go",
+        "backend/shared/upstream_attempt.go",
+        "backend/shared/routing_trace.go",
+        "backend/shared/db.go",
+        "backend/api/log.go",
+        "backend/gateway/log.go",
+        "backend/gateway/attempt.go",
+        "backend/gateway/routing_diagnostics.go",
+        "web/src/renderer/pages/Logs.jsx",
+        "web/src/renderer/pages/LogDetailModal.jsx",
+        "web/src/renderer/pages/RequestAttemptTimeline.jsx",
+        "web/src/renderer/pages/RequestRoutingTrace.jsx",
+        "web/src/renderer/api/log.js"
+      ]
+    },
+    {
+      "id": "desktop",
+      "title": "桌面主进程与 sidecar",
+      "path": "核心模块/桌面主进程与sidecar.md",
+      "summary": "说明 Electron 主进程、运行身份与数据隔离、sidecar 生命周期、IPC 和客户端配置读写；不实现网关业务与渲染层页面。",
+      "sources": [
+        "web/src/main/main.js",
+        "web/src/main/runtime-profile.js",
+        "web/src/main/server-address.js",
+        "web/src/main/app-config.js",
+        "web/src/main/preload.js",
+        "web/src/main/sidecar.js",
+        "web/src/main/tray.js",
+        "web/src/main/client-config.js",
+        "web/vite.config.mjs",
+        "web/electron-builder.dev.cjs",
+        "docs/product/DEVELOPMENT.md"
+      ]
+    },
+    {
+      "id": "renderer",
+      "title": "管理界面与请求层",
+      "path": "核心模块/管理界面与请求层.md",
+      "summary": "说明 React 渲染层的路由、API 请求与缓存、删除影响确认和客户端接入页面；不替代后端接口契约与桌面主进程生命周期。",
+      "sources": [
+        "web/src/renderer/main.jsx",
+        "web/src/renderer/App.jsx",
+        "web/src/renderer/pageResources.js",
+        "web/src/renderer/components/Layout.jsx",
+        "web/src/renderer/api/request.js",
+        "web/src/renderer/utils/deletionImpact.js",
+        "web/src/renderer/components/DeletionImpactBody.jsx",
+        "web/src/renderer/pages/Clients/ClaudeConfigPanel.jsx",
+        "web/src/renderer/utils/claudeConfig.js",
+        "web/src/renderer/pages/Channels/index.jsx",
+        "web/src/renderer/pages/Models/index.jsx",
+        "web/src/renderer/pages/Groups/index.jsx",
+        "web/src/renderer/pages/Logs.jsx",
+        "web/src/renderer/pages/Clients/index.jsx",
+        "web/src/renderer/pages/Settings.jsx"
+      ]
+    }
+  ]
+}

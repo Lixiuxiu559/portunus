@@ -56,7 +56,7 @@ backend/
   shared    跨模块公共：配置、数据库、APIKey、日志/尝试实体与查询
 ```
 
-依赖方向详见[运行入口与公共基础设施](docs/wiki/modules/runtime/README.md)和各模块文档；上游连接为 `channel → upstream → protocol`，模型发现和生成均从已保存渠道取得连接。`quota` 独立，不导入生成／路由模块，由 main 注入最小渠道读取函数。模块间用外键 ID 关联，避免包级循环依赖。
+依赖方向详见[运行入口与公共基础设施](docs/wiki/核心模块/运行入口与基础设施.md)和各模块文档；上游连接为 `channel → upstream → protocol`，模型发现和生成均从已保存渠道取得连接。`quota` 独立，不导入生成／路由模块，由 main 注入最小渠道读取函数。模块间用外键 ID 关联，避免包级循环依赖。
 
 一次调用的数据流：
 

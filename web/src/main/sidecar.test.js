@@ -4,7 +4,7 @@ const os = require('os');
 const { createBackend } = require('./sidecar.js');
 
 // 后端守护状态机离线单测：deps 注入 stub spawn / ping / portFree，
-// 不碰真实二进制与端口。状态机说明见 docs/wiki/modules/desktop/README.md。
+// 不碰真实二进制与端口。状态机说明见 docs/wiki/核心模块/桌面主进程与sidecar.md。
 
 function fakeChild() {
   const child = new (require('node:events').EventEmitter)();

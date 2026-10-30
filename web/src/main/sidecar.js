@@ -1,4 +1,4 @@
-// 后端守护（sidecar）状态机——生命周期受控的 Go 后端，见 docs/wiki/modules/desktop/README.md。
+// 后端守护（sidecar）状态机——生命周期受控的 Go 后端，见 docs/wiki/核心模块/桌面主进程与sidecar.md。
 //
 // 打包模式（deps.binPath 有值）：spawn 随包二进制；开发模式（binPath=null）：
 // 只轮询等外部后端就绪，不 spawn。

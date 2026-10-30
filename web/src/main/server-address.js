@@ -4,7 +4,7 @@
 // - baseURL：管理 API 前缀，renderer 直接当 axios baseURL 用。
 //
 // 端口按模式固定：Dev 13061，正式版 13060（两者均由主进程管理 sidecar）。
-// 运行身份与地址规则见 docs/wiki/modules/desktop/README.md。
+// 运行身份与地址规则见 docs/wiki/核心模块/桌面主进程与sidecar.md。
 
 const DEV_PORT = 13061;
 const PROD_PORT = 13060;
