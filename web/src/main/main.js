@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeImage, dialog } = require('electron');
 const path = require('path');
 const { initializeProfile } = require('./runtime-profile');
 const runtime = initializeProfile(app, require('../../package.json'));
@@ -9,6 +9,7 @@ const { addressOf, hostFor } = require('./server-address');
 const appConfig = require('./app-config');
 const clientConfig = require('./client-config');
 const { createTray } = require('./tray');
+const { registerConfigTransfer } = require('./config-transfer');
 
 // 开发模式下应用跑在 node_modules 的 Electron 默认 bundle 里，Dock/任务栏显示的是
 // Electron 官方图标；这里显式换成我们的 logo。打包版由 electron-builder 把
@@ -110,6 +111,7 @@ function createWindow() {
   });
 
   const win = mainWindow;
+  configTransfer.bindWindow(win);
   backend.ready.then(() => {
     if (win.isDestroyed()) return;
     if (runtime.isDevelopment && backend.state !== 'ready') {
@@ -161,6 +163,15 @@ function showMainWindow() {
 registerUpdate(ipcMain);
 appConfig.register(ipcMain);
 clientConfig.register(ipcMain);
+const configTransfer = registerConfigTransfer(ipcMain, {
+  getWindow: () => mainWindow,
+  rendererFile: path.join(__dirname, '../../dist/renderer/index.html'),
+  useDevServer,
+  profile: runtime.profile,
+  backend,
+  dialog,
+  getVersion: () => app.getVersion(),
+});
 
 // ─── IPC：应用信息（依赖 electron app，留 main.js）───
 ipcMain.handle('app:version', () => app.getVersion());
@@ -248,6 +259,7 @@ let backendStoppedForQuit = false;
 let backendQuitPromise = null;
 app.on('before-quit', (event) => {
   isQuitting = true;
+  configTransfer.dispose();
   if (process.platform === 'darwin' && !backendStoppedForQuit) {
     event.preventDefault();
     backendQuitPromise ??= backend.stopAndWait().finally(() => {

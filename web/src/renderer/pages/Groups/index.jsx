@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { groupConfiguration, groupServicePath, strategyDescriptions, strategyLabels } from '../../utils/groupService';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button, Typography, Chip, Card, ScrollShadow, toast } from '@heroui/react';
@@ -18,6 +18,7 @@ import PageSkeleton from '../../components/PageSkeleton';
 import { getCachedResponse } from '../../api/responseCache';
 import useDelayedFlag from '../../hooks/useDelayedFlag';
 import GroupSearch from './GroupSearch';
+import { filterImportedGroups, importedGroupIds } from '../../components/config-transfer/model';
 import './groups.css';
 
 function MemberRow({ provided, dragging, name, channelName, active, manual, sortable, index, onActivate, onRemove }) {
@@ -37,6 +38,8 @@ function MemberRow({ provided, dragging, name, channelName, active, manual, sort
 
 export default function Groups() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [importedIds, setImportedIds] = useState(() => importedGroupIds(location.state));
   const [cached] = useState(() => {
     const groups = getCachedResponse('/groups');
     const models = getCachedResponse('/models', { page: 1, page_size: 1 });
@@ -87,9 +90,10 @@ export default function Groups() {
   const channelMap = Object.fromEntries(channels.map((c) => [c.id, c.name]));
 
   // 分组数量不多，名称过滤直接在已加载列表上完成；查询时同时重取服务端数据。
+  const importedGroups = filterImportedGroups(groups, importedIds);
   const visibleGroups = queryName
-    ? groups.filter((g) => g.name.toLocaleLowerCase().includes(queryName.toLocaleLowerCase()))
-    : groups;
+    ? importedGroups.filter((g) => g.name.toLocaleLowerCase().includes(queryName.toLocaleLowerCase()))
+    : importedGroups;
   const handleSearch = (name) => {
     setQueryName(name);
     fetchAll(true);
@@ -146,6 +150,11 @@ export default function Groups() {
 
   return (
     <div data-page-ready={!loading} className="groups-page flex flex-col flex-1 min-h-0">
+      {importedIds && <div className="flex flex-wrap items-center gap-2 mb-4 text-sm shrink-0 rounded-xl bg-accent/10 p-3" role="status">
+        <span className="mr-auto">本次导入分组：{loading ? '正在读取…' : loadError ? '读取失败，请重试' : `当前可见 ${importedGroups.length} / ${importedIds.size} 个`}{!loading && !loadError && importedGroups.length < importedIds.size ? '，部分分组可能已被删除' : ''}</span>
+        <Button size="sm" variant="secondary" onPress={() => { setImportedIds(null); navigate('/groups', { replace: true, state: null }); }}>显示全部</Button>
+        <Button size="sm" variant="tertiary" onPress={() => navigate('/settings', { state: { configTransfer: true } })}>返回配置迁移</Button>
+      </div>}
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
         <GroupSearch key={searchReset} onSearch={handleSearch} onClear={() => setQueryName('')}
           disabled={refreshing || loading} pending={loading || showRefreshing} />
@@ -166,7 +175,7 @@ export default function Groups() {
             重试
           </Button>
         </div>
-      ) : groups.length === 0 ? (
+      ) : groups.length === 0 && !importedIds ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted">
           <span className="text-base font-medium text-foreground">创建你的第一个模型服务</span>
           <p>添加上游渠道 → 获取模型 → 创建分组 → 服务接入 → 查看调用记录</p>
@@ -182,8 +191,8 @@ export default function Groups() {
         </div>
       ) : visibleGroups.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted">
-          <span>没有匹配「{queryName}」的分组</span>
-          <Button variant="secondary" size="sm" onPress={clearSearch}>清除查询</Button>
+          <span>{queryName ? `没有匹配「${queryName}」的分组` : '本次导入的分组当前已不可见，请查看全部分组'}</span>
+          {queryName && <Button variant="secondary" size="sm" onPress={clearSearch}>清除查询</Button>}
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar">

@@ -1,0 +1,10 @@
+[
+  {
+    "kind": "copy-failure",
+    "exitCode": 1,
+    "temporarySourceRemoved": true,
+    "actualGoStillAlive": false,
+    "runReportExists": true,
+    "stderr": "file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-9GeWN0/copy-fault.mjs:1\nimport fs from 'node:fs';import path from 'node:path';import {syncBuiltinESMExports} from 'node:module';const mkdtemp=fs.mkdtempSync;fs.mkdtempSync=(...args)=>{const result=mkdtemp(...args);if(String(args[0]).includes('portunus-mutation-go-'))fs.writeFileSync(\"/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-9GeWN0/work-path\",result);return result;};const copy=fs.copyFileSync;fs.copyFileSync=(...args)=>{if(String(args[1]).includes('/source/')){const error=new Error('fixture copy EIO');error.code='EIO';throw error;}return copy(...args);};syncBuiltinESMExports();\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^\n\nError: fixture copy EIO\n    at fs.copyFileSync (file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-9GeWN0/copy-fault.mjs:1:488)\n    at file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-9GeWN0/scripts/mutation-go.mjs:135:98\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  code: 'EIO'\n}\n\nNode.js v24.15.0\n"
+  }
+]

@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Portunus 配置导入导出 · 架构设计 Spec CT-1</title>
+  <style>
+    :root {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #172b41;
+      background: #e9eff5;
+      font-synthesis: none;
+      --bg: #e9eff5;
+      --surface: #ffffff;
+      --surface-2: #f4f7fb;
+      --ink: #172b41;
+      --muted: #5b6c7f;
+      --faint: #8291a2;
+      --accent: #246bfd;
+      --accent-strong: #174eb8;
+      --accent-soft: #e8f0ff;
+      --line: #d6e0ea;
+      --line-strong: #b7c7d8;
+      --success: #14755d;
+      --success-soft: #e4f4ee;
+      --warning: #a46212;
+      --warning-soft: #fff2db;
+      --nav-bg: #102a43;
+      --nav-fg: #f2f7fc;
+      --nav-muted: #9fb4c8;
+      --nav-active-bg: #1d466b;
+      --nav-active-fg: #ffffff;
+      --hero-bg: #f0f5fc;
+      --hero-border: #cbdbea;
+      --table-head: #edf3f9;
+      --code-bg: #102a43;
+      --code-fg: #e8f2ff;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow: 0 18px 54px rgb(16 42 67 / 12%);
+      --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --content-width: 1600px;
+      --sidebar-width: 240px;
+      --section-space: 50px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body { margin: 0; color: var(--ink); background: var(--bg); }
+    a { color: inherit; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .document-page { min-height: 100vh; padding: 32px 24px; }
+    .doc-window {
+      width: 94%;
+      max-width: var(--content-width);
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .doc-layout { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: calc(100vh - 66px); }
+    .doc-sidebar {
+      display: flex;
+      flex-direction: column;
+      padding: 34px 22px 26px;
+      border-right: 1px solid var(--line);
+      color: var(--nav-fg);
+      background: var(--nav-bg);
+    }
+    .doc-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+    .doc-brand-mark {
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid #3b6690;
+      border-radius: var(--radius);
+      color: #ffffff;
+      background: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    .doc-brand-name { display: block; font-size: 13px; font-weight: 750; letter-spacing: -.01em; }
+    .doc-brand-meta { display: block; margin-top: 3px; color: var(--nav-muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .doc-nav-label { margin: 40px 10px 10px; color: var(--nav-muted); font-size: 9px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    .doc-nav { display: grid; gap: 4px; }
+    .doc-nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      color: var(--nav-muted);
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .doc-nav a span { color: var(--nav-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; opacity: .75; }
+    .doc-nav a:hover, .doc-nav a.active { color: var(--nav-active-fg); background: var(--nav-active-bg); }
+    .doc-sidebar-footer { margin-top: auto; padding: 24px 10px 0; border-top: 1px solid #2b4966; color: var(--nav-muted); font-size: 10px; line-height: 1.7; }
+    .doc-content { min-width: 0; padding: 42px clamp(28px, 4.6vw, 64px) 46px; background: var(--surface); }
+    .doc-hero {
+      margin-bottom: 28px;
+      padding: 30px;
+      border: 1px solid var(--hero-border);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius-lg);
+      background: var(--hero-bg);
+    }
+    .doc-eyebrow { margin: 0 0 14px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .doc-hero h1 {
+      max-width: 760px;
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: clamp(34px, 4vw, 48px);
+      font-weight: 750;
+      line-height: 1.16;
+      letter-spacing: -.045em;
+    }
+    .doc-subtitle { max-width: 680px; margin: 15px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .doc-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+    .doc-meta:empty { display: none; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); background: var(--surface); font-size: 10px; font-weight: 650; line-height: 1.4; }
+    .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
+    .badge.accent { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+    .badge.accent::before { background: var(--accent); }
+    .badge.success { color: var(--success); border-color: transparent; background: var(--success-soft); }
+    .badge.success::before { background: var(--success); }
+    .badge.warning { color: var(--warning); border-color: transparent; background: var(--warning-soft); }
+    .badge.warning::before { background: var(--warning); }
+    .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+    .summary-item { padding: 17px 20px; border-right: 1px solid var(--line); }
+    .summary-item:last-child { border-right: 0; }
+    .summary-item span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; }
+    .summary-item strong { display: block; color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .notice { display: grid; grid-template-columns: auto 1fr; gap: 12px; margin-bottom: 30px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); background: var(--surface-2); }
+    .notice.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+    .notice.success { border-left-color: var(--success); background: var(--success-soft); }
+    .notice.after-code { margin-top: 16px; margin-bottom: 0; }
+    .notice-marker { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: 800; }
+    .notice.warning .notice-marker { color: var(--warning); }
+    .notice.success .notice-marker { color: var(--success); }
+    .notice strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .notice p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .doc-section { margin-top: var(--section-space); scroll-margin-top: 24px; }
+    .section-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
+    .section-index { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 18px; font-weight: 650; line-height: 1; }
+    .section-kicker { margin: 0 0 3px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    .section-heading h2 { margin: 0; font-family: var(--font-display); font-size: 21px; line-height: 1.25; letter-spacing: -.025em; }
+    .section-intro { margin: -5px 0 20px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .info-card { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 3px 9px rgb(16 42 67 / 4%); }
+    .info-card.soft { background: var(--surface-2); }
+    .info-card h3 { margin: 0 0 12px; font-size: 13px; line-height: 1.4; }
+    .info-card h3 .card-no { margin-right: 7px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+    .info-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+    .styled-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .styled-list li { position: relative; padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.65; }
+    .styled-list li::before { content: ""; position: absolute; top: .7em; left: 0; width: 7px; height: 2px; background: var(--accent); }
+    .styled-list strong { color: var(--ink); font-weight: 650; }
+    .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    table { width: 100%; min-width: 610px; border-collapse: collapse; font-size: 11px; line-height: 1.65; text-align: left; }
+    caption { text-align: left; }
+    th { padding: 11px 14px; color: var(--muted); background: var(--table-head); font-size: 9px; font-weight: 750; letter-spacing: .04em; white-space: nowrap; }
+    td { padding: 13px 14px; border-top: 1px solid var(--line); color: var(--muted); vertical-align: top; }
+    td strong { color: var(--ink); font-weight: 650; }
+    td:first-child { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .acceptance-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: acceptance; }
+    .acceptance-card { padding: 19px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); counter-increment: acceptance; }
+    .acceptance-card h3 { display: flex; align-items: baseline; gap: 9px; margin: 0 0 13px; font-size: 12px; }
+    .acceptance-card h3::before { content: "AC-0" counter(acceptance); color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
+    .acceptance-card dl { display: grid; grid-template-columns: 58px 1fr; gap: 6px 12px; margin: 0; font-size: 11px; line-height: 1.65; }
+    .acceptance-card dt { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; text-transform: uppercase; }
+    .acceptance-card dd { margin: 0; color: var(--muted); }
+    .question-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+    .question-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: start; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 11px; line-height: 1.65; }
+    .question-list .q-id { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
+    .question-list p { margin: 0; color: var(--muted); }
+    .question-list strong { color: var(--ink); }
+    .question-list .q-impact { color: var(--warning); font-size: 9px; white-space: nowrap; }
+    .decision-table .selected { background: var(--accent-soft); }
+    .decision-table .selected td { border-top-color: var(--accent); border-bottom-color: var(--accent); }
+    .decision-table .selected td:first-child { border-left: 3px solid var(--accent); padding-left: 11px; }
+    .architecture-figure { margin: 0; overflow-x: auto; padding: 26px 22px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+    .diagram-flow { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .diagram-node { flex: 1 1 0; max-width: 120px; min-width: 82px; padding: 13px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--ink); background: var(--surface); font-size: 10px; font-weight: 650; line-height: 1.45; text-align: center; }
+    .diagram-node small { display: block; margin-top: 4px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 7px; font-weight: 500; }
+    .diagram-node.primary { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+    .diagram-arrow { flex: 0 0 auto; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 16px; }
+    .diagram-svg { display: block; width: 100%; min-width: 720px; height: auto; }
+    .diagram-svg .boundary { fill: var(--surface-2); stroke: var(--line); }
+    .diagram-svg .node { fill: var(--surface); stroke: var(--line-strong); }
+    .diagram-svg .node.primary { fill: var(--accent-soft); stroke: var(--accent); }
+    .diagram-svg .edge { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+    .diagram-svg .node-label { fill: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; font-size: 12px; }
+    .diagram-svg .edge-label { fill: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+    .architecture-figure figcaption { margin-top: 18px; color: var(--faint); font-size: 9px; line-height: 1.6; text-align: center; }
+    .diagram-source { margin-top: 14px; color: var(--muted); font-size: 10px; }
+    .diagram-source pre { margin-top: 10px; }
+    .code-label { margin: 0 0 8px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    pre { max-width: 100%; margin: 0; overflow-x: auto; padding: 20px; border-radius: var(--radius); color: var(--code-fg); background: var(--code-bg); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; line-height: 1.8; tab-size: 2; }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    :not(pre) > code { padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--accent-strong); background: var(--accent-soft); font-size: .9em; overflow-wrap: anywhere; }
+    pre code { padding: 0; border: 0; color: inherit; background: transparent; font-size: inherit; }
+    .test-details { margin-bottom: 12px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .test-details summary { display: grid; grid-template-columns: 50px 1fr auto; gap: 12px; align-items: center; padding: 16px 18px; cursor: pointer; list-style: none; }
+    .test-details summary::-webkit-details-marker { display: none; }
+    .test-details summary::after { content: "+"; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 16px; }
+    .test-details[open] summary::after { content: "−"; }
+    .test-details summary .test-id { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; }
+    .test-details summary strong { font-size: 11px; font-weight: 650; }
+    .test-body { padding: 0 18px 18px 80px; }
+    .test-body dl { display: grid; grid-template-columns: 74px 1fr; gap: 9px 14px; margin: 0; padding-top: 15px; border-top: 1px solid var(--line); font-size: 10px; line-height: 1.7; }
+    .test-body dt { color: var(--faint); }
+    .test-body dd { margin: 0; color: var(--muted); }
+    .test-body strong { color: var(--ink); }
+    .doc-footer { display: flex; justify-content: space-between; gap: 20px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--faint); font-size: 9px; line-height: 1.6; }
+
+    @media (max-width: 1100px) {
+      .doc-content { padding-inline: 32px; }
+      .diagram-flow { flex-wrap: wrap; }
+    }
+    @media (max-width: 760px) {
+      html { scroll-padding-top: 12px; }
+      .document-page { padding: 12px 10px 24px; }
+      .doc-window { width: 100%; }
+      .doc-layout { grid-template-columns: 1fr; min-height: 0; }
+      .doc-sidebar { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .doc-nav-label { margin: 22px 0 8px; }
+      .doc-nav { display: flex; flex-wrap: wrap; gap: 5px; }
+      .doc-nav a { padding: 7px 9px; }
+      .doc-sidebar-footer { display: none; }
+      .doc-content { padding: 24px 20px 32px; }
+      .doc-hero { padding: 24px 20px; }
+      .doc-hero h1 { font-size: 34px; }
+      .summary-strip { grid-template-columns: 1fr; }
+      .summary-item { padding: 12px 15px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary-item:last-child { border-bottom: 0; }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+      .question-list li { grid-template-columns: 38px 1fr; }
+      .question-list .q-impact { grid-column: 2; }
+      .test-details summary { grid-template-columns: 42px 1fr auto; padding-inline: 14px; }
+      .test-body { padding: 0 14px 16px; }
+      .test-body dl { grid-template-columns: 1fr; gap: 3px; }
+      .test-body dd { margin-bottom: 8px; }
+      .doc-footer { display: block; }
+    }
+    @media (max-width: 560px) {
+      .diagram-flow { flex-direction: column; }
+      .diagram-node { width: 100%; max-width: none; }
+      .diagram-arrow { transform: rotate(90deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
+    @media print {
+      :root {
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #ffffff;
+        --ink: #111111;
+        --muted: #444444;
+        --faint: #666666;
+        --accent: #222222;
+        --accent-strong: #111111;
+        --accent-soft: #f2f2f2;
+        --line: #cccccc;
+        --line-strong: #999999;
+        --success: #222222;
+        --success-soft: #f4f4f4;
+        --warning: #222222;
+        --warning-soft: #f4f4f4;
+        --hero-bg: #ffffff;
+        --hero-border: #bbbbbb;
+        --table-head: #f2f2f2;
+        --code-bg: #f4f4f4;
+        --code-fg: #111111;
+        --shadow: none;
+      }
+      body { background: #ffffff; }
+      .document-page { min-height: 0; padding: 0; }
+      .doc-sidebar { display: none; }
+      .doc-window { max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+      .doc-layout { display: block; min-height: 0; }
+      .doc-content { padding: 0; }
+      .doc-section, .info-card, .acceptance-card, .test-details, .architecture-figure { break-inside: avoid; }
+      .test-details:not([open]) > *:not(summary) { display: block !important; }
+      .test-details summary::after { display: none; }
+      a { text-decoration: none; }
+      .diagram-svg { min-width: 0; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    }
+
+ .doc-section>p{font-size:13px;line-height:1.9;color:var(--muted)}
+ .doc-section>h3{font-size:15px;line-height:24px;margin:26px 0 12px}
+ .doc-section>.table-wrap,.doc-section>.notice,.doc-section>.test-details{margin-top:20px}
+ .ordered{font-size:13px;line-height:1.9;color:var(--muted);padding-left:22px;display:grid;gap:9px}
+ .diagram-svg{min-width:820px}.diagram-source summary{cursor:pointer;padding:12px 0;font-size:12px;color:var(--muted)}
+ .table-wrap td:first-child{white-space:normal;min-width:84px;overflow-wrap:anywhere}
+ #file-format table{table-layout:fixed;min-width:780px}#file-format th:nth-child(1){width:10%}#file-format th:nth-child(2){width:14%}#file-format th:nth-child(3){width:22%}
+ #contracts table{min-width:830px}#contracts td:first-child{min-width:175px}
+ .test-body pre{font-size:11px}.test-body{padding-left:18px}
+ @media print{.doc-window{width:100%}.doc-section{break-inside:auto}.table-wrap{overflow:visible}table,#file-format table,#contracts table{min-width:0;table-layout:fixed}td,td:first-child,th{white-space:normal;overflow-wrap:anywhere}.table-wrap td:first-child,#contracts td:first-child{min-width:0}thead{display:table-header-group}tr{break-inside:avoid}.diagram-svg{min-width:0}details>*{display:block!important}details{break-inside:auto}.architecture-figure{break-inside:avoid}.test-body{padding:0 0 12px}#contracts th:first-child{width:24%}}
+  </style>
+</head>
+<body data-document-type="architecture-design">
+  <article class="document-page">
+    <div class="doc-window">
+      <div class="doc-layout">
+        <aside class="doc-sidebar">
+          <a class="doc-brand" href="#document-overview">
+            <span class="doc-brand-mark">P</span>
+            <span><span class="doc-brand-name">Portunus</span><span class="doc-brand-meta">系统设计 / SPEC</span></span>
+          </a>
+          <p class="doc-nav-label">文档导航</p>
+          <nav class="doc-nav" aria-label="文档章节"><a href="#overview"><span>01</span>结论、决策与适用范围</a><a href="#architecture"><span>02</span>模块与信任边界</a><a href="#file-format"><span>03</span>密码学信封与文件格式1</a><a href="#payload"><span>04</span>配置载荷、引用与无损恢复</a><a href="#validation"><span>05</span>受理上限、兼容校验与名称计划</a><a href="#export-flow"><span>06</span>导出与安全文件落盘</a><a href="#import-flow"><span>07</span>导入、确认与结果恢复</a><a href="#contracts"><span>08</span>HTTP、IPC与共享DTO</a><a href="#database"><span>09</span>持久化模型与新表字典</a><a href="#transactions"><span>10</span>事务、幂等、并发与启动恢复</a><a href="#frontend"><span>11</span>前端状态、分页、缓存与导航</a><a href="#failures-security"><span>12</span>失败语义与安全控制</a><a href="#compatibility"><span>13</span>迁移、兼容和实施落点</a><a href="#verification"><span>14</span>实际验证与实施后验收</a><a href="#handoff"><span>15</span>实施准备、证据与使用摘要</a></nav>
+          <div class="doc-sidebar-footer">配置导入与导出<br>CT-1 · dev / a6bb26a<br>2026-11-09</div>
+        </aside>
+        <main class="doc-content" id="document-overview">
+          <header class="doc-hero">
+            <p class="doc-eyebrow">PORTUNUS / CONFIG TRANSFER / CT-1</p>
+            <h1>配置导入导出<br>架构设计</h1>
+            <p class="doc-subtitle">以已确认的全量加密迁移需求及通过的原型为基线，统一文件格式、进程边界、接口、数据恢复与持久回执，供后续实施和验收使用。</p>
+            <div class="doc-meta"><span class="badge success">所选范围可实施</span><span class="badge accent">三项推荐方向已确认</span><a class="badge" href="implementation-report.md">已实现 · 验证记录</a></div>
+          </header>
+          <div class="summary-strip"><div class="summary-item"><span>职责</span><strong>Go 统一加解密与恢复</strong></div><div class="summary-item"><span>一致性</span><strong>全量事务 · 持久回执</strong></div><div class="summary-item"><span>文件</span><strong>格式 1 · 密码保护</strong></div></div>
+          <div class="notice"><span class="notice-marker">有效基线</span><div><strong>用户已确认Go集中处理、最小回执表和空库禁用导出</strong><p>核心技术假设已有合成环境验证。设计已经审核并实施，最新验证及平台边界见<a href="implementation-report.md">实施记录</a>；本文件不代表已经发布或所有平台验收均完成。提交断线时先核实回执，不能把结果未知说成已回滚。</p></div></div>
+          <section class="doc-section" id="overview" aria-labelledby="overview-heading"><div class="section-heading"><span class="section-index">01</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="overview-heading">结论、决策与适用范围</h2></div></div><p class="section-intro">设计基线 CT-1：dev / a6bb26a，应用0.5.4，Go1.26.6，Electron42.3.3。本文记录已审核的设计基线；2026-11-10的实现和验收见<a href="implementation-report.md">实施记录</a>。</p><div class="table-wrap"><table><caption class="sr-only">有效架构决策</caption><thead><tr><th scope="col">标识</th><th scope="col">有效决策</th><th scope="col">来源</th></tr></thead><tbody><tr id="AD-01"><td>AD-01</td><td>Go集中负责加解密、快照校验、改名计划与恢复；Electron仅负责文件桥与安全保存。</td><td>用户明确选择全部推荐方向。</td></tr><tr id="AD-02"><td>AD-02</td><td>增加最小持久回执；同次确认重试回放原结果，主动再次导入产生新操作。</td><td>用户明确接受新增本地回执表。</td></tr><tr id="AD-03"><td>AD-03</td><td>三类配置全为零时禁用导出；伪造的有效加密空包也拒绝导入。</td><td>用户确认空配置不导出。</td></tr><tr id="AD-04"><td>AD-04</td><td>全量、密码保护、合并新增、同名改名、格式1严格匹配、离线检查、预览确认、整次原子恢复。</td><td>PRD D-01～D-08及本次会话。</td></tr><tr id="AD-05"><td>AD-05</td><td>设置页配置迁移入口、双密码确认、预览详情tab、.portunus文件和改名呈现沿用已通过原型。</td><td>用户已明确审核通过原型；具体命名算法在本文冻结。</td></tr></tbody></table></div>
+<p>输入为<a href="prd.html">PRD</a>和<a href="prototype/index.html">已审核原型</a>，页面清单见<a href="prototype/prototype.md">prototype.md</a>。当前工作区另有未提交文档及用户自己的 <code>.claude/settings.json</code>；本文不覆盖它们、不调整版本、不执行迁移或部署。</p>
+<p>迁移只包含渠道上游连接、模型和分组路由配置。服务接入Key、监听端口、全局网关／代理设置、客户端文件、日志、历史计价、独立余额来源及运行缓存继续归目标端所有。目标是恢复配置语义，不承诺上游在线或两台电脑的全局运行环境相同。</p>
+<div class="notice "><span class="notice-marker">设计约束</span><div><strong>准备状态：所选范围可实施</strong><p>关键路线与数据契约已经明确，核心密码学和SQLite一致性假设已有隔离验证。平台文件对话框、真实进程崩溃、容量峰值和应用集成属于实施后的验收门，不能将本文件视为这些测试已经通过。</p></div></div></section>
+<section class="doc-section" id="architecture" aria-labelledby="architecture-heading"><div class="section-heading"><span class="section-index">02</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="architecture-heading">模块与信任边界</h2></div></div><p class="section-intro">所有模块运行在现有Electron主／渲染进程和Go sidecar中；没有新服务、账号或云存储。</p><figure class="architecture-figure"><svg class="diagram-svg" viewBox="0 0 1000 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="architecture-title architecture-desc"><title id="architecture-title">配置迁移模块与信任边界</title><desc id="architecture-desc">渲染层只有密码和脱敏预览；主进程控制真实文件路径；Go处理完整配置、加密、校验和事务；SQLite保存配置和回执。</desc><defs><marker id="architecture-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#246bfd"/></marker></defs><rect x="5" y="10" width="205" height="410" rx="12" class="boundary"/><text x="107.5" y="38" text-anchor="middle" class="node-label">渲染层：输入不可信</text><rect x="230" y="10" width="250" height="410" rx="12" class="boundary"/><text x="355.0" y="38" text-anchor="middle" class="node-label">Electron：文件权限</text><rect x="500" y="10" width="295" height="410" rx="12" class="boundary"/><text x="647.5" y="38" text-anchor="middle" class="node-label">Go：配置权威</text><rect x="815" y="10" width="180" height="410" rx="12" class="boundary"/><text x="905.0" y="38" text-anchor="middle" class="node-label">SQLite：持久化</text><rect x="20" y="75" width="175" height="70" rx="8" class="node"/><text x="107.5" y="101" class="node-label" text-anchor="middle" font-weight="600">设置／迁移弹窗</text><text x="107.5" y="122" class="edge-label" text-anchor="middle">密码、状态、脱敏预览</text><rect x="250" y="75" width="210" height="70" rx="8" class="node"/><text x="355.0" y="101" class="node-label" text-anchor="middle" font-weight="600">固定 IPC 文件桥</text><text x="355.0" y="122" class="edge-label" text-anchor="middle">来源校验、令牌、限额</text><rect x="520" y="75" width="255" height="70" rx="8" class="node primary"/><text x="647.5" y="101" class="node-label" text-anchor="middle" font-weight="600">ConfigTransfer Service</text><text x="647.5" y="122" class="edge-label" text-anchor="middle">Codec／Validator／Planner</text><rect x="835" y="75" width="140" height="70" rx="8" class="node"/><text x="905.0" y="101" class="node-label" text-anchor="middle" font-weight="600">既有配置四表</text><text x="905.0" y="122" class="edge-label" text-anchor="middle">只追加导入对象</text><rect x="250" y="255" width="210" height="70" rx="8" class="node"/><text x="355.0" y="281" class="node-label" text-anchor="middle" font-weight="600">用户选择的文件</text><text x="355.0" y="302" class="edge-label" text-anchor="middle">只读／写密文</text><rect x="520" y="255" width="255" height="70" rx="8" class="node"/><text x="647.5" y="281" class="node-label" text-anchor="middle" font-weight="600">受限内存预览</text><text x="647.5" y="302" class="edge-label" text-anchor="middle">原始配置不进入页面</text><rect x="835" y="255" width="140" height="70" rx="8" class="node"/><text x="905.0" y="281" class="node-label" text-anchor="middle" font-weight="600">ImportReceipt</text><text x="905.0" y="302" class="edge-label" text-anchor="middle">操作状态与脱敏结果</text><path d="M195 110H248" class="edge" marker-end="url(#architecture-arrow)"/><text x="223" y="63" class="edge-label" text-anchor="middle">固定方法</text><path d="M460 110H518" class="edge" marker-end="url(#architecture-arrow)"/><text x="490" y="63" class="edge-label" text-anchor="middle">本机 HTTP</text><path d="M775 110H833" class="edge" marker-end="url(#architecture-arrow)"/><text x="805" y="63" class="edge-label" text-anchor="middle">同一数据库</text><path d="M355 145V253" class="edge" marker-end="url(#architecture-arrow)"/><text x="380" y="205" class="edge-label" text-anchor="middle">密文</text><path d="M648 145V253" class="edge" marker-end="url(#architecture-arrow)"/><text x="688" y="205" class="edge-label" text-anchor="middle">短期保留</text><path d="M775 290H833" class="edge" marker-end="url(#architecture-arrow)"/><text x="805" y="245" class="edge-label" text-anchor="middle">元数据／回执</text><path d="M750 145V185H905V253" class="edge" marker-end="url(#architecture-arrow)"/><text x="830" y="179" class="edge-label" text-anchor="middle">恢复事务包含最终回执</text><text x="648" y="382" class="edge-label" text-anchor="middle">不调用模型发现、生成或余额查询</text></svg><figcaption>箭头是调用／数据边界。完整凭据集中在Go；主进程转送密文和密码，页面仅获得允许展示的DTO。</figcaption></figure><details class="diagram-source"><summary>查看可编辑图源</summary><pre><code>flowchart LR
+ UI[Renderer:表单与脱敏预览] --&gt;|窄IPC| MAIN[Electron:文件权限与令牌]
+ MAIN &lt;--&gt;|密文| FILE[用户选择的文件]
+ MAIN --&gt;|固定回环HTTP/绑定实例| GO[Go ConfigTransfer]
+ GO --&gt; RAM[受限预览内存]
+ GO --&gt;|配置与最终回执同事务| DB[(SQLite 配置四表+ImportReceipt)]</code></pre></details><div class="table-wrap"><table><caption class="sr-only">模块职责</caption><thead><tr><th scope="col">边界</th><th scope="col">职责</th><th scope="col">拟议落点</th></tr></thead><tbody><tr><td>Renderer</td><td>设置页迁移区、表单／状态机、脱敏预览、局部分页、成功后的缓存失效与分组导航。</td><td><code>web/src/renderer/pages/Settings.jsx</code>；新增迁移弹窗与本地桥适配模块。</td></tr><tr><td>Electron Main / preload</td><td>窄IPC、可信来源、文件选择／读取、密文令牌、同目录安全保存、受限HTTP传输、实例绑定。</td><td><code>web/src/main/config-transfer.js</code>（新增）、<code>preload.js</code>、<code>main.js</code>、sidecar只读访问描述。</td></tr><tr><td>Go API</td><td>只负责边界检查、限流准入、解析请求、固定错误映射和响应，不拼接业务CRUD。</td><td><code>backend/api/config_transfer.go</code>（新增）；新注册入口独立挂本机访问中间件。</td></tr><tr><td>Go domain</td><td>Codec、严格载荷校验、快照读取、计划、有限预览、恢复事务、回执与过期／启动恢复。</td><td><code>backend/configtransfer/</code>（新增）；依赖channel/model/group/upstream/shared，不反向依赖api。</td></tr><tr><td>SQLite</td><td>既有channels/models/groups/group_items与新增config_import_receipts。</td><td>已有业务表保持原Schema；只新增一张元数据表及索引。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="file-format" aria-labelledby="file-format-heading"><div class="section-heading"><span class="section-index">03</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="file-format-heading">密码学信封与文件格式1</h2></div></div><p class="section-intro">文件扩展名 .portunus 仅用于选择提示；识别依赖magic、版本、长度和认证。此处是格式契约，不随机器CPU、应用版本或运行参数变化。</p><div class="table-wrap"><table><caption class="sr-only">二进制文件布局</caption><thead><tr><th scope="col">偏移</th><th scope="col">长度／类型</th><th scope="col">字段</th><th scope="col">规范</th></tr></thead><tbody><tr><td>0–7</td><td>8 bytes</td><td>magic</td><td>ASCII <code>PORTCFG</code> 后跟一个0字节；不是ZIP。</td></tr><tr><td>8–9</td><td>uint16 BE</td><td>envelope_version</td><td>固定1；密码学信封版本，不自动转换。</td></tr><tr><td>10–11</td><td>uint16 BE</td><td>format_version</td><td>固定1；必须与解密后的根字段一致。</td></tr><tr><td>12</td><td>uint8</td><td>kdf_profile</td><td>固定1：Argon2id v0x13，m=65536KiB、t=3、p=1、输出32字节。</td></tr><tr><td>13</td><td>uint8</td><td>cipher_profile</td><td>固定1：AES-256-GCM，nonce12字节，tag16字节。</td></tr><tr><td>14–15</td><td>2 bytes</td><td>reserved</td><td>必须为0，未知位直接拒绝。</td></tr><tr><td>16–31</td><td>16 bytes</td><td>salt</td><td>每次导出用crypto/rand重新生成。</td></tr><tr><td>32–43</td><td>12 bytes</td><td>nonce</td><td>每次导出重新生成，禁止复用；不由时间戳或密码计算。</td></tr><tr><td>44–47</td><td>uint32 BE</td><td>plaintext_len</td><td>未加密UTF-8 JSON字节数，最大32MiB。</td></tr><tr><td>48–末尾</td><td>P+16 bytes</td><td>ciphertext_and_tag</td><td>Go AEAD.Seal返回值；文件总长严格等于P+64。</td></tr></tbody></table></div>
+<h3>编码与解码顺序</h3><ol class="ordered"><li>编码：在只读快照结束后严格校验载荷，生成16字节salt及12字节nonce，按固定profile派生32字节密钥，以完整48字节header作为AAD调用AEAD.Seal。</li><li>解码：先限制文件总量，再验证magic、两个版本、profile、保留位、P及精确总长；这些检查不通过时不执行KDF。文件自带值不能指定任意内存、迭代次数或算法。</li><li>认证成功前不解析、不展示任何配置内容。错误密码与认证失败统一反馈“无法解密，请检查密码或文件”，不依据未认证内容生成有效预览。</li><li>app_version只放在加密载荷内；文件声明不支持的版本可提前拒绝，但不能把未认证header称为可信来源信息。</li></ol>
+<p>密码使用原始有效UTF-8，1～1024字节；不trim、不做Unicode归一化，两次输入按原值一致。Main在UTF-8编码前拒绝JS字符串中的未配对代理项，不能通过替换字符偷偷改密码。非空是产品规则，不新增最低强度门槛。密钥、密码、明文均不落盘；清理可控byte buffer并释放引用，但不承诺Go／JS托管运行时能安全擦除所有副本。</p>
+<p>选择Argon2id利用现有 <code>golang.org/x/crypto v0.48.0</code>，并将其作为直接依赖声明，版本保持不变。p=1是控制本地资源的项目取值，不能称为原样采用RFC9106的p=4配置；profile一经发布即固定。</p>
+<div class="notice "><span class="notice-marker">设计约束</span><div><strong>完整性与可用性分别处理</strong><p>使用认证加密拒绝文件篡改；不设置固定密码、恢复后门或静默降级算法。空包、非法配置和格式不符都不能通过导入，正确密码也不能绕过这些检查。</p></div></div></section>
+<section class="doc-section" id="payload" aria-labelledby="payload-heading"><div class="section-heading"><span class="section-index">04</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="payload-heading">配置载荷、引用与无损恢复</h2></div></div><p class="section-intro">所有字段均由格式1定义；没有允许任意扩展的自由map。空值、缺失和null严格区分，字段大小写精确匹配。</p><div class="table-wrap"><table><caption class="sr-only">载荷字段字典</caption><thead><tr><th scope="col">对象</th><th scope="col">字段／类型</th><th scope="col">含义与不变量</th></tr></thead><tbody><tr><td>根对象</td><td>format_version:int；app_version:string；channels/models/groups:array</td><td>所有字段必需，format_version=1，app_version为非空UTF-8且≤128字节，仅记来源。三数组不可null；没有业务ID、源时间戳或计价字段。</td></tr><tr><td>局部引用</td><td>ref / channel_ref / model_ref / active_item_ref</td><td>ref为1～64字节ASCII <code>[A-Za-z0-9_-]+</code>；各类及成员ref在文件内唯一。所有引用只能指向本文件对象，不能按名字复用目标对象。导出可生成c1/m1/g1/i1。</td></tr><tr><td>渠道标识</td><td>name、icon、provider_id、profile_id、adapter_id</td><td>名称非空；icon保留原值，使用现有64KiB/256px PNG或内置名校验。Provider/Profile与未知内置图标是展示／预设元数据，可按已有值保留。空legacy标识也原样保留。</td></tr><tr><td>渠道连接</td><td>type、base_url、key、connection_options</td><td>type只接受openai/openai_responses/anthropic/gemini；有效adapter为generic或旧空值。base_url非空、可解析为含host的HTTP(S)，保留已保存路径、查询／fragment／用户信息等历史含义，不调用新建Resolve重写；它与Key都不进入预览。Key可为空，保留已保存状态。</td></tr><tr><td>连接选项</td><td>schema_version:int；model_discovery:string</td><td>两字段必需，保留0／空的legacy存储值；校验用Effective副本解释为1／api。有效版本为1，有效发现模式api/manual。Open只构造连接，不做任何请求。未知实际协议／adapter／选项版本拒绝。</td></tr><tr><td>渠道开关</td><td>auto_sync、thinking_compat:boolean</td><td>必须显式存在，false不等于缺省。手动发现且保存为true的历史AutoSync也保留，不套用新增渠道强制改写规则。后台是否同步由既有调度决定。</td></tr><tr><td>渠道限流</td><td>max_concurrent_requests:int；rate_limit_scope:string</td><td>并发为0～9007199254740991；范围允许model/channel或旧空值，空值运行时仍表示model，文件与存储不被偷偷改值。</td></tr><tr><td>模型</td><td>ref、channel_ref、name:string</td><td>名称非空，不trim、不按模型名跨渠道去重；同一channel_ref+name不得重复。</td></tr><tr><td>分组</td><td>ref、name、strategy、active_item_ref、items</td><td>name非空；strategy为manual/failover；active_item_ref是本组成员ref或null。null代表存储中的0，manual未激活和空组合法，不自动选首项。failover现存的合法激活引用同样映射保留，路由仍忽略它。</td></tr><tr><td>成员</td><td>ref、model_ref、priority:string</td><td>同组model_ref不得重复；priority为int64范围内、匹配 <code>0|-?[1-9][0-9]*</code> 的十进制字符串（不接受+号或-0），避免JS数值精度丢失。items按priority升序及源成员ID先后排列；同priority保留数组顺序。</td></tr><tr><td>通用字符串</td><td>有效UTF-8；name/base_url/key/元数据字符串≤16KiB</td><td>不接受NUL或非法Unicode；不对合法名称做trim、大小写折叠或重写。icon、ref、app_version按自身更严格限制。源字符串也须先校验，再编码。</td></tr></tbody></table></div><details class="test-details"><summary><span class="test-id">JSON</span><strong>查看最小合成载荷示例（含假密钥）</strong></summary><div class="test-body"><pre><code>{
+  &quot;format_version&quot;: 1,
+  &quot;app_version&quot;: &quot;0.5.4&quot;,
+  &quot;channels&quot;: [
+    {
+      &quot;ref&quot;: &quot;c1&quot;,
+      &quot;name&quot;: &quot;OpenAI&quot;,
+      &quot;icon&quot;: &quot;&quot;,
+      &quot;provider_id&quot;: &quot;generic&quot;,
+      &quot;profile_id&quot;: &quot;&quot;,
+      &quot;adapter_id&quot;: &quot;generic&quot;,
+      &quot;type&quot;: &quot;openai&quot;,
+      &quot;base_url&quot;: &quot;https://synthetic.invalid/v1&quot;,
+      &quot;key&quot;: &quot;synthetic-key-not-a-real-secret&quot;,
+      &quot;connection_options&quot;: {
+        &quot;schema_version&quot;: 1,
+        &quot;model_discovery&quot;: &quot;api&quot;
+      },
+      &quot;auto_sync&quot;: false,
+      &quot;thinking_compat&quot;: false,
+      &quot;max_concurrent_requests&quot;: 0,
+      &quot;rate_limit_scope&quot;: &quot;model&quot;
+    }
+  ],
+  &quot;models&quot;: [
+    {
+      &quot;ref&quot;: &quot;m1&quot;,
+      &quot;channel_ref&quot;: &quot;c1&quot;,
+      &quot;name&quot;: &quot;gpt-4.1&quot;
+    }
+  ],
+  &quot;groups&quot;: [
+    {
+      &quot;ref&quot;: &quot;g1&quot;,
+      &quot;name&quot;: &quot;coding&quot;,
+      &quot;strategy&quot;: &quot;manual&quot;,
+      &quot;active_item_ref&quot;: &quot;i1&quot;,
+      &quot;items&quot;: [
+        {
+          &quot;ref&quot;: &quot;i1&quot;,
+          &quot;model_ref&quot;: &quot;m1&quot;,
+          &quot;priority&quot;: &quot;0&quot;
+        }
+      ]
+    }
+  ]
+}</code></pre></div></details>
+<p>严格JSON检查包含：递归重复键、未知字段、大小写不精确的字段、缺失必填项、不允许的null、非整数值、非法UTF-8、未配对UTF-16转义代理项、超过16层嵌套和尾随第二段内容。根对象计为第1层，每进入对象或数组加1。单独使用 <code>DisallowUnknownFields</code> 不足以满足这些规则；先进行有限token／编码扫描，再绑定类型并校验引用。</p>
+<p>源快照包含所有四表记录，孤立模型或成员、非零但找不到本组成员的激活引用均是完整性错误，整次导出失败；不靠隐藏损坏行生成成功文件。旧内部ID只用来构造局部引用，导入后重新分配。CreatedAt/UpdatedAt使用目标端新记录时间；历史计价列采用当前新记录定义，不复制源旧值，也不改目标已有行。</p>
+</section>
+<section class="doc-section" id="validation" aria-labelledby="validation-heading"><div class="section-heading"><span class="section-index">05</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="validation-heading">受理上限、兼容校验与名称计划</h2></div></div><p class="section-intro">以上数字是本次设计的工程参数，未声称是用户现有数据规模或已经验证的最大容量。所有超限结果可观察且不会产生部分业务写入。</p><div class="table-wrap"><table><caption class="sr-only">输入与资源边界</caption><thead><tr><th scope="col">边界</th><th scope="col">固定设计值</th><th scope="col">执行要求</th></tr></thead><tbody><tr><td>文件／明文</td><td>P≤33554432字节；文件≤33554496字节</td><td>不压缩；长度检查在KDF前；不接受尾随字节或“只处理前N项”。</td></tr><tr><td>实体规模</td><td>渠道≤1000；模型≤50000；分组≤5000；成员总数≤100000</td><td>属于首版安全受理边界，不是已经测得的吞吐或业务使用规模。</td></tr><tr><td>脱敏对象</td><td>Preview DTO编码≤8MiB；终态Result DTO编码≤12MiB</td><td>使用局部引用消除成员中的名称重复，页面局部20项分页。导出和导入均做保守展示预算检查；超过预算整体拒绝，不发出当前实现无法恢复的截断包。</td></tr><tr><td>预览保留</td><td>最多2份，原始载荷合计≤64MiB，15分钟过期</td><td>是保留原始字节预算，不是Go总堆上限。解码对象、密文、KDF及HTTP缓冲另占资源。</td></tr><tr><td>重活并发</td><td>Go同时1个KDF／快照／恢复／大型结果序列化任务，无等待队列</td><td>准入在读取大请求体之前。忙时快速返回TRANSFER_BUSY；KDF不能立即取消，结束前不能释放许可。</td></tr><tr><td>Main限制</td><td>每窗口1个文件令牌；同一时间1个文件读取／保存／传输作业</td><td>在真实文件读取前做准入、类型和大小检查；令牌绑定窗口、文档代次和profile，15分钟失效。</td></tr><tr><td>HTTP边界</td><td>预览multipart总量≤32MiB+16KiB；JSON小请求≤8KiB；密码≤1024B</td><td>multipart只接受password与file两部分，流式读取，不用ReadForm／ParseMultipartForm，不允许暂存明文文件。</td></tr><tr><td>时限</td><td>body读取15s；只读快照10s；重活／提交120s；轻量状态5s</td><td>只作用于新增边界。Gin1.12支持ResponseWriter.Unwrap，可用Go ResponseController设置并恢复读deadline。超时不等于回滚证明。</td></tr><tr><td>目标名称集</td><td>最多100000个渠道／组名称、原始名称字节总量≤64MiB</td><td>逐行有界读取，只取名称。超过上限整次拒绝，避免无限读入目标命名空间。</td></tr></tbody></table></div>
+<h3>名称计划</h3><ol class="ordered"><li>源渠道和分组各自按原名称检查唯一性，目标名称比较沿用SQLite现有BINARY唯一约束，不做locale折叠。</li><li>预先保留本文件的全部原名称，再为与目标冲突的对象生成名称，避免“A”的候选名挤占另一个本来可保留的源名称。</li><li>候选依次为“名称（导入）”“名称（导入 2）”…，使用满足16KiB限制的UTF-8前缀。每个命名空间最多探测100000个候选，超出返回NAME_SPACE_EXHAUSTED；不静默改用随机或覆盖。</li><li>计划记录每个渠道／组的原名、新名及ref。<code>plan_sha256</code>是固定字段顺序的Go结构JSON（file_sha256、channels的ref/from/to、groups的ref/from/to）的SHA-256。客户端把它视为不透明值，不自行计算。</li><li>确认时只核查已经显示的新名称是否仍可用，不因其他名称被删除而缩短或重新分配已确认名称。若已显示名称被占用，整次不写入，终结旧操作，并生成新预览／新operation_id供再次确认。</li></ol>
+<p>名称预算和Preview/Result序列化预算在写入前计算；结果过大、目标Schema不符合已核对的业务唯一约束、实际生成ID超过JS安全整数范围时，整次拒绝或回滚，不能交给现有页面处理有损编号。</p>
+<h3>展示预算算法</h3><p>导出阶段先用源名称构造PreviewDTO主体，使用与正式响应一致的Go JSON编码；原名和计划名均先填源名称，has_key使用较长的false。要求 <code>编码字节数 + 64×(渠道数+分组数) + 4096 ≤ 8MiB</code>。64字节余量覆盖每个最终名称的最大导入后缀，4096字节覆盖固定长度标识、hash、时间及封装字段。Result的保守主体包含全部渠道和分组（即使实际渠道未改名）、两份原名和16位安全整数ID，按同样余量要求≤12MiB。这样不会导出本实现因显示预算而必然拒绝的包。导入仍按同一保守算法检查，并在实际计划与提交结果编码后各检查一次精确上限；预算不通过时不截断、不提交。</p>
+</section>
+<section class="doc-section" id="export-flow" aria-labelledby="export-flow-heading"><div class="section-heading"><span class="section-index">06</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="export-flow-heading">导出与安全文件落盘</h2></div></div><p class="section-intro">页面上的初始计数是摘要；真正导出的内容以只读事务取得的完整快照为准。</p><ol class="ordered"><li>设置页从summary取当前计数；三类全0时禁用导出。服务端仍独立检查空库，不能只依赖按钮。</li><li>UI校验两次密码一致后，由Main显示系统保存对话框。取消后不发起KDF或写文件。</li><li>Go在同一只读事务中有界读取channels、models、groups和group_items全部快照，建立关联并检查完整性；结束读事务后才执行Argon2及加密，避免派生期间持有读锁。</li><li>Go返回完整密文和绑定该快照的计数header。Main限制响应大小，完整接收成功后才写目标目录中的随机临时文件。</li><li>以wx／O_EXCL和0600创建临时文件，写完、同步、关闭后rename到所选目标。错误只清理本次创建的临时文件；成功结果显示实际导出快照计数。</li></ol><div class="notice "><span class="notice-marker">设计约束</span><div><strong>不把原子可见性当作断电保证</strong><p>同目录rename保证支持平台上的原子替换语义；目录fsync按平台能力尽力执行。Windows的0600不能代替ACL隔离，目录权限由系统和用户选择的位置决定。真实断电恢复、平台文件对话框和替换行为列入实施后平台验收。</p></div></div>
+<p>选择器给出的真实路径只留Main。导出目标若是目录、符号链接或不支持的特殊文件，返回明确文件错误并让用户另选；不跟随页面传入路径。导入也通过打开后的同一描述符fstat确认普通文件，并有界读取为不可变密文副本，之后不按路径再次读取。正常失败清理自有临时文件；崩溃残留也只能是密文，不扫描用户任意目录。</p>
+</section>
+<section class="doc-section" id="import-flow" aria-labelledby="import-flow-heading"><div class="section-heading"><span class="section-index">07</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="import-flow-heading">导入、确认与结果恢复</h2></div></div><p class="section-intro">文件解密和配置原文只在Go。预览不会写入渠道／模型／分组，但会登记不含秘密的操作元数据，这是已接受的回执机制。</p><figure class="architecture-figure"><svg class="diagram-svg" viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="import-sequence-title import-sequence-desc"><title id="import-sequence-title">导入预览、确认和提交时序</title><desc id="import-sequence-desc">预览先保存不含秘密的prepared元数据；确认后业务事务claim与恢复及committed回执原子提交；失败须核实结果。</desc><defs><marker id="import-sequence-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#246bfd"/></marker></defs><rect x="15" y="12" width="150" height="52" rx="8" class="node"/><text x="90.0" y="38" class="node-label" text-anchor="middle" font-weight="600">Renderer</text><path d="M90 65V700" stroke="#b7c7d8" stroke-dasharray="4 4"/><rect x="250" y="12" width="150" height="52" rx="8" class="node"/><text x="325.0" y="38" class="node-label" text-anchor="middle" font-weight="600">Main 文件桥</text><path d="M325 65V700" stroke="#b7c7d8" stroke-dasharray="4 4"/><rect x="515" y="12" width="150" height="52" rx="8" class="node"/><text x="590.0" y="38" class="node-label" text-anchor="middle" font-weight="600">Go 迁移服务</text><path d="M590 65V700" stroke="#b7c7d8" stroke-dasharray="4 4"/><rect x="795" y="12" width="150" height="52" rx="8" class="node"/><text x="870.0" y="38" class="node-label" text-anchor="middle" font-weight="600">SQLite</text><path d="M870 65V700" stroke="#b7c7d8" stroke-dasharray="4 4"/><rect x="548" y="470" width="380" height="112" fill="#e8f0ff" stroke="#246bfd" rx="8"/><path d="M90 100H325" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="207.5" y="90" class="edge-label" text-anchor="middle">选择文件、输入密码</text><path d="M325 150H590" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="457.5" y="140" class="edge-label" text-anchor="middle">密文 + 密码（有界 multipart）</text><path d="M590 200H870" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="730.0" y="190" class="edge-label" text-anchor="middle">登记 prepared 元数据</text><path d="M590 250H325" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="457.5" y="240" class="edge-label" text-anchor="middle">脱敏 Preview DTO + operation_id</text><path d="M325 290H90" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="207.5" y="280" class="edge-label" text-anchor="middle">展示数量、名称计划与详情</text><path d="M90 340H325" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="207.5" y="330" class="edge-label" text-anchor="middle">用户确认当前计划</text><path d="M325 385H590" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="457.5" y="375" class="edge-label" text-anchor="middle">固定 operation_id + 文件/计划 hash</text><path d="M590 430H870" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="730.0" y="420" class="edge-label" text-anchor="middle">短写 confirmed_at</text><path d="M590 505H870" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="730.0" y="495" class="edge-label" text-anchor="middle">业务 TX：首 DML claim → 名称复核</text><path d="M590 555H870" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="730.0" y="545" class="edge-label" text-anchor="middle">恢复四表 → 写 committed 回执 → COMMIT</text><path d="M590 620H325" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="457.5" y="610" class="edge-label" text-anchor="middle">终态 Result DTO / 回放原结果</text><path d="M325 665H90" class="edge" marker-end="url(#import-sequence-arrow)"/><text x="207.5" y="655" class="edge-label" text-anchor="middle">缓存失效、显示结果，关闭后 ACK</text><rect x="40" y="722" width="920" height="60" rx="8" fill="#fff2db" stroke="#d6e0ea"/><text x="500" y="746" text-anchor="middle" class="node-label">异常：先核实持久回执，再展示确定结果</text><text x="500" y="768" text-anchor="middle" class="edge-label">committed → 成功；aborted → 确定失败；数据库不可读 → 结果待核实，禁止换新操作自动重发</text></svg><figcaption>蓝色区域是三类配置图与最终成功回执的同一写事务。confirmed_at只记录用户确认意图，不表示业务已经提交。</figcaption></figure><details class="diagram-source"><summary>查看可编辑图源</summary><pre><code>sequenceDiagram
+ participant UI as Renderer
+ participant M as Electron Main
+ participant G as Go Transfer
+ participant D as SQLite
+ UI-&gt;&gt;M: 选择文件、密码
+ M-&gt;&gt;G: 密文、密码
+ G-&gt;&gt;D: INSERT prepared metadata
+ G--&gt;&gt;UI: 脱敏预览、operation_id、plan hash（经Main）
+ UI-&gt;&gt;G: 确认同一操作（经Main）
+ G-&gt;&gt;D: 记录confirmed_at
+ G-&gt;&gt;D: BEGIN; 第一条DML claim并取得写锁
+ G-&gt;&gt;D: 复核名称；插入渠道/模型/组/成员；写committed结果
+ G-&gt;&gt;D: COMMIT
+ G--&gt;&gt;UI: StoredResult（经Main）
+ Note over G,D: 出错先查询／fence回执，未知结果不得报回滚
+ UI-&gt;&gt;G: 用户关闭结果后ACK</code></pre></details>
+<h3>预览与恢复算法</h3><ol class="ordered"><li>准入后读取密文并做信封检查、派生及认证；严格解析和校验字段、关系、数量与能力。三类全0的空包拒绝。</li><li>生成不可变计划、Preview DTO与预算，生成UUIDv4 operation_id和随机preview_id；先写prepared纯元数据，再返回预览。预览原始载荷只留内存，记录owner_instance_id及期限。</li><li>确认绑定preview_id、operation_id、file_sha256、plan_sha256。已提交的同操作返回已存结果；终态aborted不能重新执行。当前进行中同操作返回202，并引导只读查询。</li><li>收到有效确认后，短写confirmed_at；业务事务的第一条数据库访问必须是条件DML claim，匹配prepared、owner、hash、期限与确认记录，并要求RowsAffected=1。不能先SELECT开启旧快照。</li><li>持有SQLite写锁后复核计划名称，按依赖顺序插入完整图，保存最终结果并更新committed，统一提交。遇到已占用名称回滚，不静默换名；终结旧操作并生成新预览供再次确认。</li><li>任何错误先回读同op回执；committed回放成功，能够条件fence成aborted才报告确定失败。若查询／fence也失败，返回RESULT_UNCONFIRMED，保留op并继续核实，不自动生成新op。</li></ol>
+</section>
+<section class="doc-section" id="contracts" aria-labelledby="contracts-heading"><div class="section-heading"><span class="section-index">08</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="contracts-heading">HTTP、IPC与共享DTO</h2></div></div><p class="section-intro">HTTP前缀统一为 /api/config-transfer；所有读写挂真实回环对端、Host／Origin检查。summary用于只读探测；其他调用绑定当前实例header。</p><div class="table-wrap"><table><caption class="sr-only">管理接口契约</caption><thead><tr><th scope="col">调用</th><th scope="col">输入</th><th scope="col">响应与语义</th></tr></thead><tbody><tr><td>GET /summary</td><td>无请求体；不读取密文／秘密。</td><td>200：counts、can_export、format_version=1、limits、instance_id、ready。摘要只说明当前状态，不绑定后续导出快照。</td></tr><tr><td>POST /exports</td><td>JSON {password:string, app_version:string}；Main从app.getVersion取得版本。</td><td>200 application/octet-stream，完整加密文件；Content-Length及X-Portunus-Channels/Models/Groups为实际快照计数。失败返回JSON错误，不返回半份成功文件。</td></tr><tr><td>POST /previews</td><td>multipart两部分：password（UTF-8≤1024B）、file（密文）；文件名不参与信任。</td><td>200 PreviewDTO；在返回前持久化prepared元数据。一次合法预览分配新的operation_id，不按file hash永久去重。</td></tr><tr><td>DELETE /previews/:preview_id</td><td>只接受当前预览标识；无任意路径。</td><td>200 {operation_id,state}；等待确认时条件终结为aborted并释放内存；运行中返回409，已committed只释放内存不改结果。不存在／过期可410，关闭UI可忽略此类清理结果。</td></tr><tr><td>POST /operations/:operation_id/commit</td><td>JSON {preview_id,file_sha256,plan_sha256}，精确匹配已返回的预览。</td><td>200 ResultDTO；同op同hash终态回放；进行中202；计划变化409并附replacement_preview，新操作需用户再次确认。终态ID不能再次执行。</td></tr><tr><td>GET /operations/:operation_id</td><td>无请求体，轻量状态可先查状态列。</td><td>200：prepared／committed／aborted及公开状态；prepared在当前任务运行时202；终态按需返回脱敏结果。404只表示未查到，不表示业务已回滚。</td></tr><tr><td>POST /operations/:operation_id/recover</td><td>无请求体；不能提交配置。</td><td>先核实状态。当前确实运行的任务返回202；旧owner、丢失／过期预览或已确认但不再运行的prepared，条件fence成aborted后返回确定结果；DB不可用返回RESULT_UNCONFIRMED。</td></tr><tr><td>GET /operations?unacknowledged=1</td><td>只列confirmed_at非空且未ACK的操作；limit默认20，范围1～100。</td><td>200 {data,next_cursor}，仅摘要；按created_at_ms DESC、operation_id DESC游标分页。游标是该二元组的base64url编码，限制256B，不接受SQL／任意筛选字段。</td></tr><tr><td>POST /operations/:operation_id/ack</td><td>无请求体，幂等。</td><td>204；只为committed／aborted设置acknowledged_at，不删回执、不改变终态。prepared返回409。</td></tr></tbody></table></div>
+<h3>IPC</h3><p>统一命名空间 <code>window.api.configTransfer</code>。返回 <code>{ok:true,data:T}</code> 或 <code>{ok:false,error:{code,message,stage,retryable,field?,operation_id?,replacement_preview?}}</code>；message从固定映射产生。系统选择取消是正常结果，不抛错误。</p>
+<div class="table-wrap"><table><caption class="sr-only">IPC方法</caption><thead><tr><th scope="col">固定方法</th><th scope="col">职责及返回边界</th></tr></thead><tbody><tr><td>summary()</td><td>只返回公开摘要，剥离Main专用instance信息。</td></tr><tr><td>exportConfig({password})</td><td>系统保存对话框→Go导出→同目录安全保存；返回cancelled或{file_name,bytes,counts,format_version}，不返回路径／密文／明文。</td></tr><tr><td>chooseImportFile()</td><td>系统选择→准入／fstat／有界读取→窗口绑定的opaque file_token；仅返回{file_token,file_name,bytes}或cancelled。</td></tr><tr><td>previewImport({file_token,password})</td><td>令牌对应不可变密文送Go；返PreviewDTO；不让页面传真实路径或文件内容。</td></tr><tr><td>commitImport({preview_id,operation_id,file_sha256,plan_sha256})</td><td>绑定Main当前窗口已有预览；使用专用传输，不调用现有axios自动重试路径。</td></tr><tr><td>operationResult({operation_id}) / recoverOperation({operation_id})</td><td>分别读取／核实同一操作，返回公开状态或终态；不接受URL、HTTP方法或通用invoke。</td></tr><tr><td>recoveryList({cursor?,limit?}) / acknowledge({operation_id})</td><td>前者只返已确认未ACK摘要和游标；后者只在用户关闭终态结果后调用。cursor≤256B，limit为1～100。</td></tr><tr><td>discard({preview_id?})</td><td>有preview_id时释放本窗口对应的Go预览与令牌；无preview_id时只释放本窗口已选文件，覆盖尚未成功预览即关闭的情况。已提交结果保持不变。</td></tr></tbody></table></div>
+<h3>PreviewDTO 与 ResultDTO</h3><p>下例展示PreviewDTO完整形状。没有URL、Key、原始连接选项或图标二进制；成员只引用模型，页面用ref映射派生显示文本。rename_count由渠道／组的original_name与name差异计算；改名列表同样派生，避免重复传名称。</p>
+<pre><code>{
+  &quot;preview_id&quot;: &quot;opaque-random-token&quot;,
+  &quot;operation_id&quot;: &quot;9ce19a54-6594-4cb4-a5e7-3643d7606f01&quot;,
+  &quot;file_sha256&quot;: &quot;64 lowercase hex characters&quot;,
+  &quot;plan_sha256&quot;: &quot;64 lowercase hex characters&quot;,
+  &quot;expires_at&quot;: &quot;2026-11-09T12:15:00Z&quot;,
+  &quot;file_info&quot;: {
+    &quot;format_version&quot;: 1,
+    &quot;app_version&quot;: &quot;0.5.4&quot;
+  },
+  &quot;counts&quot;: {
+    &quot;channels&quot;: 1,
+    &quot;models&quot;: 1,
+    &quot;groups&quot;: 1
+  },
+  &quot;rename_count&quot;: 1,
+  &quot;channels&quot;: [
+    {
+      &quot;ref&quot;: &quot;c1&quot;,
+      &quot;original_name&quot;: &quot;OpenAI&quot;,
+      &quot;name&quot;: &quot;OpenAI（导入）&quot;,
+      &quot;model_count&quot;: 1,
+      &quot;has_key&quot;: true,
+      &quot;type&quot;: &quot;openai&quot;
+    }
+  ],
+  &quot;models&quot;: [
+    {
+      &quot;ref&quot;: &quot;m1&quot;,
+      &quot;name&quot;: &quot;gpt-4.1&quot;,
+      &quot;channel_ref&quot;: &quot;c1&quot;
+    }
+  ],
+  &quot;groups&quot;: [
+    {
+      &quot;ref&quot;: &quot;g1&quot;,
+      &quot;original_name&quot;: &quot;coding&quot;,
+      &quot;name&quot;: &quot;coding&quot;,
+      &quot;strategy&quot;: &quot;manual&quot;,
+      &quot;active_item_ref&quot;: &quot;i1&quot;,
+      &quot;items&quot;: [
+        {
+          &quot;ref&quot;: &quot;i1&quot;,
+          &quot;model_ref&quot;: &quot;m1&quot;,
+          &quot;priority&quot;: &quot;0&quot;,
+          &quot;position&quot;: 1
+        }
+      ]
+    }
+  ]
+}</code></pre>
+<p>ResultDTO为 <code>{operation_id,state:"committed",committed_at,result_version:1,counts,rename_count,channels,groups,replayed}</code>。channels只含发生改名的 <code>{ref,id,original_name,name}</code>；groups含本次全部 <code>{ref,id,original_name,name}</code>，不重复保存成员／模型／连接信息。id为十进制字符串，写入仍检查其处于现有页面安全整数范围。终态DTO从回执还原，不按后来被用户改过的名称重建历史结果。aborted只返回固定failure_code、stage及零新增数量。</p>
+<p>API时间采用UTC RFC3339，字段明确为时间字符串；数据库使用UTC Unix毫秒。file_sha256是整份密文文件的SHA-256，只用来绑定操作，不是明文配置或密码摘要。</p>
+<p>状态响应包含 <code>{operation_id,state,counts}</code>，等待时另有expires_at；committed返回完整ResultDTO，aborted另含failure_code和stage。恢复列表每项仅含operation_id、state、created_at、confirmed_at、counts、rename_count及固定失败码（如有），不携带result_json或名称数组，客户端按用户当前查看项另取结果。全部新增HTTP响应都带X-Portunus-Instance，Main核对后再向页面返回脱敏值。</p>
+<p>本功能HTTP接口不经过现有renderer request.js自动重试。Main只自动重试只读查询；提交超时／断线后先查询同op，绝不能自动新建预览或换operation_id再提交。轻量网络重试至多3次、间隔500ms；提交后的状态查询最多120s（1s后逐步到2s间隔），超出显示“结果待核实”，允许手动继续查询。</p>
+</section>
+<section class="doc-section" id="database" aria-labelledby="database-heading"><div class="section-heading"><span class="section-index">09</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="database-heading">持久化模型与新表字典</h2></div></div><p class="section-intro">实际已实现的数据库为SQLite。只新增回执表；业务四表、索引定义与历史列继续以现有模型为权威。新回执没有业务外键，后续删除分组不删除操作证明。</p><figure class="architecture-figure"><svg class="diagram-svg" viewBox="0 0 1000 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="er-title er-desc"><title id="er-title">现有配置关系与新增回执</title><desc id="er-desc">这是逻辑关系图，配置实体通过ID关联；回执不建立指向业务实体的外键，避免业务删除破坏提交证明。</desc><defs><marker id="er-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#246bfd"/></marker></defs><rect x="25" y="65" width="210" height="70" rx="8" class="node"/><text x="130.0" y="91" class="node-label" text-anchor="middle" font-weight="600">channels</text><text x="130.0" y="112" class="edge-label" text-anchor="middle">name 唯一</text><rect x="370" y="65" width="245" height="70" rx="8" class="node"/><text x="492.5" y="91" class="node-label" text-anchor="middle" font-weight="600">models</text><text x="492.5" y="112" class="edge-label" text-anchor="middle">channel_id + name 唯一</text><rect x="370" y="265" width="245" height="70" rx="8" class="node"/><text x="492.5" y="291" class="node-label" text-anchor="middle" font-weight="600">group_items</text><text x="492.5" y="312" class="edge-label" text-anchor="middle">group_id + model_id 唯一</text><rect x="740" y="265" width="235" height="70" rx="8" class="node"/><text x="857.5" y="291" class="node-label" text-anchor="middle" font-weight="600">groups</text><text x="857.5" y="312" class="edge-label" text-anchor="middle">name 唯一；active可为0</text><rect x="740" y="65" width="235" height="70" rx="8" class="node primary"/><text x="857.5" y="91" class="node-label" text-anchor="middle" font-weight="600">config_import_receipts</text><text x="857.5" y="112" class="edge-label" text-anchor="middle">operation_id PK；无业务FK</text><path d="M235 100H368" class="edge" marker-end="url(#er-arrow)"/><text x="300" y="85" class="edge-label" text-anchor="middle">1 → 0..N</text><path d="M492 135V263" class="edge" marker-end="url(#er-arrow)"/><text x="540" y="205" class="edge-label" text-anchor="middle">1 → 0..N</text><path d="M740 300H617" class="edge" marker-end="url(#er-arrow)"/><text x="680" y="285" class="edge-label" text-anchor="middle">1 → 0..N</text><path d="M860 265V180H615V265" class="edge" marker-end="url(#er-arrow)" stroke-dasharray="5 4"/><text x="740" y="170" class="edge-label" text-anchor="middle">active: 0..1，且属于本组</text><text x="500" y="380" class="edge-label" text-anchor="middle">既有引用是逻辑语义；设计阶段未连接用户数据库验证物理FK。回执与业务图靠事务保持一致。</text></svg><figcaption>实线显示逻辑的一对多引用，虚线是分组可选激活引用；并不声称这些都已部署为数据库外键。</figcaption></figure><details class="diagram-source"><summary>查看可编辑图源</summary><pre><code>erDiagram
+ CHANNEL ||--o{ MODEL : owns
+ MODEL ||--o{ GROUP_ITEM : referenced_by
+ GROUP ||--o{ GROUP_ITEM : contains
+ GROUP o|--o| GROUP_ITEM : optional_active_in_own_group
+ IMPORT_RECEIPT { string operation_id PK }
+</code></pre></details><div class="table-wrap"><table><caption class="sr-only">回执全字段字典</caption><thead><tr><th scope="col">字段</th><th scope="col">物理类型／空值</th><th scope="col">用途与写入来源</th></tr></thead><tbody><tr><td>operation_id</td><td>TEXT / PK / UUIDv4</td><td>Go创建；一行对应一次有效预览及其可能确认，不对应一个文件永久身份。终态永不复用。</td></tr><tr><td>owner_instance_id</td><td>TEXT / NOT NULL</td><td>当前Go进程实例，使用sidecar传入ID，独立运行时生成随机UUID；只表示归属，不是认证秘密。</td></tr><tr><td>file_sha256、plan_sha256</td><td>TEXT / 64小写hex / NOT NULL</td><td>分别绑定密文和精确名称计划；输入格式在应用层校验。</td></tr><tr><td>status</td><td>TEXT / prepared、committed、aborted</td><td>prepared覆盖等待和事务进行中；不能从SQL读到单独的committing状态。进程内运行注册表补充短期状态。</td></tr><tr><td>created_at_ms、expires_at_ms</td><td>INTEGER / NOT NULL / UTC Unix毫秒</td><td>预览登记及15分钟期限；当前进程还用单调时间限制实际TTL，时钟回拨不能延长内存保留。</td></tr><tr><td>confirmed_at_ms</td><td>INTEGER / NULL</td><td>收到有效确认后短写的意图记录，不证明业务提交。未确认预览不会在启动时打扰用户。</td></tr><tr><td>claim_started_at_ms</td><td>INTEGER / NULL</td><td>业务事务第一条DML写入；事务回滚时回到NULL，成功后表示该事务开始时间。</td></tr><tr><td>committed_at_ms、acknowledged_at_ms</td><td>INTEGER / NULL</td><td>前者与业务同事务填写；后者仅在用户看过并关闭终态结果后填写。ACK不删数据。</td></tr><tr><td>result_version</td><td>INTEGER / NOT NULL / 1</td><td>脱敏结果契约版本，与文件格式版本不同；未来演进需明确向后读取，不能当作重做操作的理由。</td></tr><tr><td>channels_count、models_count、groups_count、rename_count</td><td>INTEGER / NOT NULL / 默认0</td><td>终态实际新增量与改名数，便于轻量状态／恢复列表查询；prepared／aborted为0。</td></tr><tr><td>result_json</td><td>TEXT / NULL / 最大12MiB</td><td>仅committed保存ResultDTO所需的名称、标识和公开结果；不包含密码、Key、URL、原始载荷、密文文件或全部模型。</td></tr><tr><td>failure_code、failure_stage</td><td>TEXT / NULL</td><td>aborted的固定码与阶段；不保存底层异常原文或秘密字段值。</td></tr></tbody></table></div>
+<h3>迁移与保留</h3><p>新增 <code>configtransfer.Migrate(db)</code> 使用下列固定目标DDL，在既有业务AutoMigrate之后、迁移服务开始接收请求之前执行。它只创建这张表与两个索引；启动检查已存在表的字段、PK及索引符合本基线，不擅自修复未知Schema。已有业务唯一约束不符时停用迁移功能并报UNSUPPORTED_DATABASE_SCHEMA。</p>
+<pre><code>CREATE TABLE IF NOT EXISTS config_import_receipts (
+  operation_id TEXT PRIMARY KEY NOT NULL,
+  owner_instance_id TEXT NOT NULL,
+  file_sha256 TEXT NOT NULL CHECK(length(file_sha256)=64),
+  plan_sha256 TEXT NOT NULL CHECK(length(plan_sha256)=64),
+  status TEXT NOT NULL CHECK(status IN (&#x27;prepared&#x27;,&#x27;committed&#x27;,&#x27;aborted&#x27;)),
+  created_at_ms INTEGER NOT NULL,
+  expires_at_ms INTEGER NOT NULL,
+  confirmed_at_ms INTEGER,
+  claim_started_at_ms INTEGER,
+  committed_at_ms INTEGER,
+  acknowledged_at_ms INTEGER,
+  result_version INTEGER NOT NULL DEFAULT 1 CHECK(result_version=1),
+  channels_count INTEGER NOT NULL DEFAULT 0 CHECK(channels_count&gt;=0),
+  models_count INTEGER NOT NULL DEFAULT 0 CHECK(models_count&gt;=0),
+  groups_count INTEGER NOT NULL DEFAULT 0 CHECK(groups_count&gt;=0),
+  rename_count INTEGER NOT NULL DEFAULT 0 CHECK(rename_count&gt;=0),
+  result_json TEXT,
+  failure_code TEXT,
+  failure_stage TEXT,
+  CHECK(expires_at_ms &gt; created_at_ms),
+  CHECK(status=&#x27;committed&#x27; OR (channels_count=0 AND models_count=0
+         AND groups_count=0 AND rename_count=0)),
+  CHECK((status=&#x27;committed&#x27; AND committed_at_ms IS NOT NULL
+         AND result_json IS NOT NULL AND failure_code IS NULL)
+     OR (status=&#x27;prepared&#x27; AND committed_at_ms IS NULL AND result_json IS NULL)
+     OR (status=&#x27;aborted&#x27; AND committed_at_ms IS NULL
+         AND result_json IS NULL AND failure_code IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_ct_prepared_owner
+  ON config_import_receipts(status, owner_instance_id);
+CREATE INDEX IF NOT EXISTS idx_ct_unack_confirmed
+  ON config_import_receipts(created_at_ms DESC, operation_id DESC)
+  WHERE acknowledged_at_ms IS NULL AND confirmed_at_ms IS NOT NULL;</code></pre>
+<p>prepared在预览返回前登记；取消、过期及启动恢复可以留下不含秘密的aborted元数据，这是回执范围，不属于残留的渠道／模型／分组。只列已确认且未ACK的恢复结果。终态与最小证明不按日志保留期删除，否则旧ID可能被重新执行。存储随用户有效预览／导入次数增长，不宣称固定空间；移除整个用户数据库或手工回退数据库后的证明连续性不在本功能保证内。</p>
+<p>DDL的CHECK约束行形状与未提交计数，不单独阻止任意SQL倒转状态。单向生命周期由迁移包封装的条件更新保证：committed／aborted只允许从prepared转换且检查RowsAffected；ACK只更新终态的acknowledged_at，禁止无条件保存整个回执实体。此应用边界须有终态复用和回退拒绝测试。</p>
+<p>旧版本应用会忽略新增表；回退应用时保留该表。已导入的配置属于用户数据，不能在版本回退中自动删掉。未来若变更本表或结果版本，另行制定增量迁移，不能覆盖现有终态。</p>
+</section>
+<section class="doc-section" id="transactions" aria-labelledby="transactions-heading"><div class="section-heading"><span class="section-index">10</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="transactions-heading">事务、幂等、并发与启动恢复</h2></div></div><p class="section-intro">最终写入只由Go完成。回执使“同一次确认”有持久身份；file hash只做绑定，不把文件重复导入变成去重同步。</p><pre><code>-- BEGIN后第一条数据库访问；不能先SELECT开启旧读快照。
+UPDATE config_import_receipts
+SET claim_started_at_ms = :now
+WHERE operation_id = :op AND owner_instance_id = :owner
+  AND status = &#x27;prepared&#x27; AND file_sha256 = :file_sha
+  AND plan_sha256 = :plan_sha AND expires_at_ms &gt; :now
+  AND confirmed_at_ms IS NOT NULL;
+-- 必须RowsAffected=1，随后复核显示过的名称并恢复完整配置图。
+-- 所有INSERT、active_item_id映射、结果列和status=&#x27;committed&#x27;在同一Tx。
+
+-- 启动／恢复fence；同样先DML，不先读旧快照。
+UPDATE config_import_receipts
+SET status=&#x27;aborted&#x27;, failure_code=&#x27;SESSION_LOST&#x27;, failure_stage=&#x27;recovery&#x27;
+WHERE status=&#x27;prepared&#x27; AND owner_instance_id &lt;&gt; :current_owner;</code></pre>
+<h3>完整写入顺序</h3><ol class="ordered"><li>取得每op互斥和全局重活许可；已committed同hash立即回放，hash不匹配返回OPERATION_MISMATCH。aborted不再执行。当前同op运行中返回202，不启动第二个事务。</li><li>短写有效确认意图后，进入业务Tx并先claim。0行必须检查已存终态／期限或fencing，不允许继续创建配置。</li><li>按计划以显式列map写入渠道，序列化原始options；布尔false、数字0、空legacy字段都包含在列map里。不能直接依赖普通实体Create的默认值或调用会重套预设的CreateTx。</li><li>同事务内按唯一名称准确读回新渠道ID；按(channel_id,name)写入并读回模型；按唯一新名创建分组；逐组按文件items顺序创建成员并按(group_id,model_id)读回ID。此写法已隔离验证，不假定map能自动回填主键。</li><li>设置合法active_item_ref映射（null写0），保留原始priority；检查新ID与结果预算，然后同一Tx填充结果、计数、committed时间及状态。已有业务行不会更新。</li><li>错误先结束Tx并读回receipt；必要时通过条件DML把仍prepared的当前操作fence为aborted。只有终态依据明确时才给出成功或失败；查询／fence不可用时保持RESULT_UNCONFIRMED。</li></ol>
+<h3>进程重启</h3><p>新服务具有新owner。恢复DML与旧请求claim争抢同一SQLite写锁：恢复先成功，旧claim之后0行不能写；旧事务先持锁，则恢复等待结束后看到committed并不能把它改为aborted。该性质已在DELETE与WAL两种临时库模式、两独立连接池验证。</p>
+<p>恢复尚未完成时，迁移服务ready=false，新增功能返回503；网关及原有管理功能可继续运行。恢复重试有界，DB_BUSY不等于名称冲突。当前实例运行中操作的recover与commit共用op锁；内存预览已丢失、已到期或旧owner的prepared才能被恢复fence。定时过期先释放秘密引用，再尽力持久化aborted；失效后即使状态短暂仍prepared也不能再claim。</p>
+<p>SQLite驱动此基线的隔离实测为3.41.2，裸连接busy_timeout=5000ms、journal_mode=delete。设计不切换全局WAL或修改全应用连接池；DB_BUSY只在新边界做同op核实／有限重试。每次事务均使用请求上下文；取消或commit返回错误不能直接证明回滚。</p>
+</section>
+<section class="doc-section" id="frontend" aria-labelledby="frontend-heading"><div class="section-heading"><span class="section-index">11</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="frontend-heading">前端状态、分页、缓存与导航</h2></div></div><p class="section-intro">延续已审核原型的页面层级。下图是持久操作状态，不机械把UI的spinner、详情tab或表单错误写入数据库。</p><figure class="architecture-figure"><svg class="diagram-svg" viewBox="0 0 1000 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="states-title states-desc"><title id="states-title">持久操作状态机</title><desc id="states-desc">准备状态只进入已提交或已终止；进行中是进程内状态，不是持久committing枚举；ACK不改变终态。</desc><defs><marker id="states-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#246bfd"/></marker></defs><rect x="365" y="35" width="270" height="70" rx="8" class="node primary"/><text x="500.0" y="61" class="node-label" text-anchor="middle" font-weight="600">prepared</text><text x="500.0" y="82" class="edge-label" text-anchor="middle">等待确认／事务进行中</text><rect x="55" y="260" width="265" height="70" rx="8" class="node"/><text x="187.5" y="286" class="node-label" text-anchor="middle" font-weight="600">committed</text><text x="187.5" y="307" class="edge-label" text-anchor="middle">结果与配置同事务提交</text><rect x="680" y="260" width="265" height="70" rx="8" class="node"/><text x="812.5" y="286" class="node-label" text-anchor="middle" font-weight="600">aborted</text><text x="812.5" y="307" class="edge-label" text-anchor="middle">已fence，禁止再执行</text><path d="M430 105L188 258" class="edge" marker-end="url(#states-arrow)"/><text x="265" y="174" class="edge-label" text-anchor="middle">claim＋恢复＋结果 COMMIT</text><path d="M565 105L812 258" class="edge" marker-end="url(#states-arrow)"/><text x="758" y="174" class="edge-label" text-anchor="middle">取消／过期／确定失败／旧owner</text><path d="M638 68C840 40 825 220 620 105" class="edge" marker-end="url(#states-arrow)" stroke-dasharray="5 4"/><text x="825" y="90" class="edge-label" text-anchor="middle">运行中：由内存注册表示</text><text x="190" y="365" class="edge-label" text-anchor="middle">ACK只填确认时间，不删回执</text><text x="812" y="365" class="edge-label" text-anchor="middle">新一次确认需新预览／新operation_id</text></svg><figcaption>持续化终态没有反向转换；prepared存在于预览阶段属于授权回执元数据，三类业务配置仍未写入。</figcaption></figure><details class="diagram-source"><summary>查看可编辑图源</summary><pre><code>stateDiagram-v2
+ [*] --&gt; prepared: 有效预览登记
+ prepared --&gt; committed: claim + 全量恢复 + 回执同事务提交
+ prepared --&gt; aborted: 取消/过期/失败fence/旧owner恢复
+ committed --&gt; committed: ACK或结果重放
+ aborted --&gt; aborted: ACK或返回原失败
+</code></pre></details><div class="table-wrap"><table><caption class="sr-only">前端状态技术映射</caption><thead><tr><th scope="col">界面状态</th><th scope="col">权威来源</th><th scope="col">交互与恢复</th></tr></thead><tbody><tr><td>设置正常／空库</td><td>summary counts是服务端值，can_export独立检查。</td><td>空库仅禁用导出，导入始终可用；加载失败显示重试，不能用0冒充已知空库。</td></tr><tr><td>导出表单／处理中</td><td>密码与确认是UI短期输入；选择路径属于Main。</td><td>密码不进入URL、持久化或日志；进行中防重复；取消选择不报失败。</td></tr><tr><td>选文件／校验</td><td>file_token属于Main；password由UI输入；内容由Go校验。</td><td>换文件使旧预览失效；非进行中关闭会释放令牌；认证错误保留文件供重输。</td></tr><tr><td>预览／名称变化</td><td>PreviewDTO为Go冻结数据；详情tab、页码和折叠属于UI。</td><td>按20项局部分页，成员显示通过ref派生；新名称计划需要再次确认，不能静默提交。</td></tr><tr><td>提交中／结果待核实</td><td>opID与回执是权威；UI只显示短期请求状态。</td><td>提交后断线显示正在核实，不报“已回滚”；只查同op。查询预算用完保留继续查询，不自动重新导入。</td></tr><tr><td>成功／已回滚</td><td>终态ResultDTO来自回执，数量和最终名称不重新猜测。</td><td>只在确定终态后清除输入与预览；用户关闭结果或查看分组后ACK。</td></tr><tr><td>恢复旧操作</td><td>页面空闲时读取未ACK且已确认的摘要，再核实对应操作。</td><td>复用成功／失败弹窗，标明上次操作时间；不在用户填写新表单时强行打断，也不创建新操作重跑。</td></tr></tbody></table></div>
+<p>PreviewDTO采用引用而非重复嵌入名称，最大8MiB；详情及改名列表本地20项分页，分组成员也局部分页，保持正常小数据原型不变。打开新弹窗、换文件、关闭或卸载时递增UI代次并取消页面等待；迟到的旧响应不能覆盖新状态。进行中关闭受限，但窗口被系统关闭／renderer重载仍由回执恢复。</p>
+<p>IPC成功不会经过现有axios写拦截器，所以确定committed或回放committed后必须显式 <code>responseCache.invalidate()</code>，重取summary及相关列表；列表重取失败不推翻已经提交的结果。现有缓存generation可阻止先前慢GET写回旧快照。</p>
+<p>“查看导入分组”使用现有 <code>/groups</code> 路由，附非持久导航state中的importedGroupIds，以String(id)匹配已刷新列表，提供“显示全部／返回配置迁移”。不创建生产新路由、不拼超长URL。若用户后来删除分组，历史结果仍表示当时提交成功，当前列表显示实际可见数量，不重建已删除对象。</p>
+</section>
+<section class="doc-section" id="failures-security" aria-labelledby="failures-security-heading"><div class="section-heading"><span class="section-index">12</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="failures-security-heading">失败语义与安全控制</h2></div></div><p class="section-intro">新增边界使用结构化错误，不改变整个项目既有错误返回。HTTP错误形状为 {error,code,stage,retryable,field?,operation_id?,replacement_preview?}。</p><div class="table-wrap"><table><caption class="sr-only">错误契约</caption><thead><tr><th scope="col">错误码</th><th scope="col">状态</th><th scope="col">含义</th><th scope="col">用户恢复</th></tr></thead><tbody><tr><td>INVALID_INPUT / LIMIT_EXCEEDED</td><td>400 / 413</td><td>字段类型、大小、计数、编码、展示预算不符合；不显示原始字段值。</td><td>修正输入或重新导出；无业务写入。</td></tr><tr><td>EMPTY_CONFIGURATION</td><td>409</td><td>三类全空，不导出空文件，不导入空包。</td><td>先配置内容或选择其他文件。</td></tr><tr><td>FORMAT_UNSUPPORTED / CRYPTO_PROFILE_UNSUPPORTED</td><td>422</td><td>版本、profile或保留位不支持；不尝试转换／降级。</td><td>使用支持该格式的应用或换文件。</td></tr><tr><td>DECRYPT_FAILED / FILE_CORRUPT</td><td>422</td><td>认证失败用通用解密提示；结构损坏可独立报不可读。</td><td>保留文件或更换文件；不产生有效预览。</td></tr><tr><td>CONFIG_INVALID / SOURCE_INTEGRITY_ERROR</td><td>422 / 409</td><td>能力、字段或引用无效；以对象ref、字段路径定位。</td><td>整次拒绝，不跳过问题项。</td></tr><tr><td>NAME_SPACE_EXHAUSTED / UNSUPPORTED_DATABASE_SCHEMA</td><td>409 / 503</td><td>名称探测预算耗尽，或实际Schema与要求不符。</td><td>前者调整同名配置后重新预览；后者停用迁移功能，不能擅自修表。</td></tr><tr><td>PREVIEW_CHANGED / PREVIEW_EXPIRED</td><td>409 / 410</td><td>旧操作终结，不沿旧计划写入；新预览需确认。</td><td>Main仍持文件时可重新解密；重启后重新选文件。</td></tr><tr><td>OPERATION_RUNNING / TRANSFER_BUSY</td><td>202 / 423</td><td>同op已有任务或全局重活槽占用，不排无限队列。</td><td>前者查同op，后者保留输入让用户重试。</td></tr><tr><td>OPERATION_MISMATCH / OPERATION_ABORTED</td><td>409</td><td>op复用、hash不同或终态aborted，不允许执行。</td><td>核实原结果；新的用户确认需要新预览。</td></tr><tr><td>DB_BUSY / TRANSFER_UNAVAILABLE / BACKEND_CHANGED</td><td>503 / 503 / 409</td><td>本机写竞争、恢复未就绪、实例不匹配；不能伪装成名称冲突。</td><td>未提交阶段可重试；提交后先查同op。</td></tr><tr><td>RESULT_UNCONFIRMED</td><td>503</td><td>无法取得可证明的终态；不能说“已全部回滚”。</td><td>保留op并核实；不自动创建副本。</td></tr><tr><td>FILE_READ_FAILED / FILE_SAVE_FAILED</td><td>IPC固定码</td><td>只说明用户选择的位置／文件不可读写，不转发底层路径或错误原文。</td><td>重新选择；正常失败清理自有临时文件。</td></tr></tbody></table></div><div class="table-wrap"><table><caption class="sr-only">安全约束</caption><thead><tr><th scope="col">边界</th><th scope="col">控制与验证落点</th></tr></thead><tbody><tr><td>秘密与日志</td><td>固定错误码／stage／ref路径；不返回解析器、SQL或文件系统原始错误。迁移DB会话使用Silent logger，禁止GORM慢SQL／错误SQL输出密钥参数。日志仅opID、阶段、码、数量、字节量和耗时。</td></tr><tr><td>IPC来源</td><td>校验event.sender为主窗口webContents、senderFrame为主frame，并精确匹配当前file页面URL（忽略hash）或受控的http://localhost:5173开发origin。对入参做类型、长度和键白名单检查。</td></tr><tr><td>文件能力</td><td>页面只传file_token／预览标识，不传路径、URL或任意文件内容。导航到新文档或renderer退出时失效令牌；原地hash导航不当作新文档。</td></tr><tr><td>环境绑定</td><td>Main从runtime-profile/server-address和owned sidecar取得固定回环地址与instance/generation；调用前检查ready，响应仍核对实例。新路由的X-Portunus-Instance只是防误路由，不是鉴权。</td></tr><tr><td>资源准入</td><td>Main在大读取前串行准入，Go在大body前占重活槽。Argon2没有立即取消能力，取消后仍等其真正结束再释放许可。秘密内存预算、响应上限、期限均独立实施。</td></tr><tr><td>持久化秘密</td><td>回执、浏览器存储、应用配置和临时文件都不保存密码或明文载荷；只在Go的受限预览中短期保留原文，完成／关闭／到期释放。保留预算不是总内存保证。</td></tr></tbody></table></div>
+<p>2026-11-10实施契约补齐：错误允许可选field，表示固定字段名及数组下标构成的安全ASCII路径，长度≤256；Main只透传通过路径白名单的值，界面可据此定位字段，不透传底层异常原文或用户字段值。discard的preview_id改为可选，仅用于释放尚未预览的本窗口文件令牌；业务语义不变。</p>
+<p>stage固定为input、body_read、snapshot、encrypt、decrypt、validate、plan、commit、recovery、file_read或file_save。终态aborted的failure_code可使用上述已知码，另有USER_CANCELLED（确认前取消）、SESSION_LOST（旧进程或预览丢失）和IMPORT_FAILED（已核实未提交的写入失败）；状态查询返回200的确定终态，不把它当作查询本身失败。retryable只表示同阶段可重试，不授权换新op；所有确认后的异常均先核实原op。</p>
+<p>正式版和Dev只连接各自主进程拥有的sidecar与独立数据库。手工选择迁移文件只影响当前目标环境，不自动读取另一环境或复制数据库。设计和开发验收使用合成凭据，真实生成验证由用户另行操作。</p>
+</section>
+<section class="doc-section" id="compatibility" aria-labelledby="compatibility-heading"><div class="section-heading"><span class="section-index">13</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="compatibility-heading">迁移、兼容和实施落点</h2></div></div><p class="section-intro">新增表与接口是加法变更。保持现有业务接口、客户端服务Key和默认运行环境；文件格式1与内部回执版本各自演进。</p><div class="table-wrap"><table><caption class="sr-only">变更落点与兼容</caption><thead><tr><th scope="col">范围</th><th scope="col">确定的修改</th><th scope="col">兼容与约束</th></tr></thead><tbody><tr><td>Go装配</td><td>main.go在既有AutoMigrate后调用configtransfer.Migrate，构建服务并进行旧owner恢复；新增独立的api.RegisterConfigTransfer。</td><td>保留原api.Register(r, quotaServices...)签名，避免改写现有调用者与测试装配；新增入口自行挂本机管理中间件。</td></tr><tr><td>恢复数据</td><td>新增快照读取、严格校验、名称计划及RestoreTx；用已核对的实体列映射。</td><td>不调用普通Create/ImportNamesTx/Resolve作为无损入口，不迁移源ID／旧计价，不更新目标已有对象。</td></tr><tr><td>桌面装配</td><td>Main新增registerConfigTransfer并注入窗口、profile、backend访问描述、dialog与fs；preload只暴露固定家族。</td><td>sidecar增加Main私有只读instance/generation访问，不把此信息或任意HTTP能力暴露给页面。文件读写模块可以注入依赖做离线测试。</td></tr><tr><td>前端</td><td>设置页新增区域及受控弹窗；成功后显式失效缓存；分组页接收临时ID过滤上下文。</td><td>不改主导航结构，继承当前HeroUI定制样式、焦点和navGuard约定；不引入新全局状态库或生产演示控件。</td></tr><tr><td>文件兼容</td><td>envelope=1、format=1、KDF/cipher profile=1都固定；app_version只记录。</td><td>未来新增影响语义的字段须提升文件format；不能在仍叫格式1时默默改变必填、KDF参数或排序含义。未知实际能力失败，未知展示目录元数据保留。</td></tr><tr><td>Schema回退</td><td>创建回执表和索引，无业务表重建、数据搬移或旧列删除。</td><td>回退应用保留回执；若未来新Schema与旧应用不兼容需单独迁移方案。本次不执行DDL或调整版本。</td></tr></tbody></table></div><div class="notice "><span class="notice-marker">设计约束</span><div><strong>工程参数属于本设计，不冒充性能实测</strong><p>上限与超时是明确的受理规则；实现前需把这些值同步到产品文案和边界验收。PRD／原型正本未被本次架构任务擅自修改，若更新它们，应标注本次已确认决策及本文新增的工程约束。</p></div></div></section>
+<section class="doc-section" id="verification" aria-labelledby="verification-heading"><div class="section-heading"><span class="section-index">14</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="verification-heading">实际验证与实施后验收</h2></div></div><p class="section-intro">验证命令使用 GOPROXY=off、GOSUMDB=off、GOTOOLCHAIN=local、GOFLAGS=-mod=readonly；PoC与缓存都在/private/tmp，未写生产实现或用户数据库。</p><div class="table-wrap"><table><caption class="sr-only">实际风险验证</caption><thead><tr><th scope="col">编号</th><th scope="col">验证</th><th scope="col">观察</th><th scope="col">限制</th></tr></thead><tbody><tr id="V-01"><td>V-01</td><td>密码学／格式隔离实验</td><td>Go1.26.6，Darwin arm64，x/crypto0.48.0；190B合成JSON。48B header、总长P+64往返通过；错误密码、cipher/tag/nonce篡改拒绝；未来版本、未知profile、保留位、截断／尾随／超长在KDF前拒绝；随机盐与nonce变化、密码空格及组合字符保持字节语义。</td><td>一次观测Seal117ms、Open85ms；两次KDF累计分配134232088B，不是峰值RSS或延迟SLA；未测最大文件／其他平台。</td></tr><tr id="V-02"><td>V-02</td><td>SQLite默认值及恢复</td><td>GORM1.31.2、glebarez/sqlite1.11.0、SQLite3.41.2。普通Create会改false与空默认字段；完整显式列map保持false/0/空Key/零options，JSON可读回。</td><td>主键通过同事务唯一键回读；没有把map自动ID回填当作已验证能力。</td></tr><tr id="V-03"><td>V-03</td><td>事务故障与重放</td><td>在渠道、模型、分组、成员／激活及写committed回执后五点注入错误，业务四表均回到0；同op顺序与并发重试只写一次并回放同结果，hash变更拒绝。</td><td>使用合成临时数据库；未模拟实际断电或进程kill。</td></tr><tr id="V-04"><td>V-04</td><td>fencing与排序</td><td>DELETE/WAL各两个独立连接池，分别覆盖恢复先拿写锁和旧claim先拿锁；旧请求被fence或committed保留。同priority按源创建顺序恢复，激活映射正确。</td><td>并发实验各连接池1连接、显式busy_timeout=3000ms；不把这一配置说成生产默认。源码／独立复核均已检查。</td></tr><tr id="V-05"><td>V-05</td><td>独立安全与一致性复核</td><td>核对严格JSON、来源校验、未知元数据兼容、KDF取消、临时文件、回执fencing、日志和预算。最终约束已纳入本文。</td><td>只读复核，没有访问用户数据库或运行安装版／Dev。</td></tr><tr id="V-06"><td>V-06</td><td>精确目标DDL验证</td><td>以本文最终DDL创建临时SQLite：建表、两个索引、重复执行、两种合法终态通过；12类非法行形状及prepared／aborted各4个非零计数字段均被拒绝。业务与回执错误同事务回滚，确认意图保留。</td><td>最终运行通过（0.462s）；CHECK保证行形状，终态单向依赖应用层条件UPDATE。无真实数据库变更。</td></tr><tr id="V-07"><td>V-07</td><td>HTML实际浏览器检查</td><td>1440px桌面、390px窄屏及794px打印媒体下检查。四张内联图可见；页面无整体横向溢出；窄屏表格／图局部滚动，打印隐藏导航、展开图源并允许表格换页。</td><td>锚点与本地引用检查通过；没有外部运行脚本。本检查不代替后续产品界面集成验收。</td></tr></tbody></table></div>
+<p>数据实验首次全部通过（1.111s），新增同op并发重放专项也通过（0.771s）；这些耗时只表示该次实验执行结果。临时源为 <code>/private/tmp/portunus_spec_crypto.go</code>、<code>/private/tmp/portunus-spec-data-poc/data_test.go</code> 及 <code>/private/tmp/portunus-spec-data-poc/exact_schema_test.go</code>；本Spec的契约与结论完整保存在HTML，不依赖临时源长期保留。最终DDL的SHA-256为 <code>83c9afbbeb019d4ae5319762e7aa0a38739e54fbabf489c21f3e64d59d12928e</code>，验证命令为上列离线环境变量后运行 <code>go test -v /private/tmp/portunus-spec-data-poc/exact_schema_test.go</code>。</p>
+<h3>实施验收门（最新状态见实施记录）</h3><ul class="styled-list"><li>真实HTTP+IPC端到端，包括instance切换、renderer重载、请求取消、限额准入、日志脱敏及未ACK恢复。</li><li>严格解析器的模糊／边界验证；源字符串、非法Unicode、重复键、null/缺失和大小写等价不能被默认解码器吞掉。</li><li>受理上限附近的峰值内存、处理时间和UI分页可读性，验证对网关／日志写竞争的影响；若不能满足，调整上限并同步契约和文案，不声称本轮已测容量。</li><li>macOS、Windows、Linux的文件选择、取消、可写目录、目标替换、临时文件权限及进程中断；不要把Unix mode当作Windows ACL。</li><li>隔离合成库上的真实进程退出／重启恢复；断电持久性需专门环境，未进行前不承诺零丢失。</li></ul>
+<div class="table-wrap"><table><caption class="sr-only">PRD验收映射</caption><thead><tr><th scope="col">需求验收</th><th scope="col">设计落点</th><th scope="col">验证办法（待实施）</th></tr></thead><tbody><tr><td>AC-01～03</td><td>完整快照、局部引用、int64 priority字符串、顺序插入及激活映射。</td><td>Go包的导出→解密→恢复往返；包含多页模型、空组、未激活、同优先级。</td></tr><tr><td>AC-04～06</td><td>固定密码学profile、AAD、严格长度／编码、秘密不返页面。</td><td>错误密码、所有header边界、密文篡改、超限、无密码／明文日志与临时文件检查。</td></tr><tr><td>AC-07～09</td><td>格式严格匹配，app_version不相等仍允许；保存快照语义和严格关系校验。</td><td>不同应用版本／相同格式；未知实际能力拒绝，未知预设标签与图标保留；重复键、大小写、null／缺失、孤立引用。</td></tr><tr><td>AC-10～12</td><td>唯一名称计划、不复用目标对象、同次op幂等而主动再导入新op。</td><td>既有不同密钥同名项、候选名挤占、重复文件、同op并发、断线重放及目标新名称占用。</td></tr><tr><td>AC-13～15</td><td>冻结DTO、迟到响应代次、预览元数据与业务分离、名称变化新确认。</td><td>预览／取消时业务四表零变化；换文件后旧响应不覆盖；新计划不得被旧op自动执行。</td></tr><tr><td>AC-16～17</td><td>单Tx业务图＋committed回执、恢复fencing、确定终态反馈。</td><td>逐写入点失败、确认响应丢失、真实进程kill、应用重启未ACK结果、ACK不删证明、重复点击。</td></tr><tr><td>AC-18～20</td><td>离线构造连接，本机权限边界与环境隔离。</td><td>导入流程不触发上游请求；核对服务接入Key／端口／客户端文件／日志／余额来源不变，拒绝非本机和不可信IPC。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="handoff" aria-labelledby="handoff-heading"><div class="section-heading"><span class="section-index">15</span><div><p class="section-kicker">SYSTEM DESIGN / SPECIFICATION</p><h2 id="handoff-heading">实施准备、证据与使用摘要</h2></div></div><p class="section-intro">本文件是CT-1的架构正本，关键决策、Schema、接口及失败语义已经统一。未新增核心业务阻塞项；以下工作项表达依赖，不执行编码或发布。</p><div class="table-wrap"><table><caption class="sr-only">承接工作项</caption><thead><tr><th scope="col">工作项</th><th scope="col">边界</th><th scope="col">依赖与保护</th></tr></thead><tbody><tr id="W-01"><td>W-01</td><td>格式、严格类型、Codec与脱敏DTO</td><td>依赖本文固定信封、字段字典、限制；先用合成数据验证，不能从页面列表反推密钥。</td></tr><tr id="W-02"><td>W-02</td><td>目标DDL、Receipt生命周期、快照／计划／RestoreTx</td><td>依赖W-01契约及唯一索引；先测试默认值、回滚、fencing、终态不复用，再接HTTP。</td></tr><tr id="W-03"><td>W-03</td><td>受限管理接口与服务生命周期</td><td>依赖W-01/02；保留原api.Register签名，新增装配入口与实例绑定，明确ready及结果不确定语义。</td></tr><tr id="W-04"><td>W-04</td><td>Main／preload文件桥与安全保存</td><td>依赖已冻结API，可独立注入dialog/fs/transport测试；文件路径不进入渲染参数，正式与Dev身份不变。</td></tr><tr id="W-05"><td>W-05</td><td>原型落地与缓存／分组上下文</td><td>依赖DTO、IPC与终态；UI模拟控件不进入生产；实现局部分页、迟到响应隔离及ACK。</td></tr><tr id="W-06"><td>W-06</td><td>集成与平台验收</td><td>完成PRD映射和上节验证门；只能在Dev或合成环境验证，发布另需明确用户指令。</td></tr></tbody></table></div><div class="table-wrap"><table><caption class="sr-only">依据</caption><thead><tr><th scope="col">编号</th><th scope="col">依据</th><th scope="col">来源与限制</th></tr></thead><tbody><tr id="E-01"><td>E-01</td><td>用户决策及产品依据</td><td><a href="prd.html">PRD</a>；<a href="prototype/prototype.md">已审核原型清单</a>；本次用户明确“都按照推荐继续”。</td></tr><tr id="E-02"><td>E-02</td><td>领域与连接</td><td><a href="../../../backend/channel/channel.go">backend/channel/channel.go</a>；<a href="../../../backend/channel/service.go">backend/channel/service.go</a>；<a href="../../../backend/channel/icon.go">backend/channel/icon.go</a>；<a href="../../../backend/model/model.go">backend/model/model.go</a>；<a href="../../../backend/group/group.go">backend/group/group.go</a>；<a href="../../../backend/group/service.go">backend/group/service.go</a>；<a href="../../../backend/upstream/connection.go">backend/upstream/connection.go</a></td></tr><tr id="E-03"><td>E-03</td><td>数据库与装配</td><td><a href="../../../backend/shared/db.go">backend/shared/db.go</a>；<a href="../../../main.go">main.go</a>；<a href="../../../go.mod">go.mod</a>。设计阶段未验证真实用户Schema。</td></tr><tr id="E-04"><td>E-04</td><td>桌面和缓存</td><td><a href="../../../web/src/main/preload.js">web/src/main/preload.js</a>；<a href="../../../web/src/main/mac-update-health.js">web/src/main/mac-update-health.js</a>；<a href="../../../web/src/main/client-config.js">web/src/main/client-config.js</a>；<a href="../../../web/src/main/runtime-profile.js">web/src/main/runtime-profile.js</a>；<a href="../../../web/src/main/server-address.js">web/src/main/server-address.js</a>；<a href="../../../web/src/renderer/api/request.js">web/src/renderer/api/request.js</a>；<a href="../../../web/src/renderer/api/responseCache.js">web/src/renderer/api/responseCache.js</a></td></tr><tr id="E-05"><td>E-05</td><td>密码学能力</td><td><a href="https://pkg.go.dev/crypto/cipher">Go AEAD文档</a>；<a href="https://pkg.go.dev/golang.org/x/crypto/argon2">Go Argon2</a>；<a href="https://www.rfc-editor.org/rfc/rfc9106.html">RFC9106</a>。参数以本文固定profile为准；实际能力另由锁定版本PoC确认。</td></tr><tr id="E-06"><td>E-06</td><td>外部平台与JSON语义</td><td><a href="https://github.com/electron/electron/blob/v42.0.0/docs/tutorial/security.md">Electron42 IPC来源安全</a>；<a href="https://nodejs.org/api/fs.html">Node文件系统</a>；<a href="https://pkg.go.dev/encoding/json">Go JSON默认兼容行为</a>。具体项目版本以package/go.mod为准。</td></tr></tbody></table></div>
+<p><strong>准备结论：</strong>所选范围可实施。Go集中、持久回执与空库规则均由用户明确决定；密码学profile、文件边界、DTO、限额及恢复算法为本方向内的工程设计取值。此前候选B与无持久回执方案不再有效。</p>
+<p><strong>当前限制：</strong>2026-11-10已完成真实HTTP／原生Electron IPC集成、合成容量样本及受控进程中断恢复，详见实施记录；跨平台原生文件流程和真实断电仍未验证，不能标为全部平台或生产验证通过。后续代码基线变化时应重新核对本方案。</p>
+<p><strong>实施授权：</strong>2026-11-09交付时仅产出设计；2026-11-10用户明确批准按PRD、原型及本文实施，代码和验证已在dev工作区完成，见实施记录。未对真实数据库执行DDL，未调整正式版本、安装应用、合并或发布；实现授权不等于发布授权。</p>
+</section>
+          <footer class="doc-footer"><span>Portunus · 配置导入导出 Spec CT-1<br>本HTML为架构设计正本，图源与契约均可离线读取。</span><span>设计准备：所选范围可实施<br>2026-11-09</span></footer>
+        </main>
+      </div>
+    </div>
+  </article>
+</body>
+</html>

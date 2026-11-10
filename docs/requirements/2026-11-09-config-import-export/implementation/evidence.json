@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-10",
+  "branch": "dev",
+  "base_commit": "a6bb26aa7c8b4dade3fab0dbf7c9b49f13fa03c5",
+  "scope": "synthetic temporary data only",
+  "records": {
+    "http_main_integration": {
+      "checks": [
+        "real Main handlers + HTTP codec/file/preview/commit, wrong password, 48 models, ties/non-first active/empty group, lost response, same-op replay, ACK",
+        "active repeated import creates copies; post-preview name occupation produces a distinct replacement operation and requires confirmation",
+        "real SIGKILL/new-owner restart preserves committed result and counts without importing again"
+      ],
+      "exported": {
+        "file_name": "synthetic-config.portunus",
+        "bytes": 4870,
+        "counts": {
+          "channels": 2,
+          "models": 48,
+          "groups": 3
+        },
+        "format_version": 1
+      },
+      "counts": {
+        "channels": 8,
+        "models": 192,
+        "groups": 13
+      }
+    },
+    "transaction_process_crash": {
+      "result": {
+        "operation_id": "1bd2ba55-f4d2-4de9-9bb5-a6013d173ae5",
+        "state": "aborted",
+        "counts": {
+          "channels": 0,
+          "models": 0,
+          "groups": 0
+        },
+        "failure_code": "SESSION_LOST",
+        "stage": "recovery"
+      },
+      "counts": {
+        "channels": 2,
+        "models": 48,
+        "groups": 3
+      },
+      "phase": "killed after channels were written, during first model insertion"
+    },
+    "capacity_sample": {
+      "capacity": "PASS",
+      "root": "/private/tmp/portunus-ct-capacity-1794275880478",
+      "counts": {
+        "channels": 2,
+        "models": 50000,
+        "groups": 3
+      },
+      "members": 10000,
+      "file_bytes": 3869027,
+      "preview_bytes": 4026690,
+      "export_ms": 202,
+      "preview_ms": 233,
+      "commit_ms": 852,
+      "observed_rss_kib": [
+        {
+          "pid": 48327,
+          "kib": 142176
+        },
+        {
+          "pid": 48328,
+          "kib": 181280
+        }
+      ],
+      "limits": "one synthetic 50000-model/10000-member case; sampled RSS, not a guaranteed maximum or SLA"
+    },
+    "native_electron_ipc": {
+      "native_electron": "PASS",
+      "root": "/private/tmp/portunus-ct-native-1794277022841",
+      "electron": "42.3.3",
+      "counts": {
+        "channels": 2,
+        "models": 48,
+        "groups": 3
+      },
+      "checks": [
+        "actual Electron contextIsolation/preload/contextBridge/ipcMain",
+        "actual renderer bridge module",
+        "Main secure file operations",
+        "actual loopback Go HTTP + SQLite + encrypted file",
+        "native zero-argument methods, preview/commit/replay/recoveryList/ACK/discard"
+      ]
+    }
+  }
+}

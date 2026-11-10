@@ -1,0 +1,211 @@
+/* 源自 web/src/renderer/index.css，保留项目原字体及明暗语义 token。 */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/inter-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/jm-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/jm-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/jm-700.woff2') format('woff2');
+}
+:root { --font-sans: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif; --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+:root {
+  --brand-50: oklch(97.3% 0.014 37.6);
+  --brand-100: oklch(94.5% 0.028 37.6);
+  --brand-200: oklch(89.2% 0.058 37.6);
+  --brand-300: oklch(82.0% 0.104 37.6);
+  --brand-400: oklch(74.2% 0.161 37.6);
+  --brand-500: oklch(66.9% 0.205 37.6);
+  --brand-600: oklch(58.5% 0.190 37.6);
+  --brand-700: oklch(53.0% 0.165 37.6);
+  --brand-800: oklch(45.5% 0.130 37.6);
+  --brand-900: oklch(38.0% 0.100 37.6);
+  --brand-950: oklch(30.5% 0.075 37.6);
+
+  /* 亮色主题的暖中性色（色相 34.4） */
+  --neutral-50: oklch(98.5% 0.0040 34.4);
+  --neutral-100: oklch(96.5% 0.0050 34.4);
+  --neutral-200: oklch(92.5% 0.0060 34.4);
+  --neutral-300: oklch(86.5% 0.0070 34.4);
+  --neutral-400: oklch(72.0% 0.0100 34.4);
+  --neutral-500: oklch(60.0% 0.0120 34.4);
+  --neutral-600: oklch(52.0% 0.0120 34.4);
+  --neutral-700: oklch(44.0% 0.0120 34.4);
+  --neutral-800: oklch(36.0% 0.0100 34.4);
+  --neutral-900: oklch(27.0% 0.0080 34.4);
+  --neutral-950: oklch(20.5% 0.0060 34.4);
+
+  /* 状态色：警告使用琥珀色相 80，与品牌橙 37.6 拉开 */
+  --success-100: oklch(94% 0.045 145);
+  --success-400: oklch(70% 0.145 145);
+  --success-500: oklch(60% 0.150 145);
+  --success-700: oklch(47% 0.120 145);
+  --warning-100: oklch(96% 0.060 80);
+  --warning-400: oklch(86% 0.145 80);
+  --warning-500: oklch(80% 0.150 80);
+  --warning-700: oklch(50% 0.110 80);
+  --danger-100: oklch(94% 0.035 15);
+  --danger-400: oklch(70% 0.170 15);
+  --danger-600: oklch(55% 0.200 15);
+  --danger-700: oklch(50% 0.190 15);
+}
+
+:root,
+.light,
+.default,
+[data-theme="light"],
+[data-theme="default"] {
+  /* Theme Colors (Light Mode) */
+  --accent: var(--brand-600);
+  --accent-foreground: oklch(100% 0 0);
+  --accent-hover: var(--brand-700);
+  --accent-pressed: var(--brand-800);
+  --accent-subtle: var(--brand-50);
+  --accent-subtle-foreground: var(--brand-700);
+  --background: var(--neutral-50);
+  --border: var(--neutral-300);
+  --border-strong: var(--neutral-500);
+  --danger: var(--danger-600);
+  --danger-foreground: oklch(100% 0 0);
+  --danger-subtle: var(--danger-100);
+  --danger-subtle-foreground: var(--danger-700);
+  --default: var(--neutral-200);
+  --default-foreground: var(--neutral-900);
+  --field-background: oklch(100% 0 0);
+  --field-border: transparent;
+  --field-focus: oklch(100% 0 0);
+  --field-foreground: var(--neutral-900);
+  --field-placeholder: var(--neutral-600);
+  --focus: var(--brand-500);
+  --foreground: var(--neutral-900);
+  --muted: var(--neutral-600);
+  --overlay: oklch(100% 0 0);
+  --overlay-foreground: var(--neutral-900);
+  --scrollbar: var(--neutral-300);
+  --segment: oklch(100% 0 0);
+  --segment-foreground: var(--neutral-900);
+  --separator: var(--neutral-200);
+  --success: var(--success-700);
+  --success-foreground: oklch(100% 0 0);
+  --success-subtle: var(--success-100);
+  --success-subtle-foreground: var(--success-700);
+  --surface: oklch(100% 0 0);
+  --surface-foreground: var(--neutral-900);
+  --surface-secondary: var(--neutral-100);
+  --surface-secondary-foreground: var(--neutral-900);
+  --surface-tertiary: var(--neutral-200);
+  --surface-tertiary-foreground: var(--neutral-900);
+  --warning: var(--warning-700);
+  --warning-foreground: oklch(100% 0 0);
+  --warning-subtle: var(--warning-100);
+  --warning-subtle-foreground: var(--warning-700);
+
+  /* Border Radius */
+  --radius: 0.5rem;
+  --field-radius: 1rem;
+}
+
+
+html.dark,
+html[data-theme="dark"],
+html.dark [data-slot],
+html[data-theme="dark"] [data-slot] {
+  color-scheme: dark;
+  /* 暗色主题的冷中性色（色相 265） */
+  --cool-50: oklch(97.5% 0.0040 265);
+  --cool-100: oklch(94.5% 0.0060 265);
+  --cool-200: oklch(88.5% 0.0080 265);
+  --cool-300: oklch(80.0% 0.0100 265);
+  --cool-400: oklch(70.0% 0.0120 265);
+  --cool-500: oklch(60.0% 0.0140 265);
+  --cool-600: oklch(51.0% 0.0150 265);
+  --cool-700: oklch(42.0% 0.0160 265);
+  --cool-800: oklch(33.0% 0.0180 265);
+  --cool-900: oklch(26.0% 0.0200 265);
+  --cool-950: oklch(18.0% 0.0200 265);
+
+  /* Theme Colors (Dark Mode) */
+  --accent: var(--brand-400);
+  --accent-foreground: var(--cool-950);
+  --accent-hover: var(--brand-300);
+  --accent-pressed: var(--brand-500);
+  --accent-subtle: color-mix(in oklch, var(--brand-500) 16%, var(--surface));
+  --accent-subtle-foreground: var(--brand-300);
+  --background: var(--cool-950);
+  --border: var(--cool-700);
+  --border-strong: var(--cool-500);
+  --danger: var(--danger-400);
+  --danger-foreground: var(--cool-950);
+  --danger-subtle: color-mix(in oklch, var(--danger-400) 16%, var(--surface));
+  --danger-subtle-foreground: var(--danger-400);
+  --default: var(--cool-800);
+  --default-foreground: var(--cool-50);
+  --field-background: var(--cool-900);
+  --field-border: var(--cool-700);
+  --field-focus: var(--cool-900);
+  --field-foreground: var(--cool-50);
+  --field-placeholder: var(--cool-400);
+  --focus: var(--brand-400);
+  --foreground: var(--cool-50);
+  --muted: var(--cool-400);
+  --overlay: var(--cool-900);
+  --overlay-foreground: var(--cool-50);
+  --scrollbar: var(--cool-600);
+  --segment: var(--cool-700);
+  --segment-foreground: var(--cool-50);
+  --separator: var(--cool-800);
+  --success: var(--success-400);
+  --success-foreground: var(--cool-950);
+  --success-subtle: color-mix(in oklch, var(--success-400) 16%, var(--surface));
+  --success-subtle-foreground: var(--success-400);
+  --surface: var(--cool-900);
+  --surface-foreground: var(--cool-50);
+  --surface-secondary: var(--cool-800);
+  --surface-secondary-foreground: var(--cool-50);
+  --surface-tertiary: var(--cool-700);
+  --surface-tertiary-foreground: var(--cool-50);
+  --warning: var(--warning-400);
+  --warning-foreground: var(--cool-950);
+  --warning-subtle: color-mix(in oklch, var(--warning-400) 16%, var(--surface));
+  --warning-subtle-foreground: var(--warning-400);
+}

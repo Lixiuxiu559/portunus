@@ -7,7 +7,7 @@ import AsyncContent from './AsyncContent';
 import logo from '../assets/logo.png';
 import { useUpdater } from '../hooks/useUpdater';
 import useLiquidNav from '../hooks/useLiquidNav';
-import { getNavBlock } from '../utils/navGuard';
+import { getNavBlock, isNavLocked } from '../utils/navGuard';
 import { preparePage } from '../pageResources';
 import '../workspace.css';
 
@@ -42,6 +42,7 @@ export default function Layout() {
   };
 
   const confirmLeave = () => {
+    if (isNavLocked()) return;
     if (pendingNav) navigate(pendingNav.path);
     setPendingNav(null);
   };
@@ -85,14 +86,14 @@ export default function Layout() {
           <Modal.Dialog>
             <Modal.CloseTrigger />
             <Modal.Header>
-              <Modal.Heading>离开当前页面？</Modal.Heading>
+              <Modal.Heading>{isNavLocked() ? '配置迁移正在处理' : '离开当前页面？'}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <Typography color="muted">{getNavBlock()}，离开将丢弃未保存的内容。</Typography>
+              <Typography color="muted">{getNavBlock()}{isNavLocked() ? '。' : '，离开将丢弃未保存的内容。'}</Typography>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">留在此页</Button>
-              <Button variant="danger" onPress={confirmLeave}>丢弃并离开</Button>
+              {!isNavLocked() && <Button variant="danger" onPress={confirmLeave}>丢弃并离开</Button>}
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

@@ -1,0 +1,66 @@
+{
+  "level": "file-level-risk",
+  "complexity_tools": "not configured; no new tools installed",
+  "crap": null,
+  "go_statement_coverage_percent": 79.8,
+  "go_files": [
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/codec.go",
+      "statements": 49,
+      "covered": 41,
+      "percent": 83.7
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/json.go",
+      "statements": 146,
+      "covered": 117,
+      "percent": 80.1
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/plan.go",
+      "statements": 114,
+      "covered": 103,
+      "percent": 90.4
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/restore.go",
+      "statements": 204,
+      "covered": 152,
+      "percent": 74.5
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/schema.go",
+      "statements": 52,
+      "covered": 42,
+      "percent": 80.8
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/service.go",
+      "statements": 368,
+      "covered": 284,
+      "percent": 77.2
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/snapshot.go",
+      "statements": 114,
+      "covered": 92,
+      "percent": 80.7
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/types.go",
+      "statements": 32,
+      "covered": 25,
+      "percent": 78.1
+    },
+    {
+      "file": "github.com/Lixiuxiu559/portunus/backend/configtransfer/validate.go",
+      "statements": 94,
+      "covered": 80,
+      "percent": 85.1
+    }
+  ],
+  "javascript_scope": "Main migration bridge, renderer adapter/controller/model; excludes JSX",
+  "javascript_line_percent": 96.64,
+  "javascript_branch_percent": 81.44,
+  "mutation_testing": "skipped; no configured toolchain"
+}

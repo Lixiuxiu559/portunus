@@ -1,0 +1,155 @@
+{
+  "date": "2026-11-10",
+  "base": "a6bb26aa7c8b4dade3fab0dbf7c9b49f13fa03c5",
+  "branch": "dev",
+  "sourceManifest": "source-manifest.json",
+  "oldManifestChanges": [
+    "backend/api/config_transfer_test.go",
+    "web/src/main/config-transfer.test.js",
+    "web/src/renderer/api/configTransfer.test.js",
+    "web/src/renderer/components/config-transfer/controller.test.js",
+    "web/src/renderer/components/config-transfer/model.test.js"
+  ],
+  "js": {
+    "reportDir": "web/reports/mutation/js/core/2026-11-10T02-54-05-330Z-a6f989e8",
+    "tool": {
+      "name": "StrykerJS + official TAP runner",
+      "version": "10.1.1",
+      "node": "v24.15.0"
+    },
+    "counts": {
+      "killed": 1365,
+      "survived": 343,
+      "noCoverage": 42,
+      "timeout": 56,
+      "compileError": 0,
+      "runtimeError": 1,
+      "ignored": 0,
+      "pending": 0,
+      "unknown": 0,
+      "total": 1807
+    },
+    "scope": {
+      "mutate": [
+        "src/main/config-transfer.js",
+        "src/renderer/api/configTransfer.js",
+        "src/renderer/components/config-transfer/controller.js",
+        "src/renderer/components/config-transfer/model.js"
+      ],
+      "testFiles": [
+        "src/main/config-transfer.test.js",
+        "src/renderer/api/configTransfer.test.js",
+        "src/renderer/components/config-transfer/controller.test.js",
+        "src/renderer/components/config-transfer/model.test.js"
+      ],
+      "coverageGranularity": "test-file",
+      "concurrency": 2,
+      "excluded": [
+        "bootstrap / main.js / preload.js / sidecar.js 旧代码",
+        "JSX 界面组件"
+      ],
+      "note": "部分测试导入旧代码，但只对 mutate 列出的生产文件生成突变；使用全部默认生产 mutator，包含静态突变，无 dashboard 上传"
+    },
+    "runCompleted": true,
+    "resultComplete": false,
+    "sourceUnchanged": true,
+    "reportSHA256": "8cd30474adae2de07257c948688d2cc215fc567a5c25dbc54560d339850cfe04",
+    "summarySHA256": "b2669fe0b96f6d9c475cb8968246124d1ca8add596a39b5265b1b6694977e6a3"
+  },
+  "go": {
+    "report": "go-summary.json",
+    "counts": {
+      "KILLED": 427,
+      "LIVED": 54,
+      "NOT COVERED": 49,
+      "TIMED OUT": 4,
+      "NOT VIABLE": 57,
+      "SKIPPED": 0,
+      "RUNNABLE": 0
+    },
+    "total": 591,
+    "runCompleted": true,
+    "resultComplete": false,
+    "allKilled": false,
+    "sourceChecksPassed": true,
+    "allProfileSourcesIdentical": true
+  },
+  "finalRunnerCodecStrict": {
+    "reportDir": "tmp/mutation-go/reports/2026-11-10T03-03-46.426Z-codec",
+    "counts": {
+      "KILLED": 28,
+      "LIVED": 0,
+      "NOT COVERED": 0,
+      "TIMED OUT": 0,
+      "NOT VIABLE": 0,
+      "SKIPPED": 0,
+      "RUNNABLE": 0
+    },
+    "exitCode": 0,
+    "workspaceUnchanged": true,
+    "snapshotUnchanged": true,
+    "temporarySourceRemoved": true
+  },
+  "verification": [
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "tests": 336,
+      "passed": 336,
+      "skipped": 0,
+      "log": "/private/tmp/portunus-mutation-web-test.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:renderer",
+      "exitCode": 0
+    },
+    {
+      "command": "env GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly GOCACHE=/private/tmp/portunus-implementation-gocache go test ./... -count=1",
+      "exitCode": 0,
+      "log": "/private/tmp/portunus-mutation-go-test.log"
+    },
+    {
+      "command": "go test -race ./backend/configtransfer ./backend/api",
+      "exitCode": 0,
+      "seconds": {
+        "configtransfer": 93.965,
+        "api": 5.64
+      },
+      "performedBy": "Go implementation subtask"
+    },
+    {
+      "command": "pnpm test:mutation --dry-run",
+      "exitCode": 0,
+      "suites": {
+        "js": 0,
+        "go": 0
+      },
+      "log": "/private/tmp/portunus-mutation-all-dry-run.log"
+    },
+    {
+      "command": "node scripts/mutation-go.mjs codec --strict",
+      "exitCode": 0,
+      "log": "/private/tmp/portunus-mutation-go-codec-strict.log"
+    }
+  ],
+  "quality": {
+    "correctness": {
+      "unresolved": 0,
+      "report": "correctness-review.md"
+    },
+    "standards": {
+      "hardViolations": 0,
+      "judgmentItems": 1,
+      "report": "standards-review.md"
+    },
+    "spec": {
+      "findings": 0,
+      "report": "spec-review.md"
+    }
+  },
+  "conclusion": "已接入并完成指定范围活跃突变；严格全范围门禁未通过。只有Killed计明确检出，超时/编译/运行错误不计入。"
+}

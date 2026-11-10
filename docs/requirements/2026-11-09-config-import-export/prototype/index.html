@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Portunus · 配置迁移交互原型</title>
+  <link rel="stylesheet" href="assets/project-theme.css">
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m10.3 4-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8m-8 4h5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 2M4 16l2 2a7 7 0 0 0 12-1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H4m6-6-6 6 6 6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14a8.5 8.5 0 0 1-10-10A9 9 0 1 0 20 14Z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></symbol>
+    <symbol id="i-channel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6h.01M7 17h.01"/></symbol>
+    <symbol id="i-model" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-group" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="m20 13-7 7a2 2 0 0 1-3 0l-8-8V3h9l9 7a2 2 0 0 1 0 3Z"/><path d="M7 7h.01"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7m-1-6-10 10M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></symbol>
+  </defs></svg>
+
+  <div class="bg-decor" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div id="app" class="app-shell">
+    <header class="app-topbar">
+      <div class="app-topbar-brand"><img src="assets/logo.png" alt=""><span class="brand-name">Portunus</span></div>
+      <nav class="app-top-navigation" aria-label="主导航">
+        <div class="nav-tabs"><button type="button" data-nav="channels">渠道</button><button type="button" data-nav="models">模型</button><button type="button" data-nav="groups">分组</button><button type="button" data-nav="logs">日志</button><button type="button" data-nav="clients">接入</button><button type="button" data-nav="settings" class="selected" aria-current="page">设置</button></div>
+      </nav>
+      <button id="theme-toggle" class="theme-switch" type="button" aria-label="切换到深色" title="切换到深色"><svg class="icon"><use href="#i-sun"/></svg></button>
+    </header>
+    <main class="app-main" id="workspace-content">
+      <div id="settings-page" class="app-page settings-page">
+        <div class="settings-sections">
+          <section class="card settings-card" aria-labelledby="sync-heading">
+            <h2 id="sync-heading" class="settings-section-title">上游模型同步</h2>
+            <div class="settings-rows">
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-label">自动同步间隔（分钟）</span><span class="settings-hint">0 表示关闭自动同步；对所有开启自动同步的渠道生效</span></div><div class="settings-row-actions"><input class="input interval-field" type="number" value="60" readonly aria-label="自动同步间隔（只读上下文）"><button type="button" class="button secondary" data-context>保存</button></div></div>
+              <div class="settings-row"><span class="settings-label">上次同步时间</span><span class="settings-value">2026-11-09 10:32</span></div>
+              <div class="settings-row"><span class="settings-label">立即同步</span><button type="button" class="button primary" data-context><svg class="icon"><use href="#i-refresh"/></svg>立即同步</button></div>
+            </div>
+          </section>
+
+          <section class="card settings-card" id="migration-card" aria-labelledby="migration-heading">
+            <div class="card-heading"><h2 id="migration-heading" class="settings-section-title">配置迁移</h2><span class="tiny muted" id="local-counts">本机现有：2 个渠道 · 4 个模型 · 2 个分组</span></div>
+            <div class="settings-rows">
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-label">导出配置</span><span class="settings-hint">将全部渠道、模型和分组保存为密码保护的文件</span></div><button id="open-export" type="button" class="button secondary"><svg class="icon"><use href="#i-download"/></svg>导出配置</button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-label">导入配置</span><span class="settings-hint">从另一台电脑恢复配置，保留本机现有内容，同名项自动改名</span></div><button id="open-import" type="button" class="button primary"><svg class="icon"><use href="#i-upload"/></svg>导入配置</button></div>
+            </div>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="access-heading"><h2 id="access-heading" class="settings-section-title">服务接入</h2><div class="settings-row"><span class="settings-hint">网关地址、访问令牌、监听范围及 API / 客户端接入示例统一在服务接入页维护。</span><button class="text-button" type="button" data-context>前往服务接入 <span aria-hidden="true">→</span></button></div></section>
+
+          <section class="card settings-card" aria-labelledby="about-heading"><h2 id="about-heading" class="settings-section-title">关于 Portunus</h2><div class="settings-row"><div class="about-info"><button class="text-button" type="button" data-context>github.com/Lixiuxiu559/portunus <svg class="icon small"><use href="#i-external"/></svg></button><span class="settings-hint version-label"><svg class="icon small"><use href="#i-tag"/></svg>当前 v0.5.4</span></div><button type="button" class="button tertiary" data-context><svg class="icon"><use href="#i-refresh"/></svg>检查更新</button></div></section>
+        </div>
+      </div>
+      <div id="groups-page" class="app-page" hidden></div>
+    </main>
+  </div>
+
+  <div id="modal-layer" class="modal-layer" hidden>
+    <section id="dialog" class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-subtitle" tabindex="-1">
+      <header id="dialog-header" class="modal-header"></header>
+      <button id="close-modal" type="button" class="icon-button modal-close" aria-label="关闭弹窗"><svg class="icon"><use href="#i-x"/></svg></button>
+      <div id="dialog-body" class="modal-body"></div>
+      <footer id="dialog-footer" class="modal-footer"></footer>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <aside class="demo-toolbar" aria-label="原型演示控制区">
+    <div class="demo-caption"><span class="demo-dot"></span><strong>交互原型</strong><span class="demo-description">模拟数据与文件操作 · 不读取、不加密、不保存真实配置</span></div>
+    <div class="demo-controls"><span id="demo-message">示例密码：demo1234</span><label class="sr-only" for="scene-select">查看演示状态</label><select id="scene-select">
+      <option value="settings">设置入口</option><optgroup label="导出"><option value="export">导出 · 设置密码</option><option value="exporting">导出 · 进行中</option><option value="exported">导出 · 完成</option><option value="export-error">导出 · 保存失败</option></optgroup>
+      <optgroup label="导入"><option value="import">导入 · 选择文件</option><option value="decrypting">导入 · 校验中</option><option value="preview">导入 · 同名预览</option><option value="no-conflict">导入 · 无同名预览</option><option value="importing">导入 · 进行中</option><option value="success">导入 · 完成</option></optgroup>
+      <optgroup label="异常与边界"><option value="wrong-password">密码错误</option><option value="corrupt">文件损坏</option><option value="version">文件格式不一致</option><option value="invalid">配置校验失败</option><option value="changed">预览后名称被占用</option><option value="rollback">写入失败与全部回滚</option><option value="long">超长文本</option><option value="empty">空配置（规则待定）</option></optgroup>
+    </select><button type="button" id="advance-step" class="demo-button" hidden>完成此步骤</button><button type="button" id="reset-demo" class="demo-button">重置</button><a class="demo-link" href="prototype.md" target="_blank">清单</a></div>
+  </aside>
+  <noscript><div class="noscript-note">本地脚本未启用：可查看设置页布局；启用脚本后可走查弹窗与模拟操作。</div></noscript>
+  <script src="prototype.js"></script>
+</body>
+</html>

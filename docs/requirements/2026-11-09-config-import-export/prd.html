@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Portunus 配置导入导出 · 产品需求文档</title>
+  <style>
+    :root {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #172b41;
+      background: #e9eff5;
+      font-synthesis: none;
+      --bg: #e9eff5;
+      --surface: #ffffff;
+      --surface-2: #f4f7fb;
+      --ink: #172b41;
+      --muted: #5b6c7f;
+      --faint: #8291a2;
+      --accent: #246bfd;
+      --accent-strong: #174eb8;
+      --accent-soft: #e8f0ff;
+      --line: #d6e0ea;
+      --line-strong: #b7c7d8;
+      --success: #14755d;
+      --success-soft: #e4f4ee;
+      --warning: #a46212;
+      --warning-soft: #fff2db;
+      --nav-bg: #102a43;
+      --nav-fg: #f2f7fc;
+      --nav-muted: #9fb4c8;
+      --nav-active-bg: #1d466b;
+      --nav-active-fg: #ffffff;
+      --hero-bg: #f0f5fc;
+      --hero-border: #cbdbea;
+      --table-head: #edf3f9;
+      --code-bg: #102a43;
+      --code-fg: #e8f2ff;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow: 0 18px 54px rgb(16 42 67 / 12%);
+      --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --content-width: 1600px;
+      --sidebar-width: 240px;
+      --section-space: 50px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body { margin: 0; color: var(--ink); background: var(--bg); }
+    a { color: inherit; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .document-page { min-height: 100vh; padding: 32px 24px; }
+    .doc-window {
+      width: 94%;
+      max-width: var(--content-width);
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .doc-layout { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: calc(100vh - 66px); }
+    .doc-sidebar {
+      display: flex;
+      flex-direction: column;
+      padding: 34px 22px 26px;
+      border-right: 1px solid var(--line);
+      color: var(--nav-fg);
+      background: var(--nav-bg);
+    }
+    .doc-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+    .doc-brand-mark {
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid #3b6690;
+      border-radius: var(--radius);
+      color: #ffffff;
+      background: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    .doc-brand-name { display: block; font-size: 13px; font-weight: 750; letter-spacing: -.01em; }
+    .doc-brand-meta { display: block; margin-top: 3px; color: var(--nav-muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .doc-nav-label { margin: 40px 10px 10px; color: var(--nav-muted); font-size: 9px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    .doc-nav { display: grid; gap: 4px; }
+    .doc-nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      color: var(--nav-muted);
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .doc-nav a span { color: var(--nav-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; opacity: .75; }
+    .doc-nav a:hover, .doc-nav a.active { color: var(--nav-active-fg); background: var(--nav-active-bg); }
+    .doc-sidebar-footer { margin-top: auto; padding: 24px 10px 0; border-top: 1px solid #2b4966; color: var(--nav-muted); font-size: 10px; line-height: 1.7; }
+    .doc-content { min-width: 0; padding: 42px clamp(28px, 4.6vw, 64px) 46px; background: var(--surface); }
+    .doc-hero {
+      margin-bottom: 28px;
+      padding: 30px;
+      border: 1px solid var(--hero-border);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius-lg);
+      background: var(--hero-bg);
+    }
+    .doc-eyebrow { margin: 0 0 14px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .doc-hero h1 {
+      max-width: 760px;
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: clamp(34px, 4vw, 48px);
+      font-weight: 750;
+      line-height: 1.16;
+      letter-spacing: -.045em;
+    }
+    .doc-subtitle { max-width: 680px; margin: 15px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .doc-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+    .doc-meta:empty { display: none; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); background: var(--surface); font-size: 10px; font-weight: 650; line-height: 1.4; }
+    .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
+    .badge.accent { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+    .badge.accent::before { background: var(--accent); }
+    .badge.success { color: var(--success); border-color: transparent; background: var(--success-soft); }
+    .badge.success::before { background: var(--success); }
+    .badge.warning { color: var(--warning); border-color: transparent; background: var(--warning-soft); }
+    .badge.warning::before { background: var(--warning); }
+    .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+    .summary-item { padding: 17px 20px; border-right: 1px solid var(--line); }
+    .summary-item:last-child { border-right: 0; }
+    .summary-item span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; }
+    .summary-item strong { display: block; color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .notice { display: grid; grid-template-columns: auto 1fr; gap: 12px; margin-bottom: 30px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); background: var(--surface-2); }
+    .notice.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+    .notice.success { border-left-color: var(--success); background: var(--success-soft); }
+    .notice.after-code { margin-top: 16px; margin-bottom: 0; }
+    .notice-marker { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: 800; }
+    .notice.warning .notice-marker { color: var(--warning); }
+    .notice.success .notice-marker { color: var(--success); }
+    .notice strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .notice p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .doc-section { margin-top: var(--section-space); scroll-margin-top: 24px; }
+    .section-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
+    .section-index { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 18px; font-weight: 650; line-height: 1; }
+    .section-kicker { margin: 0 0 3px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    .section-heading h2 { margin: 0; font-family: var(--font-display); font-size: 21px; line-height: 1.25; letter-spacing: -.025em; }
+    .section-intro { margin: -5px 0 20px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .info-card { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 3px 9px rgb(16 42 67 / 4%); }
+    .info-card.soft { background: var(--surface-2); }
+    .info-card h3 { margin: 0 0 12px; font-size: 13px; line-height: 1.4; }
+    .info-card h3 .card-no { margin-right: 7px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+    .info-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+    .styled-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .styled-list li { position: relative; padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.65; }
+    .styled-list li::before { content: ""; position: absolute; top: .7em; left: 0; width: 7px; height: 2px; background: var(--accent); }
+    .styled-list strong { color: var(--ink); font-weight: 650; }
+    .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    table { width: 100%; min-width: 610px; border-collapse: collapse; font-size: 11px; line-height: 1.65; text-align: left; }
+    caption { text-align: left; }
+    th { padding: 11px 14px; color: var(--muted); background: var(--table-head); font-size: 9px; font-weight: 750; letter-spacing: .04em; white-space: nowrap; }
+    td { padding: 13px 14px; border-top: 1px solid var(--line); color: var(--muted); vertical-align: top; }
+    td strong { color: var(--ink); font-weight: 650; }
+    td:first-child { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .acceptance-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: acceptance; }
+    .acceptance-card { padding: 19px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); counter-increment: acceptance; }
+    .acceptance-card h3 { display: flex; align-items: baseline; gap: 9px; margin: 0 0 13px; font-size: 12px; }
+    .acceptance-card h3::before { content: "AC-0" counter(acceptance); color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
+    .acceptance-card dl { display: grid; grid-template-columns: 58px 1fr; gap: 6px 12px; margin: 0; font-size: 11px; line-height: 1.65; }
+    .acceptance-card dt { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; text-transform: uppercase; }
+    .acceptance-card dd { margin: 0; color: var(--muted); }
+    .question-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+    .question-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: start; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 11px; line-height: 1.65; }
+    .question-list .q-id { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
+    .question-list p { margin: 0; color: var(--muted); }
+    .question-list strong { color: var(--ink); }
+    .question-list .q-impact { color: var(--warning); font-size: 9px; white-space: nowrap; }
+    .decision-table .selected { background: var(--accent-soft); }
+    .decision-table .selected td { border-top-color: var(--accent); border-bottom-color: var(--accent); }
+    .decision-table .selected td:first-child { border-left: 3px solid var(--accent); padding-left: 11px; }
+    .architecture-figure { margin: 0; overflow-x: auto; padding: 26px 22px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+    .diagram-flow { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .diagram-node { flex: 1 1 0; max-width: 120px; min-width: 82px; padding: 13px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--ink); background: var(--surface); font-size: 10px; font-weight: 650; line-height: 1.45; text-align: center; }
+    .diagram-node small { display: block; margin-top: 4px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 7px; font-weight: 500; }
+    .diagram-node.primary { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+    .diagram-arrow { flex: 0 0 auto; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 16px; }
+    .diagram-svg { display: block; width: 100%; min-width: 720px; height: auto; }
+    .diagram-svg .boundary { fill: var(--surface-2); stroke: var(--line); }
+    .diagram-svg .node { fill: var(--surface); stroke: var(--line-strong); }
+    .diagram-svg .node.primary { fill: var(--accent-soft); stroke: var(--accent); }
+    .diagram-svg .edge { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+    .diagram-svg .node-label { fill: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; font-size: 12px; }
+    .diagram-svg .edge-label { fill: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+    .architecture-figure figcaption { margin-top: 18px; color: var(--faint); font-size: 9px; line-height: 1.6; text-align: center; }
+    .diagram-source { margin-top: 14px; color: var(--muted); font-size: 10px; }
+    .diagram-source pre { margin-top: 10px; }
+    .code-label { margin: 0 0 8px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    pre { max-width: 100%; margin: 0; overflow-x: auto; padding: 20px; border-radius: var(--radius); color: var(--code-fg); background: var(--code-bg); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; line-height: 1.8; tab-size: 2; }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    :not(pre) > code { padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--accent-strong); background: var(--accent-soft); font-size: .9em; overflow-wrap: anywhere; }
+    pre code { padding: 0; border: 0; color: inherit; background: transparent; font-size: inherit; }
+    .test-details { margin-bottom: 12px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .test-details summary { display: grid; grid-template-columns: 50px 1fr auto; gap: 12px; align-items: center; padding: 16px 18px; cursor: pointer; list-style: none; }
+    .test-details summary::-webkit-details-marker { display: none; }
+    .test-details summary::after { content: "+"; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 16px; }
+    .test-details[open] summary::after { content: "−"; }
+    .test-details summary .test-id { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; font-weight: 700; }
+    .test-details summary strong { font-size: 11px; font-weight: 650; }
+    .test-body { padding: 0 18px 18px 80px; }
+    .test-body dl { display: grid; grid-template-columns: 74px 1fr; gap: 9px 14px; margin: 0; padding-top: 15px; border-top: 1px solid var(--line); font-size: 10px; line-height: 1.7; }
+    .test-body dt { color: var(--faint); }
+    .test-body dd { margin: 0; color: var(--muted); }
+    .test-body strong { color: var(--ink); }
+    .doc-footer { display: flex; justify-content: space-between; gap: 20px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--faint); font-size: 9px; line-height: 1.6; }
+
+    @media (max-width: 1100px) {
+      .doc-content { padding-inline: 32px; }
+      .diagram-flow { flex-wrap: wrap; }
+    }
+    @media (max-width: 760px) {
+      html { scroll-padding-top: 12px; }
+      .document-page { padding: 12px 10px 24px; }
+      .doc-window { width: 100%; }
+      .doc-layout { grid-template-columns: 1fr; min-height: 0; }
+      .doc-sidebar { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .doc-nav-label { margin: 22px 0 8px; }
+      .doc-nav { display: flex; flex-wrap: wrap; gap: 5px; }
+      .doc-nav a { padding: 7px 9px; }
+      .doc-sidebar-footer { display: none; }
+      .doc-content { padding: 24px 20px 32px; }
+      .doc-hero { padding: 24px 20px; }
+      .doc-hero h1 { font-size: 34px; }
+      .summary-strip { grid-template-columns: 1fr; }
+      .summary-item { padding: 12px 15px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary-item:last-child { border-bottom: 0; }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+      .question-list li { grid-template-columns: 38px 1fr; }
+      .question-list .q-impact { grid-column: 2; }
+      .test-details summary { grid-template-columns: 42px 1fr auto; padding-inline: 14px; }
+      .test-body { padding: 0 14px 16px; }
+      .test-body dl { grid-template-columns: 1fr; gap: 3px; }
+      .test-body dd { margin-bottom: 8px; }
+      .doc-footer { display: block; }
+    }
+    @media (max-width: 560px) {
+      .diagram-flow { flex-direction: column; }
+      .diagram-node { width: 100%; max-width: none; }
+      .diagram-arrow { transform: rotate(90deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
+    @media print {
+      :root {
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #ffffff;
+        --ink: #111111;
+        --muted: #444444;
+        --faint: #666666;
+        --accent: #222222;
+        --accent-strong: #111111;
+        --accent-soft: #f2f2f2;
+        --line: #cccccc;
+        --line-strong: #999999;
+        --success: #222222;
+        --success-soft: #f4f4f4;
+        --warning: #222222;
+        --warning-soft: #f4f4f4;
+        --hero-bg: #ffffff;
+        --hero-border: #bbbbbb;
+        --table-head: #f2f2f2;
+        --code-bg: #f4f4f4;
+        --code-fg: #111111;
+        --shadow: none;
+      }
+      body { background: #ffffff; }
+      .document-page { min-height: 0; padding: 0; }
+      .doc-sidebar { display: none; }
+      .doc-window { max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+      .doc-layout { display: block; min-height: 0; }
+      .doc-content { padding: 0; }
+      .doc-section, .info-card, .acceptance-card, .test-details, .architecture-figure { break-inside: avoid; }
+      .test-details:not([open]) > *:not(summary) { display: block !important; }
+      .test-details summary::after { display: none; }
+      a { text-decoration: none; }
+      .diagram-svg { min-width: 0; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    }
+
+    .doc-section > p { color: var(--muted); font-size: 13px; line-height: 1.85; }
+    .doc-section > h3 { margin: 24px 0 12px; font-size: 15px; }
+    .doc-section > .two-col, .doc-section > .table-wrap { margin-top: 20px; }
+    .doc-section .notice { margin-top: 22px; }
+    .acceptance-card h3::before { content: none; }
+    .acceptance-card h3 a { color: var(--ink); text-decoration: none; }
+    .acceptance-card h3 a:hover { color: var(--accent); }
+    #rules table { min-width: 870px; table-layout: fixed; }
+    #rules th:nth-child(1) { width: 8%; }
+    #rules th:nth-child(2) { width: 11%; }
+    #rules th:nth-child(3) { width: 15%; }
+    #rules th:nth-child(4) { width: 53%; }
+    #rules th:nth-child(5) { width: 13%; }
+    #rules td:nth-child(4) { min-width: 340px; }
+    #rules td:nth-child(3) { min-width: 130px; }
+    #rules td:last-child { min-width: 105px; }
+    #evidence td:last-child { overflow-wrap: anywhere; }
+    @media print {
+      .doc-window { width: 100%; }
+      .doc-section { break-inside: auto; }
+      .table-wrap { overflow: visible; border-radius: 0; }
+      table, #rules table { min-width: 0; table-layout: fixed; }
+      th { white-space: normal; }
+      td, td:first-child { overflow-wrap: anywhere; white-space: normal; }
+      #rules td:nth-child(4), #rules td:nth-child(3), #rules td:last-child { min-width: 0; }
+      tr, .section-heading { break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
+  </style>
+</head>
+<body data-document-type="prd">
+  <article class="document-page">
+    <div class="doc-window">
+      <div class="doc-layout">
+        <aside class="doc-sidebar">
+          <a class="doc-brand" href="#document-overview">
+            <span class="doc-brand-mark">P</span>
+            <span><span class="doc-brand-name">Portunus</span><span class="doc-brand-meta">产品需求文档</span></span>
+          </a>
+          <p class="doc-nav-label">文档导航</p>
+          <nav class="doc-nav" aria-label="文档章节"><a href="#goals"><span>01</span>问题、目标与用户故事</a><a href="#scope"><span>02</span>迁移范围与使用边界</a><a href="#decisions"><span>03</span>已确认的业务决策</a><a href="#flows"><span>04</span>用户流程与状态</a><a href="#rules"><span>05</span>功能需求与业务规则</a><a href="#exceptions"><span>06</span>异常分支与提示</a><a href="#acceptance"><span>07</span>验收标准</a><a href="#constraints"><span>08</span>体验、依赖与取舍</a><a href="#open-items"><span>09</span>假设与非阻塞开放项</a><a href="#evidence"><span>10</span>依据与现状事实</a></nav>
+          <div class="doc-sidebar-footer">渠道 · 模型 · 分组<br>配置迁移需求<br>2026-11-09</div>
+        </aside>
+        <main class="doc-content" id="document-overview">
+          <header class="doc-hero">
+            <p class="doc-eyebrow">PORTUNUS / CONFIGURATION MIGRATION</p>
+            <h1>配置导入与导出</h1>
+            <p class="doc-subtitle">把已配置好的渠道、模型与分组迁移到另一台电脑，保留上游连接和路由关系。迁移文件使用密码保护，导入前预览新增内容与改名结果。</p>
+            <div class="doc-meta"><span class="badge accent">基于已确认共识的评审稿</span><span class="badge">首版格式 1</span><span class="badge">功能未实现</span></div>
+          </header>
+          <div class="summary-strip"><div class="summary-item"><span>导出</span><strong>全量 · 密码加密</strong></div><div class="summary-item"><span>导入</span><strong>合并新增 · 同名改名</strong></div><div class="summary-item"><span>完成条件</span><strong>先预览 · 全部成功</strong></div></div>
+          <div class="notice"><span class="notice-marker">文档状态</span><div><strong>核心业务决策已确认，本文为 PRD 评审稿</strong><p>最终兼容规则：文件格式版本必须一致，应用版本仅记录。主流程无阻塞分歧；入口、命名、空包与输入限制见开放项。本文未开展代码实施。</p></div></div>
+          <section class="doc-section" id="goals" aria-labelledby="goals-title"><div class="section-heading"><span class="section-index">01</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="goals-title">问题、目标与用户故事</h2></div></div><p class="section-intro">使用方是在多台电脑使用 Portunus 的现有用户。本期目标是减少重复配置，而非同步整个应用环境。</p>
+<p>用户已经在一台电脑完成渠道、模型和分组配置，希望在另一台电脑继续使用，避免重新填写上游连接信息、重新选择模型、重新建立分组及路由顺序。迁移由用户主动导出文件，再带到目标电脑导入。</p>
+<div class="two-col"><div class="info-card"><h3>目标结果</h3><ul class="styled-list"><li>通过一个密码加密文件恢复三类配置及其关联。</li><li>目标电脑已有配置保留；导入内容按新增处理。</li><li>确认写入前可查看数量和同名项的新名称。</li><li>失败时没有本次导入留下的残缺配置。</li></ul></div><div class="info-card soft"><h3>“可以正常使用”的定义</h3><p>配置可被目标应用完整读取和管理；渠道保留生成调用所需的连接信息，模型归属和分组路由语义正确。导入成功表示配置恢复完成。真实上游是否可达、凭据是否仍有效以及目标网络是否可用，不属于导入成功的保证。</p></div></div>
+<div class="table-wrap"><table><caption class="sr-only">用户故事</caption><thead><tr><th scope="col">标识</th><th scope="col">用户故事</th><th scope="col">可观察结果</th></tr></thead><tbody><tr id="US-01"><td>US-01</td><td>一次导出全部已保存的配置。</td><td>一个文件包含全部渠道、模型、分组及其关联。</td></tr><tr id="US-02"><td>US-02</td><td>导入时保留目标电脑原有配置。</td><td>现有对象不被覆盖；同名导入项以新名称新增。</td></tr><tr id="US-03"><td>US-03</td><td>迁移文件中的上游密钥受到保护。</td><td>必须提供正确密码才能读取配置；预览和错误不泄露密钥。</td></tr><tr id="US-04"><td>US-04</td><td>写入前检查，失败后能重新尝试。</td><td>预览后才写入；任何失败均整次取消并说明原因。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="scope" aria-labelledby="scope-title"><div class="section-heading"><span class="section-index">02</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="scope-title">迁移范围与使用边界</h2></div></div><p class="section-intro">用户限定导入导出的对象为渠道、模型、分组。渠道指生成调用的连接配置，不等同于整个应用及全部渠道附属功能。</p><div class="table-wrap"><table><caption class="sr-only">迁移范围</caption><thead><tr><th scope="col">对象</th><th scope="col">本期恢复内容</th><th scope="col">结果要求</th></tr></thead><tbody><tr><td>渠道</td><td>名称、图标、厂商与配置档标识、连接适配能力、协议、基础地址、完整上游凭据和连接选项；自动同步、thinking 兼容、渠道并发和限流范围等渠道级设置。</td><td>保留已保存的有效配置；不得重新套用厂商默认值而改变连接行为。原本允许为空的合法字段仍可为空。</td></tr><tr><td>模型</td><td>全部已保存的模型名称及所属渠道，包括尚未加入分组的模型。</td><td>保留用于上游调用的原始模型名；不能因渠道或分组改名而改写。</td></tr><tr><td>分组</td><td>对外名称、manual / failover 策略、成员、当前激活模型和备用顺序。</td><td>跨渠道成员保持归属；相同优先级成员也保持源端实际先后顺序。</td></tr><tr><td>文件信息</td><td>文件格式版本 <code>format_version</code> 与导出应用版本 <code>app_version</code>。</td><td>首版格式为 <code>1</code>；应用版本用于显示来源，不要求与目标端相等。</td></tr></tbody></table></div>
+<h3>本期范围外</h3><ul class="styled-list"><li>选择性导出、明文导出、覆盖更新、同名复用、去重同步、跨格式转换和云端自动同步。</li><li>Portunus 服务接入 Key、本机监听地址与端口、全局网关和代理设置、客户端配置文件、应用偏好、数据库与安装路径。</li><li>调用记录、用量历史、临时限流与熔断状态；独立余额／额度查询来源、其专用凭据和查询缓存。</li><li>历史计价字段和费用计算，不属于当前活跃配置的迁移范围。</li></ul>
+<div class="notice"><span class="notice-marker">接入边界</span><div><strong>新电脑使用自己的接入信息</strong><p>客户端使用目标电脑的地址和服务接入 Key。若导入分组因同名而改名，客户端需要使用改名后的分组名称；原有分组的调用名称保持原样。</p></div></div>
+</section>
+<section class="doc-section" id="decisions" aria-labelledby="decisions-title"><div class="section-heading"><span class="section-index">03</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="decisions-title">已确认的业务决策</h2></div></div><p class="section-intro">八项决策来自本次逐项讨论，用户已确认总体共识。本文的验收细化另行标明，不将整份 PRD 表述为已批准。</p><div class="table-wrap"><table><caption class="sr-only">已确认决策</caption><thead><tr><th scope="col">标识</th><th scope="col">决策</th><th scope="col">边界</th></tr></thead><tbody><tr id="D-01"><td>D-01</td><td>全量导出</td><td>一次包含所有渠道、模型、分组及其关联配置。</td></tr><tr id="D-02"><td>D-02</td><td>密码加密</td><td>导出时设置密码；导入时输入密码；没有明文模式。</td></tr><tr id="D-03"><td>D-03</td><td>合并新增</td><td>保留目标端原有配置；本次导入的所有对象均作为新增。</td></tr><tr id="D-04"><td>D-04</td><td>同名自动改名</td><td>渠道、分组重名时使用新名称；保持导入内容之间的关联。重复导入继续按新增处理。</td></tr><tr id="D-05"><td>D-05</td><td>格式版本必须一致</td><td>首版只接受格式 1；应用版本可以不同；不做跨格式转换。</td></tr><tr id="D-06"><td>D-06</td><td>完整离线校验</td><td>检查字段、关联与路由设置，不自动请求上游决定能否导入。</td></tr><tr id="D-07"><td>D-07</td><td>全部成功或全部回滚</td><td>任何配置无效或写入失败，取消整次导入，并说明原因。</td></tr><tr id="D-08"><td>D-08</td><td>先预览、再确认</td><td>显示三类新增数量和改名清单，用户确认后才写入。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="flows" aria-labelledby="flows-title"><div class="section-heading"><span class="section-index">04</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="flows-title">用户流程与状态</h2></div></div><p class="section-intro">流程描述用户能观察到的行为；具体页面布局、接口和加密实现由后续设计确定。</p><h3>导出</h3><figure class="architecture-figure"><div class="diagram-flow"><div class="diagram-node">发起全部导出</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node">设置文件密码</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node">选择保存位置</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node primary">保存加密文件</div></div><figcaption>完成后取得一个完整迁移文件；取消保存或保存失败时，不显示导出成功。</figcaption></figure><p>发起导出时说明包含上游凭据和三类配置范围。成功反馈显示导出数量和保存结果；导出操作不修改源端配置。</p><h3>导入</h3><figure class="architecture-figure"><div class="diagram-flow"><div class="diagram-node">选择文件<br>输入密码</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node">解密与完整校验</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node">预览数量<br>与改名结果</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node">确认导入</div><span class="diagram-arrow" aria-hidden="true">→</span><div class="diagram-node primary">展示完成结果</div></div><figcaption>选文件、解密、校验和预览均不新增或修改三类业务配置；只有确认导入才开始写入。</figcaption></figure><div class="table-wrap"><table><caption class="sr-only">导入状态</caption><thead><tr><th scope="col">状态</th><th scope="col">界面行为</th><th scope="col">数据结果</th></tr></thead><tbody><tr><td>未选择文件</td><td>选择本地导出文件。</td><td>不改变配置。</td></tr><tr><td>解密／校验中</td><td>显示处理状态，防止同次操作被重复发起。</td><td>不能提前确认写入。</td></tr><tr><td>待确认</td><td>展示来源应用版本、文件格式、三类新增数量及全部原名／新名。</td><td>可以取消；尚未写入。</td></tr><tr><td>导入中</td><td>显示正在导入，防止重复确认。</td><td>不提前显示成功。</td></tr><tr><td>成功</td><td>显示实际新增数量和最终改名结果；相关列表可见新增项。</td><td>本次全部对象与关联完整恢复。</td></tr><tr><td>失败</td><td>显示阶段、原因及可操作的修正方向。</td><td>不遗留本次部分配置，保留原有项。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="rules" aria-labelledby="rules-title"><div class="section-heading"><span class="section-index">05</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="rules-title">功能需求与业务规则</h2></div></div><p class="section-intro">规则可用于后续设计及验收引用。加密算法、文件物理结构、接口、模块与数据保存方式不在本文定义。</p><div class="table-wrap"><table><caption class="sr-only">规则与验收映射</caption><thead><tr><th scope="col">标识</th><th scope="col">需求</th><th scope="col">依据</th><th scope="col">可观察规则</th><th scope="col">验收</th></tr></thead><tbody><tr id="FR-01"><td>FR-01</td><td>导出完整性</td><td>D-01</td><td>导出全部已保存的三类配置，包含未被分组引用的渠道和模型。文件内关联必须自洽，不能把缺失关联对象的文件作为成功导出结果。保留源端合法状态，不为迁移擅自同步模型或调整路由。</td><td>AC-01～03</td></tr><tr id="FR-02"><td>FR-02</td><td>密码与凭据</td><td>D-02；保护目标的细化</td><td>导出密码不能为空；需要正确密码才能解密。文件不暴露完整连接凭据；预览、结果、日志和错误不得回显密码或原始密钥。解密失败或文件损坏时停止导入；不提供绕过密码的恢复入口。密码强度细节见开放项。</td><td>AC-04～06</td></tr><tr id="FR-03"><td>FR-03</td><td>格式版本</td><td>D-05</td><td>文件具有有效的 format_version 及 app_version 记录。首版只接受格式 1；格式缺失、非法、大于或小于 1 均拒绝，不转换。格式相同且内容通过校验时，不能因应用版本不同而拦截。</td><td>AC-07、08</td></tr><tr id="FR-04"><td>FR-04</td><td>字段与能力</td><td>D-06、D-07</td><td>检查文件类型与完整性、必要字段、类型与取值、唯一性，以及目标端支持的连接能力和路由策略。遵循目标应用现有业务规则，不将原本合法的空凭据额外判错。同格式下若存在影响连接或路由的未知能力，也须整次拒绝，不能静默忽略或降级。</td><td>AC-06、08、09</td></tr><tr id="FR-05"><td>FR-05</td><td>关联与路由</td><td>D-01、D-04、D-06</td><td>模型归属文件中的正确渠道，成员引用文件中的正确模型；保留当前激活模型和完整备用顺序。不要求保留内部编号，但不能误关联目标端已有同名项。文件内部重复对象或歧义引用须报错，不能借目标端重名规则掩盖。</td><td>AC-02、03、09、10</td></tr><tr id="FR-06"><td>FR-06</td><td>合并与改名</td><td>D-03、D-04</td><td>所有导入对象均新增；原有配置不变。渠道与分组重名时生成符合现有命名规则的唯一名称，兼顾目标端已有名称与本次其他导入项。不能改写上游模型名。重复导入不按名称、凭据或文件去重或复用。具体后缀不在本 PRD 固定。</td><td>AC-10～12</td></tr><tr id="FR-07"><td>FR-07</td><td>预览与确认</td><td>D-08；预览承诺的细化</td><td>确认前展示来源应用版本、格式版本、三类预计新增数量，以及全部原名／新名；无需显示原始凭据。用户确认的范围和名称应与实际一致。若目标配置变化使预览名称不可用，应更新预览并再次确认，不能静默更名或覆盖。取消、换文件和解密失败不写入。</td><td>AC-13～15</td></tr><tr id="FR-08"><td>FR-08</td><td>原子结果</td><td>D-07；完成语义的细化</td><td>本次全部对象和关联成功后才显示成功。任何校验或写入失败均取消整次导入，不保留部分成功项，不影响操作前已有配置。错误定位阶段及对象／字段（可识别时），不泄露秘密。成功后列表展示新增内容和最终名称。</td><td>AC-09、16、17</td></tr><tr id="FR-09"><td>FR-09</td><td>离线处理</td><td>D-06；可用性边界</td><td>导入流程不主动触发模型发现、生成测试或余额查询，不以网络可达为完成条件；之后用户可用现有渠道验证能力自行检查。导入后正常后台调度仍遵循保留的渠道设置和本机设置，不承诺整个应用从此没有网络请求。</td><td>AC-18</td></tr><tr id="FR-10"><td>FR-10</td><td>范围与隔离</td><td>用户限定范围；项目边界</td><td>不替换服务接入 Key、监听设置、全局网关设置或客户端文件；不迁移日志、独立余额来源和临时运行状态。保留现有本机管理权限边界，不为迁移开放远程管理能力。</td><td>AC-19、20</td></tr><tr id="FR-11"><td>FR-11</td><td>操作完成反馈</td><td>D-01、D-02；体验细化</td><td>导出读取、生成或保存失败及用户取消时，不显示成功，不将不完整文件作为迁移成果。导出不修改源配置。导入中防止重复确认造成额外副本；成功和失败应明确区分。</td><td>AC-01、17</td></tr></tbody></table></div></section>
+<section class="doc-section" id="exceptions" aria-labelledby="exceptions-title"><div class="section-heading"><span class="section-index">06</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="exceptions-title">异常分支与提示</h2></div></div><p class="section-intro">错误信息应帮助用户修正问题；“配置恢复完成”不能展示为“所有上游调用均成功”。</p><div class="table-wrap"><table><caption class="sr-only">异常处理</caption><thead><tr><th scope="col">异常或边界</th><th scope="col">反馈要求</th><th scope="col">数据结果</th></tr></thead><tbody><tr><td>密码错误或无法解密</td><td>提示无法解密，可检查密码或更换文件；不展示配置明文。</td><td>不写入。</td></tr><tr><td>损坏或非受支持文件</td><td>说明文件不可读／不完整，建议重新选择或导出。</td><td>不部分解析后继续写入。</td></tr><tr><td>格式版本不一致</td><td>可识别时显示文件格式与本应用支持的格式，说明需使用支持该格式的 Portunus；不笼统承诺升级一定解决旧格式问题。</td><td>不转换、不写入。</td></tr><tr><td>字段无效、能力不支持、关联缺失</td><td>可识别时指出对象、字段与原因，不能携带秘密值。</td><td>整次拒绝，不能跳过无效项。</td></tr><tr><td>确认前名称已被占用</td><td>更新预览并重新确认。</td><td>不静默改名或覆盖。</td></tr><tr><td>写入失败</td><td>说明未完成，整次导入已取消，可修正后重试。</td><td>没有部分配置遗留。</td></tr><tr><td>相同文件重复导入</td><td>按新增处理，预览显示新的副本及改名结果。</td><td>不更新或复用已有项。</td></tr><tr><td>上游暂时离线</td><td>文件和配置合法时仍可导入，只报告配置恢复完成。</td><td>不单独因离线拒绝。</td></tr></tbody></table></div></section>
+<section class="doc-section" id="acceptance" aria-labelledby="acceptance-title"><div class="section-heading"><span class="section-index">07</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="acceptance-title">验收标准</h2></div></div><p class="section-intro">下列是可观察的验收条件，不是测试代码或已执行的验证结果。覆盖正常、失败与边界路径。</p><ol class="acceptance-list"><li class="acceptance-card" id="AC-01"><h3><a href="#AC-01">AC-01 · 全量导出且源端不变</a></h3><dl><dt>关联规则</dt><dd>FR-01、FR-11</dd><dt>前置</dt><dd>源端有多个渠道、全部已保存模型以及跨渠道分组。</dd><dt>操作</dt><dd>设置密码并完成全量导出。</dd><dt>结果</dt><dd>取得一个可正确解密的完整文件，三类数量对应源端保存内容，源端配置未变化。</dd></dl></li><li class="acceptance-card" id="AC-02"><h3><a href="#AC-02">AC-02 · 空目标恢复手动分组</a></h3><dl><dt>关联规则</dt><dd>FR-01、FR-05</dd><dt>前置</dt><dd>源端有多个渠道、同名上游模型及激活非首项的 manual 分组，目标端没有三类配置。</dd><dt>操作</dt><dd>导入有效文件并确认。</dd><dt>结果</dt><dd>名称及归属恢复，当前激活项对应源端，完整上游凭据保留，无需重新填写。</dd></dl></li><li class="acceptance-card" id="AC-03"><h3><a href="#AC-03">AC-03 · 备用顺序保持</a></h3><dl><dt>关联规则</dt><dd>FR-01、FR-05</dd><dt>前置</dt><dd>failover 分组包含相同优先级的成员。</dd><dt>操作</dt><dd>导出后在目标端导入。</dd><dt>结果</dt><dd>成员展示与配置的实际先后顺序对应源端，不能因内部编号变化交换同优先级成员。</dd></dl></li><li class="acceptance-card" id="AC-04"><h3><a href="#AC-04">AC-04 · 密码保护与完整连接</a></h3><dl><dt>关联规则</dt><dd>FR-02</dd><dt>前置</dt><dd>源端含完整上游密钥和非默认连接选项。</dd><dt>操作</dt><dd>先查看未解密文件，再用正确密码导入。</dd><dt>结果</dt><dd>文件未暴露完整凭据，导入恢复已保存连接配置，预览、结果及错误无原始密钥和密码。</dd></dl></li><li class="acceptance-card" id="AC-05"><h3><a href="#AC-05">AC-05 · 空密码和错误密码</a></h3><dl><dt>关联规则</dt><dd>FR-02</dd><dt>前置</dt><dd>有一个有效加密文件。</dd><dt>操作</dt><dd>导出时不填密码，或导入时输入错误密码。</dd><dt>结果</dt><dd>空密码不能完成导出；错误密码不能进入有效预览和写入，目标不变且可重新尝试。</dd></dl></li><li class="acceptance-card" id="AC-06"><h3><a href="#AC-06">AC-06 · 文件损坏</a></h3><dl><dt>关联规则</dt><dd>FR-02、FR-04</dd><dt>前置</dt><dd>目标已有配置，文件被截断、损坏或并非受支持的导出文件。</dd><dt>操作</dt><dd>尝试导入。</dd><dt>结果</dt><dd>提示文件或解密失败，不显示成功，不产生新增项，也不泄露秘密。</dd></dl></li><li class="acceptance-card" id="AC-07"><h3><a href="#AC-07">AC-07 · 应用版本不同、格式相同</a></h3><dl><dt>关联规则</dt><dd>FR-03</dd><dt>前置</dt><dd>文件格式为 1，来源应用版本不同，但内容均受目标支持且合法。</dd><dt>操作</dt><dd>预览并确认。</dd><dt>结果</dt><dd>展示来源应用版本，不能因应用版本差异拦截，最终完整导入。</dd></dl></li><li class="acceptance-card" id="AC-08"><h3><a href="#AC-08">AC-08 · 格式或能力不支持</a></h3><dl><dt>关联规则</dt><dd>FR-03、FR-04</dd><dt>前置</dt><dd>格式缺失、非法、为 0／2，或格式为 1 但含目标端不支持的连接能力／路由设置。</dd><dt>操作</dt><dd>尝试导入。</dd><dt>结果</dt><dd>整次拒绝并说明可识别原因；不转换格式，不静默忽略或降级能力。</dd></dl></li><li class="acceptance-card" id="AC-09"><h3><a href="#AC-09">AC-09 · 无效字段或断裂关联</a></h3><dl><dt>关联规则</dt><dd>FR-04、FR-05、FR-08</dd><dt>前置</dt><dd>文件有非法字段、内部重复／歧义对象、模型缺少渠道、成员缺少模型或非法激活成员。</dd><dt>操作</dt><dd>尝试导入。</dd><dt>结果</dt><dd>指出可识别的问题，整次不写入；合法空字段不被额外判错。</dd></dl></li><li class="acceptance-card" id="AC-10"><h3><a href="#AC-10">AC-10 · 同名新增及关联</a></h3><dl><dt>关联规则</dt><dd>FR-05、FR-06</dd><dt>前置</dt><dd>目标有同名渠道和分组，且已有渠道的地址或密钥与文件不同。</dd><dt>操作</dt><dd>预览并确认导入。</dd><dt>结果</dt><dd>原有项不变，导入项用唯一新名称，导入分组仍只关联本次对应模型与渠道，不误用已有同名渠道的密钥。</dd></dl></li><li class="acceptance-card" id="AC-11"><h3><a href="#AC-11">AC-11 · 连续名称冲突</a></h3><dl><dt>关联规则</dt><dd>FR-06</dd><dt>前置</dt><dd>原名称和若干候选改名已被占用，文件内也有可能与生成名冲突的对象。</dd><dt>操作</dt><dd>预览并导入。</dd><dt>结果</dt><dd>全部拟用名称合法唯一，最终名称与预览一致，上游模型名不变。</dd></dl></li><li class="acceptance-card" id="AC-12"><h3><a href="#AC-12">AC-12 · 重复导入</a></h3><dl><dt>关联规则</dt><dd>FR-06</dd><dt>前置</dt><dd>同一文件已导入成功一次。</dd><dt>操作</dt><dd>再次选择、预览并确认导入。</dd><dt>结果</dt><dd>产生另一套新增配置，同名继续改名，已有配置不更新；预览数量与新增副本一致。</dd></dl></li><li class="acceptance-card" id="AC-13"><h3><a href="#AC-13">AC-13 · 预览完整且不写入</a></h3><dl><dt>关联规则</dt><dd>FR-07</dd><dt>前置</dt><dd>有效文件已解密并通过校验。</dd><dt>操作</dt><dd>停留在预览。</dd><dt>结果</dt><dd>可查看来源应用版本、格式、三类数量和全部原名／新名；此时没有新增或修改三类配置。</dd></dl></li><li class="acceptance-card" id="AC-14"><h3><a href="#AC-14">AC-14 · 取消或换文件</a></h3><dl><dt>关联规则</dt><dd>FR-07</dd><dt>前置</dt><dd>处于选文件、输入密码或预览阶段。</dd><dt>操作</dt><dd>取消流程，或改用另一文件。</dd><dt>结果</dt><dd>不改变配置，不能把旧预览误提交为新文件的结果。</dd></dl></li><li class="acceptance-card" id="AC-15"><h3><a href="#AC-15">AC-15 · 预览后名称被占用</a></h3><dl><dt>关联规则</dt><dd>FR-07</dd><dt>前置</dt><dd>预览的新名称可用，随后目标端创建了同名对象。</dd><dt>操作</dt><dd>尝试确认原预览。</dd><dt>结果</dt><dd>不覆盖或静默改名写入；更新预览，再次确认后才能导入。</dd></dl></li><li class="acceptance-card" id="AC-16"><h3><a href="#AC-16">AC-16 · 写入中途失败</a></h3><dl><dt>关联规则</dt><dd>FR-08</dd><dt>前置</dt><dd>预检通过，但写入阶段出现失败。</dd><dt>操作</dt><dd>操作结束后查看三类配置。</dd><dt>结果</dt><dd>没有任何本次新增对象或关联遗留，操作前配置保留，提示失败而非部分成功。</dd></dl></li><li class="acceptance-card" id="AC-17"><h3><a href="#AC-17">AC-17 · 完成反馈和重复确认</a></h3><dl><dt>关联规则</dt><dd>FR-08、FR-11</dd><dt>前置</dt><dd>一次导入正在执行，或导出保存取消／失败。</dd><dt>操作</dt><dd>重复点击导入确认，或结束失败的导出。</dd><dt>结果</dt><dd>同一次确认不产生两套副本；只有全部完成才显示成功及实际数量。失败／取消的导出不显示成功。</dd></dl></li><li class="acceptance-card" id="AC-18"><h3><a href="#AC-18">AC-18 · 离线导入</a></h3><dl><dt>关联规则</dt><dd>FR-09</dd><dt>前置</dt><dd>目标无法访问上游，但文件完整、字段及关联合法。</dd><dt>操作</dt><dd>解密、预览并确认导入。</dd><dt>结果</dt><dd>不因离线拦截，流程不主动触发模型同步、生成测试或余额查询，成功文案仅表示配置恢复完成。</dd></dl></li><li class="acceptance-card" id="AC-19"><h3><a href="#AC-19">AC-19 · 目标本机设置保持</a></h3><dl><dt>关联规则</dt><dd>FR-10</dd><dt>前置</dt><dd>目标已有服务接入 Key、监听设置、全局网关设置和客户端文件。</dd><dt>操作</dt><dd>完成导入。</dd><dt>结果</dt><dd>这些设置与文件保持原值；接入时使用目标地址、服务 Key 和最终分组名。</dd></dl></li><li class="acceptance-card" id="AC-20"><h3><a href="#AC-20">AC-20 · 范围外数据保持</a></h3><dl><dt>关联规则</dt><dd>FR-10</dd><dt>前置</dt><dd>源端含调用历史、旧计价值、独立余额来源／缓存和临时运行状态。</dd><dt>操作</dt><dd>导出并导入。</dd><dt>结果</dt><dd>不迁移这些源端数据，目标已有此类数据不变，本机管理权限边界未放宽。</dd></dl></li></ol></section>
+<section class="doc-section" id="constraints" aria-labelledby="constraints-title"><div class="section-heading"><span class="section-index">08</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="constraints-title">体验、依赖与取舍</h2></div></div><p class="section-intro">由加密、完整恢复和预览确认目标推导的验收细化，不扩展为技术实现方案。</p>
+<ul class="styled-list"><li><strong>操作可理解：</strong>处理、预览、成功和失败状态清晰；结果中的渠道／模型／分组数量口径一致。</li><li><strong>凭据最少暴露：</strong>密码保护文件，预览与错误只提供定位问题所需信息。</li><li><strong>不依赖上游响应：</strong>用户持有文件和密码即可进行配置迁移；后续真实调用仍依赖上游、凭据与网络。</li><li><strong>性能数字不编造：</strong>尚无确认的文件大小、数量上限或时延目标；后续若引入可见限制，须说明限制值、超限反馈并补充边界验收。</li></ul>
+<div class="two-col"><div class="info-card"><h3>已接受的取舍</h3><p>合并新增保护已有配置，但重复导入会产生副本；分组改名可能需要调整客户端 model 名称。严格要求格式一致，首版无需跨格式转换，但其他格式须由支持它的应用处理。</p></div><div class="info-card soft"><h3>恢复配置与运行表现</h3><p>目标端全局超时、重试和代理设置仍由本机决定。本期承诺配置完整、关联正确和路由语义恢复，不承诺两台电脑的全部运行表现完全相同。</p></div></div>
+</section>
+<section class="doc-section" id="open-items" aria-labelledby="open-items-title"><div class="section-heading"><span class="section-index">09</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="open-items-title">假设与非阻塞开放项</h2></div></div><p class="section-intro">主流程和八项核心决策没有待确认分歧。下列细节尚未逐项讨论，保留为开放项，不伪装为用户已确认，也不为本次交付新增审批门。</p><div class="table-wrap"><table><caption class="sr-only">非阻塞开放项</caption><thead><tr><th scope="col">标识</th><th scope="col">未逐项确定的细节</th><th scope="col">影响与后续处理</th></tr></thead><tbody><tr id="O-01"><td>O-01</td><td>入口位置、文件扩展名与默认文件名。</td><td>影响查找及保存体验；不改变全量、加密和合并规则，具体呈现由后续页面设计给出。</td></tr><tr id="O-02"><td>O-02</td><td>自动改名后缀、编号与长度处理文案。</td><td>必须满足 FR-06 的合法、唯一和预览一致；“日常（导入）”仅为讨论示例，不是固定规范。</td></tr><tr id="O-03"><td>O-03</td><td>空配置库是否允许导出、有效空包的反馈。</td><td>影响零数据边界场景；不影响有配置的迁移主流程，后续补齐该场景规则及验收。</td></tr><tr id="O-04"><td>O-04</td><td>密码最小强度、是否二次确认，以及文件和配置数量限制。</td><td>已确定非空密码及加密；其他输入限制尚无依据。若引入限制，需补充文案与边界验收。</td></tr></tbody></table></div><p><strong>工作假设：</strong>通过现有本机管理界面发起迁移，用户自行将文件和密码带到目标电脑。账号、云同步与跨机器管理若有新需求，应另行定义范围。</p></section>
+<section class="doc-section" id="evidence" aria-labelledby="evidence-title"><div class="section-heading"><span class="section-index">10</span><div><p class="section-kicker">PRODUCT REQUIREMENTS</p><h2 id="evidence-title">依据与现状事实</h2></div></div><p class="section-intro">以下来源用于核对现状；它们与用户决定、工作假设分开呈现。</p><div class="table-wrap"><table><caption class="sr-only">现状依据</caption><thead><tr><th scope="col">标识</th><th scope="col">现状事实</th><th scope="col">仓库依据</th></tr></thead><tbody><tr id="F-01"><td>F-01</td><td>渠道持有完整连接配置、密钥及渠道级设置。</td><td><a href="../../../backend/channel/channel.go">backend/channel/channel.go:10–55</a></td></tr><tr id="F-02"><td>F-02</td><td>模型按渠道归属，历史计价字段不对外展示。</td><td><a href="../../../backend/model/model.go">backend/model/model.go:13–25</a></td></tr><tr id="F-03"><td>F-03</td><td>分组名就是客户端模型名；支持 manual / failover，同优先级也有先后顺序。</td><td><a href="../../../backend/group/group.go">backend/group/group.go:23–42</a></td></tr><tr id="F-04"><td>F-04</td><td>独立余额来源、凭据和状态不等同于生成连接配置。</td><td><a href="../../../backend/quota/types.go">backend/quota/types.go:60–91、161–177</a></td></tr><tr id="F-05"><td>F-05</td><td>服务接入 Key 是独立于上游渠道密钥的身份。</td><td><a href="../../../backend/shared/apikey.go">backend/shared/apikey.go:14–23</a></td></tr><tr id="F-06"><td>F-06</td><td>现有管理入口限制本机访问；该注册入口未见本次全量加密迁移能力。</td><td><a href="../../../backend/api/api.go">backend/api/api.go:17–38</a></td></tr><tr id="F-07"><td>F-07</td><td>正式版与 Dev 应用的数据和运行环境必须隔离。</td><td><a href="../../product/DEVELOPMENT.md">开发说明</a>；<a href="../../../CLAUDE.md">CLAUDE.md</a></td></tr></tbody></table></div><p>业务决策来自本次会话，现状核对基线为 <code>dev / a6bb26a</code>。代码和现有测试不能单独证明新需求已经正确实现。本文仅交付需求及验收标准，没有实施功能或执行功能验收。后续需求变更直接维护本 HTML 正本。</p></section>
+          <footer class="doc-footer"><span>Portunus · 配置导入导出 PRD<br>本 HTML 为需求正本，可离线阅读与打印。</span><span>业务决策：本次会话确认<br>文档日期：2026-11-09</span></footer>
+        </main>
+      </div>
+    </div>
+  </article>
+</body>
+</html>

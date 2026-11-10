@@ -16,6 +16,7 @@ import (
 
 	"github.com/Lixiuxiu559/portunus/backend/api"
 	"github.com/Lixiuxiu559/portunus/backend/channel"
+	"github.com/Lixiuxiu559/portunus/backend/configtransfer"
 	"github.com/Lixiuxiu559/portunus/backend/cron"
 	"github.com/Lixiuxiu559/portunus/backend/gateway"
 	"github.com/Lixiuxiu559/portunus/backend/group"
@@ -90,6 +91,12 @@ func main() {
 	api.Register(r.Group("/api"), quotaService)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	transferService := configtransfer.NewService(shared.DB, os.Getenv("PORTUNUS_INSTANCE_ID"))
+	if err := transferService.Start(ctx); err != nil {
+		// A schema/recovery failure disables migration without stopping the gateway.
+		log.Printf("配置迁移暂不可用: %v", err)
+	}
+	api.RegisterConfigTransfer(r.Group("/api"), transferService)
 	go quotaService.RunScheduler(ctx)
 
 	cron.Start() // 定时自动同步渠道模型

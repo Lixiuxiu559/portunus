@@ -6,6 +6,7 @@ import { useUpdater } from '../hooks/useUpdater';
 import { getSettings, setSyncInterval, syncNow } from '../api/setting';
 import { getCachedResponse } from '../api/responseCache';
 import { formatDateTime } from '../utils/dateTime';
+import ConfigTransferCard from '../components/config-transfer/ConfigTransferCard';
 import './settings.css';
 
 const GITHUB_URL = 'https://github.com/Lixiuxiu559/portunus';
@@ -150,6 +151,8 @@ export default function Settings() {
           </div>
         </Card.Content>
       </Card>
+
+      <ConfigTransferCard />
 
       <Card className="settings-card gap-4 p-5">
         <Card.Header className="p-0"><Typography type="body-sm" className="settings-section-title text-muted">服务接入</Typography></Card.Header>

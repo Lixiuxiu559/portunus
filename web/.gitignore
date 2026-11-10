@@ -6,3 +6,4 @@ bin/
 .DS_Store
 __pycache__/
 dist-dev/
+reports/mutation/

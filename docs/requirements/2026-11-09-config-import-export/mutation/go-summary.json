@@ -1,0 +1,1906 @@
+{
+  "date": "2026-11-10",
+  "tool": "Gremlins",
+  "version": "v0.6.0",
+  "command": "node scripts/mutation-go.mjs all",
+  "installCommand": "node scripts/mutation-go.mjs --install",
+  "runnerFile": "/Users/lixiuxiu/development_tool/projects/portunus/scripts/mutation-go.mjs",
+  "runnerSHA256": "cb463063c91aae4b5c4a5a837aadd09154d2a38bdbd81ed2b7a863532d1c5451",
+  "total": 591,
+  "counts": {
+    "KILLED": 427,
+    "LIVED": 54,
+    "NOT COVERED": 49,
+    "TIMED OUT": 4,
+    "NOT VIABLE": 57,
+    "SKIPPED": 0,
+    "RUNNABLE": 0
+  },
+  "toolCompleted": true,
+  "runCompleted": true,
+  "resultComplete": false,
+  "allKilled": false,
+  "allProfileSourcesIdentical": true,
+  "allWorkspaceAndSnapshotChecksPassed": true,
+  "profiles": [
+    {
+      "profile": "codec",
+      "counts": {
+        "KILLED": 28,
+        "LIVED": 0,
+        "NOT COVERED": 0,
+        "TIMED OUT": 0,
+        "NOT VIABLE": 0,
+        "SKIPPED": 0,
+        "RUNNABLE": 0
+      },
+      "total": 28,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-04.159Z-codec",
+      "toolExitCode": 0,
+      "workspaceUnchanged": true,
+      "snapshotUnchanged": true,
+      "temporarySourceRemoved": true,
+      "testPattern": "^(TestCodec|TestMutationCodec)",
+      "files": [
+        "codec.go"
+      ]
+    },
+    {
+      "profile": "rules",
+      "counts": {
+        "KILLED": 145,
+        "LIVED": 31,
+        "NOT COVERED": 18,
+        "TIMED OUT": 3,
+        "NOT VIABLE": 35,
+        "SKIPPED": 0,
+        "RUNNABLE": 0
+      },
+      "total": 232,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules",
+      "toolExitCode": 0,
+      "workspaceUnchanged": true,
+      "snapshotUnchanged": true,
+      "temporarySourceRemoved": true,
+      "testPattern": "^(TestStrictJSON|TestSourceIntegrity|TestInvalidCustomPNG|TestMutationRule|TestMutationJSON|TestMutationPlan)",
+      "files": [
+        "json.go",
+        "validate.go",
+        "plan.go",
+        "types.go"
+      ]
+    },
+    {
+      "profile": "recovery",
+      "counts": {
+        "KILLED": 132,
+        "LIVED": 14,
+        "NOT COVERED": 27,
+        "TIMED OUT": 1,
+        "NOT VIABLE": 2,
+        "SKIPPED": 0,
+        "RUNNABLE": 0
+      },
+      "total": 176,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery",
+      "toolExitCode": 0,
+      "workspaceUnchanged": true,
+      "snapshotUnchanged": true,
+      "temporarySourceRemoved": true,
+      "testPattern": "^TestMutation(Restore|Recovery|Stored|Service|Commit)",
+      "files": [
+        "restore.go",
+        "service.go"
+      ]
+    },
+    {
+      "profile": "storage",
+      "counts": {
+        "KILLED": 75,
+        "LIVED": 5,
+        "NOT COVERED": 0,
+        "TIMED OUT": 0,
+        "NOT VIABLE": 20,
+        "SKIPPED": 0,
+        "RUNNABLE": 0
+      },
+      "total": 100,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage",
+      "toolExitCode": 0,
+      "workspaceUnchanged": true,
+      "snapshotUnchanged": true,
+      "temporarySourceRemoved": true,
+      "testPattern": "^(TestSchemaIsExact|TestSourceIntegrity|TestMutationRestoreRoundTrip|TestMutationStorage)",
+      "files": [
+        "snapshot.go",
+        "schema.go"
+      ]
+    },
+    {
+      "profile": "api",
+      "counts": {
+        "KILLED": 47,
+        "LIVED": 4,
+        "NOT COVERED": 4,
+        "TIMED OUT": 0,
+        "NOT VIABLE": 0,
+        "SKIPPED": 0,
+        "RUNNABLE": 0
+      },
+      "total": 55,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-35.374Z-api",
+      "toolExitCode": 0,
+      "workspaceUnchanged": true,
+      "snapshotUnchanged": true,
+      "temporarySourceRemoved": true,
+      "testPattern": "^TestConfigTransfer",
+      "files": [
+        "config_transfer.go"
+      ]
+    }
+  ],
+  "survivors": [
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/validate.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 34,
+      "column": 12,
+      "originalLine": "\tif len(s) > 64*1024 || !strings.HasPrefix(s, prefix) {",
+      "classification": "test_gap",
+      "reason": "PNG data URI总长度64KiB精确边界未覆盖。",
+      "patches": [
+        {
+          "original": "\tif len(s) > 64*1024 || !strings.HasPrefix(s, prefix) {",
+          "mutated": "\tif len(s) >= 64*1024 || !strings.HasPrefix(s, prefix) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28498.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/validate.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 63,
+      "column": 21,
+      "originalLine": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+      "classification": "test_gap",
+      "reason": "所选rules测试未分别构造最大合法渠道/模型/分组输入；storage大容量用例属于另一个mutant profile。",
+      "patches": [
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) >= MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28760.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) >= MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28789.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) >= MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28821.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/validate.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 63,
+      "column": 52,
+      "originalLine": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+      "classification": "test_gap",
+      "reason": "所选rules测试未分别构造最大合法渠道/模型/分组输入；storage大容量用例属于另一个mutant profile。",
+      "patches": [
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) >= MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28760.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) >= MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28789.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) >= MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28821.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/validate.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 63,
+      "column": 81,
+      "originalLine": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+      "classification": "test_gap",
+      "reason": "所选rules测试未分别构造最大合法渠道/模型/分组输入；storage大容量用例属于另一个mutant profile。",
+      "patches": [
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) >= MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28760.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) >= MaxModels || len(p.Groups) > MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28789.json"
+        },
+        {
+          "original": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) > MaxGroups {",
+          "mutated": "\tif len(p.Channels) > MaxChannels || len(p.Models) > MaxModels || len(p.Groups) >= MaxGroups {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28821.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/validate.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 136,
+      "column": 12,
+      "originalLine": "\t\tif total > MaxItems {",
+      "classification": "test_gap",
+      "reason": "所选rules测试没有恰好100000成员的合法输入；storage快照容量测试未用于此突变。",
+      "patches": [
+        {
+          "original": "\t\tif total > MaxItems {",
+          "mutated": "\t\tif total >= MaxItems {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/31231.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 88,
+      "column": 36,
+      "originalLine": "\t\t\tv, err := readJSONValue(d, depth+1)",
+      "classification": "test_gap",
+      "reason": "数组嵌套深度递增可被削弱；现有深度16/17用例使用对象链，未验证嵌套数组目标。",
+      "patches": [
+        {
+          "original": "\t\t\tv, err := readJSONValue(d, depth+1)",
+          "mutated": "\t\t\tv, err := readJSONValue(d, depth-1)",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26483.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 182,
+      "column": 9,
+      "originalLine": "\t\tfor i < len(data) {",
+      "classification": "test_gap",
+      "reason": "未闭合字符串在循环边界变为<=后可能越界；选择用例没有覆盖在字符串末尾耗尽输入。",
+      "patches": [
+        {
+          "original": "\t\tfor i < len(data) {",
+          "mutated": "\t\tfor i <= len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26813.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 196,
+      "column": 9,
+      "originalLine": "\t\t\tif i >= len(data) {",
+      "classification": "test_gap",
+      "reason": "末尾单个反斜杠的边界未断言；>=改>可能让后续读取越界。",
+      "patches": [
+        {
+          "original": "\t\t\tif i >= len(data) {",
+          "mutated": "\t\t\tif i > len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26904.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 203,
+      "column": 11,
+      "originalLine": "\t\t\tif i+4 >= len(data) {",
+      "classification": "test_gap",
+      "reason": "截断的\\u四位十六进制边界未断言；当前成功代理对用例不足以发现截断越界。",
+      "patches": [
+        {
+          "original": "\t\t\tif i+4 >= len(data) {",
+          "mutated": "\t\t\tif i+4 > len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26998.json"
+        },
+        {
+          "original": "\t\t\tif i+4 >= len(data) {",
+          "mutated": "\t\t\tif i-4 >= len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27036.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 203,
+      "column": 8,
+      "originalLine": "\t\t\tif i+4 >= len(data) {",
+      "classification": "test_gap",
+      "reason": "截断的\\u四位十六进制边界未断言；当前成功代理对用例不足以发现截断越界。",
+      "patches": [
+        {
+          "original": "\t\t\tif i+4 >= len(data) {",
+          "mutated": "\t\t\tif i+4 > len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26998.json"
+        },
+        {
+          "original": "\t\t\tif i+4 >= len(data) {",
+          "mutated": "\t\t\tif i-4 >= len(data) {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27036.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 215,
+      "column": 12,
+      "originalLine": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+      "classification": "test_gap",
+      "reason": "高代理项之后截断的低代理转义边界未完全覆盖。",
+      "patches": [
+        {
+          "original": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "mutated": "\t\t\t\tif i+5 > len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27205.json"
+        },
+        {
+          "original": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "mutated": "\t\t\t\tif i-5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27283.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 215,
+      "column": 9,
+      "originalLine": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+      "classification": "test_gap",
+      "reason": "高代理项之后截断的低代理转义边界未完全覆盖。",
+      "patches": [
+        {
+          "original": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "mutated": "\t\t\t\tif i+5 > len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27205.json"
+        },
+        {
+          "original": "\t\t\t\tif i+5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "mutated": "\t\t\t\tif i-5 >= len(data) || data[i] != '\\\\' || data[i+1] != 'u' {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27283.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 31,
+      "column": 122,
+      "originalLine": "\trows, err := db.Table(table).Select(\"CASE WHEN length(CAST(name AS BLOB)) <= ? THEN name ELSE NULL END AS name\", 64*1024*1024).Limit(100001).Rows()",
+      "classification": "test_gap",
+      "reason": "目标名称SQL查询的100001行/64MiB边界未使用满额目标库验证。",
+      "patches": [
+        {
+          "original": "\trows, err := db.Table(table).Select(\"CASE WHEN length(CAST(name AS BLOB)) <= ? THEN name ELSE NULL END AS name\", 64*1024*1024).Limit(100001).Rows()",
+          "mutated": "\trows, err := db.Table(table).Select(\"CASE WHEN length(CAST(name AS BLOB)) <= ? THEN name ELSE NULL END AS name\", 64*1024/1024).Limit(100001).Rows()",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27474.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "LIVED",
+      "line": 47,
+      "column": 8,
+      "originalLine": "\t\tcount++",
+      "classification": "test_gap",
+      "reason": "目标名称计数上限只有小样本；递增反转在100000行容量之前没有行为差异。",
+      "patches": [
+        {
+          "original": "\t\tcount++",
+          "mutated": "\t\tcount--",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27520.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 49,
+      "column": 12,
+      "originalLine": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+      "classification": "test_gap",
+      "reason": "目标名称个数/总字节精确上限未覆盖。",
+      "patches": [
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count >= 100000 || bytes > 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27531.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes >= 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27563.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes > 64*1024/1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27585.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 49,
+      "column": 30,
+      "originalLine": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+      "classification": "test_gap",
+      "reason": "目标名称个数/总字节精确上限未覆盖。",
+      "patches": [
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count >= 100000 || bytes > 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27531.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes >= 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27563.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes > 64*1024/1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27585.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 49,
+      "column": 39,
+      "originalLine": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+      "classification": "test_gap",
+      "reason": "目标名称个数/总字节精确上限未覆盖。",
+      "patches": [
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count >= 100000 || bytes > 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27531.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes >= 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27563.json"
+        },
+        {
+          "original": "\t\tif count > 100000 || bytes > 64*1024*1024 {",
+          "mutated": "\t\tif count > 100000 || bytes > 64*1024/1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27585.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "LIVED",
+      "line": 71,
+      "column": 10,
+      "originalLine": "\t\t\tprobes++",
+      "classification": "test_gap",
+      "reason": "命名空间探测次数反转在普通少量冲突下不被发现；缺耗尽和有界失败用例。",
+      "patches": [
+        {
+          "original": "\t\t\tprobes++",
+          "mutated": "\t\t\tprobes--",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27632.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 72,
+      "column": 14,
+      "originalLine": "\t\t\tif probes > 100000 {",
+      "classification": "test_gap",
+      "reason": "第100000次可用命名探测边界未覆盖。",
+      "patches": [
+        {
+          "original": "\t\t\tif probes > 100000 {",
+          "mutated": "\t\t\tif probes >= 100000 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27644.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 80,
+      "column": 31,
+      "originalLine": "\t\t\tif len(prefix)+len(suffix) > MaxNameBytes {",
+      "classification": "equivalent_proven",
+      "reason": "仅把len(prefix)+len(suffix)>MaxNameBytes改为>=；等于时切片prefix[:MaxNameBytes-len(suffix)]恰好等于整个原prefix，且有效源名称已通过UTF-8校验，因此候选名和后续保留集合完全相同。",
+      "patches": [
+        {
+          "original": "\t\t\tif len(prefix)+len(suffix) > MaxNameBytes {",
+          "mutated": "\t\t\tif len(prefix)+len(suffix) >= MaxNameBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27720.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 113,
+      "column": 21,
+      "originalLine": "\tif len(cn)+len(gn) > 100000 {",
+      "classification": "test_gap",
+      "reason": "渠道和分组共享100000个目标名称的合并预算缺精确边界断言。",
+      "patches": [
+        {
+          "original": "\tif len(cn)+len(gn) > 100000 {",
+          "mutated": "\tif len(cn)+len(gn) >= 100000 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27842.json"
+        },
+        {
+          "original": "\tif len(cn)+len(gn) > 100000 {",
+          "mutated": "\tif len(cn)-len(gn) > 100000 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27868.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 123,
+      "column": 11,
+      "originalLine": "\tif total > 64*1024*1024 {",
+      "classification": "test_gap",
+      "reason": "渠道和分组共享64MiB目标名称字节预算缺精确边界断言。",
+      "patches": [
+        {
+          "original": "\tif total > 64*1024*1024 {",
+          "mutated": "\tif total >= 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27869.json"
+        },
+        {
+          "original": "\tif total > 64*1024*1024 {",
+          "mutated": "\tif total > 64*1024/1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27903.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 113,
+      "column": 12,
+      "originalLine": "\tif len(cn)+len(gn) > 100000 {",
+      "classification": "test_gap",
+      "reason": "渠道和分组共享100000个目标名称的合并预算缺精确边界断言。",
+      "patches": [
+        {
+          "original": "\tif len(cn)+len(gn) > 100000 {",
+          "mutated": "\tif len(cn)+len(gn) >= 100000 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27842.json"
+        },
+        {
+          "original": "\tif len(cn)+len(gn) > 100000 {",
+          "mutated": "\tif len(cn)-len(gn) > 100000 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27868.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 123,
+      "column": 20,
+      "originalLine": "\tif total > 64*1024*1024 {",
+      "classification": "test_gap",
+      "reason": "渠道和分组共享64MiB目标名称字节预算缺精确边界断言。",
+      "patches": [
+        {
+          "original": "\tif total > 64*1024*1024 {",
+          "mutated": "\tif total >= 64*1024*1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27869.json"
+        },
+        {
+          "original": "\tif total > 64*1024*1024 {",
+          "mutated": "\tif total > 64*1024/1024 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27903.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "LIVED",
+      "line": 141,
+      "column": 11,
+      "originalLine": "\t\tif name != c.Name {",
+      "classification": "test_gap",
+      "reason": "当前preview fixture中两渠道恰好一改名一不改名，反转条件仍累计1；缺不对称改名数量断言。",
+      "patches": [
+        {
+          "original": "\t\tif name != c.Name {",
+          "mutated": "\t\tif name == c.Name {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/27960.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 171,
+      "column": 47,
+      "originalLine": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+      "classification": "test_gap",
+      "reason": "保守显示预算margin的算术变异在远离上限的小配置无行为差异；缺接近预算但合法的正例。",
+      "patches": [
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) - 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28057.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64/(len(p.Channels)+len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28078.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)-len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28079.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 171,
+      "column": 14,
+      "originalLine": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+      "classification": "test_gap",
+      "reason": "保守显示预算margin的算术变异在远离上限的小配置无行为差异；缺接近预算但合法的正例。",
+      "patches": [
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) - 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28057.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64/(len(p.Channels)+len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28078.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)-len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28079.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 171,
+      "column": 31,
+      "originalLine": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+      "classification": "test_gap",
+      "reason": "保守显示预算margin的算术变异在远离上限的小配置无行为差异；缺接近预算但合法的正例。",
+      "patches": [
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) - 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28057.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64/(len(p.Channels)+len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28078.json"
+        },
+        {
+          "original": "\tmargin := 64*(len(p.Channels)+len(p.Groups)) + 4096",
+          "mutated": "\tmargin := 64*(len(p.Channels)-len(p.Groups)) + 4096",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28079.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "LIVED",
+      "line": 173,
+      "column": 9,
+      "originalLine": "\tif err != nil || n+margin > MaxPreviewBytes {",
+      "classification": "test_gap",
+      "reason": "所选rules测试仅调用checkBudgets的超预算失败路径，未明确断言小payload预算成功；完整正常基线通过不等于此突变被选定测试杀死。",
+      "patches": [
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err == nil || n+margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28192.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n+margin >= MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28193.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n-margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28377.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 173,
+      "column": 28,
+      "originalLine": "\tif err != nil || n+margin > MaxPreviewBytes {",
+      "classification": "test_gap",
+      "reason": "所选rules测试仅调用checkBudgets的超预算失败路径，未明确断言小payload预算成功；完整正常基线通过不等于此突变被选定测试杀死。",
+      "patches": [
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err == nil || n+margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28192.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n+margin >= MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28193.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n-margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28377.json"
+        }
+      ]
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 173,
+      "column": 20,
+      "originalLine": "\tif err != nil || n+margin > MaxPreviewBytes {",
+      "classification": "test_gap",
+      "reason": "所选rules测试仅调用checkBudgets的超预算失败路径，未明确断言小payload预算成功；完整正常基线通过不等于此突变被选定测试杀死。",
+      "patches": [
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err == nil || n+margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28192.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n+margin >= MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28193.json"
+        },
+        {
+          "original": "\tif err != nil || n+margin > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n-margin > MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/28377.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 52,
+      "column": 77,
+      "originalLine": "\tif !valid || expired || r.OwnerInstanceID != s.instanceID || r.ExpiresAtMs <= time.Now().UnixMilli() {",
+      "classification": "test_gap",
+      "reason": "持久expires_at恰好等于当前毫秒的边界未确定性覆盖；不能据此认定等价。",
+      "patches": [
+        {
+          "original": "\tif !valid || expired || r.OwnerInstanceID != s.instanceID || r.ExpiresAtMs <= time.Now().UnixMilli() {",
+          "mutated": "\tif !valid || expired || r.OwnerInstanceID != s.instanceID || r.ExpiresAtMs < time.Now().UnixMilli() {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/36038.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 290,
+      "column": 32,
+      "originalLine": "\tif err != nil || len(encoded) > MaxResultBytes {",
+      "classification": "test_gap",
+      "reason": "最终Result JSON恰好12MiB的合法边界未覆盖。",
+      "patches": [
+        {
+          "original": "\tif err != nil || len(encoded) > MaxResultBytes {",
+          "mutated": "\tif err != nil || len(encoded) >= MaxResultBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37668.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 104,
+      "column": 28,
+      "originalLine": "\tfor attempt := 0; attempt < 3; attempt++ {",
+      "classification": "test_gap",
+      "reason": "初始化首次成功使循环立即return；所选快速测试没有真实SQLITE_BUSY重试耗尽，未验证次数/递增方向。",
+      "patches": [
+        {
+          "original": "\tfor attempt := 0; attempt < 3; attempt++ {",
+          "mutated": "\tfor attempt := 0; attempt <= 3; attempt++ {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37799.json"
+        },
+        {
+          "original": "\tfor attempt := 0; attempt < 3; attempt++ {",
+          "mutated": "\tfor attempt := 0; attempt < 3; attempt-- {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37832.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "LIVED",
+      "line": 104,
+      "column": 40,
+      "originalLine": "\tfor attempt := 0; attempt < 3; attempt++ {",
+      "classification": "test_gap",
+      "reason": "初始化首次成功使循环立即return；所选快速测试没有真实SQLITE_BUSY重试耗尽，未验证次数/递增方向。",
+      "patches": [
+        {
+          "original": "\tfor attempt := 0; attempt < 3; attempt++ {",
+          "mutated": "\tfor attempt := 0; attempt <= 3; attempt++ {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37799.json"
+        },
+        {
+          "original": "\tfor attempt := 0; attempt < 3; attempt++ {",
+          "mutated": "\tfor attempt := 0; attempt < 3; attempt-- {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37832.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 298,
+      "column": 26,
+      "originalLine": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+      "classification": "mixed",
+      "reason": "槽位>=2改>2仍存活：两个测试预览均32MiB，第三个小预览被另一条总字节门禁拒绝，缺两个小预览后第三个小预览。retainedBytes+len(raw)改减法则在生产不变量下等价：prepare之前最多1个保留预览、每份解密明文<=32MiB，两个相加最多64MiB；第三份先被槽位门禁拒绝。",
+      "patches": [
+        {
+          "original": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "mutated": "\tfull := len(s.previews) > 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37932.json"
+        },
+        {
+          "original": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "mutated": "\tfull := len(s.previews) >= 2 || s.retainedBytes-len(raw) > 64*1024*1024",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37980.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 298,
+      "column": 49,
+      "originalLine": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+      "classification": "mixed",
+      "reason": "槽位>=2改>2仍存活：两个测试预览均32MiB，第三个小预览被另一条总字节门禁拒绝，缺两个小预览后第三个小预览。retainedBytes+len(raw)改减法则在生产不变量下等价：prepare之前最多1个保留预览、每份解密明文<=32MiB，两个相加最多64MiB；第三份先被槽位门禁拒绝。",
+      "patches": [
+        {
+          "original": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "mutated": "\tfull := len(s.previews) > 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37932.json"
+        },
+        {
+          "original": "\tfull := len(s.previews) >= 2 || s.retainedBytes+len(raw) > 64*1024*1024",
+          "mutated": "\tfull := len(s.previews) >= 2 || s.retainedBytes-len(raw) > 64*1024*1024",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37980.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 315,
+      "column": 21,
+      "originalLine": "\tif err != nil || n > MaxPreviewBytes {",
+      "classification": "test_gap",
+      "reason": "Preview DTO恰好8MiB的合法边界未覆盖。",
+      "patches": [
+        {
+          "original": "\tif err != nil || n > MaxPreviewBytes {",
+          "mutated": "\tif err != nil || n >= MaxPreviewBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/38053.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 454,
+      "column": 51,
+      "originalLine": "\tif row.ResultJSON == nil || len(*row.ResultJSON) > MaxResultBytes {",
+      "classification": "test_gap",
+      "reason": "已提交回执JSON恰好12MiB边界未覆盖；严格JSON语义损坏已单独测试。",
+      "patches": [
+        {
+          "original": "\tif row.ResultJSON == nil || len(*row.ResultJSON) > MaxResultBytes {",
+          "mutated": "\tif row.ResultJSON == nil || len(*row.ResultJSON) >= MaxResultBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/38448.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "LIVED",
+      "line": 570,
+      "column": 61,
+      "originalLine": "\tif err := s.fence(ctx, op, \"USER_CANCELLED\", \"input\"); err != nil {",
+      "classification": "test_gap",
+      "reason": "Discard的返回错误路径反转可在fence成功后提前返回零DTO和nil；选择用例只验证无错误，缺返回终态断言。",
+      "patches": [
+        {
+          "original": "\tif err := s.fence(ctx, op, \"USER_CANCELLED\", \"input\"); err != nil {",
+          "mutated": "\tif err := s.fence(ctx, op, \"USER_CANCELLED\", \"input\"); err == nil {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43075.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "LIVED",
+      "line": 574,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "classification": "test_gap",
+      "reason": "Discard读取回执之后的返回条件反转未被DTO终态断言发现。",
+      "patches": [
+        {
+          "original": "\tif err != nil {",
+          "mutated": "\tif err == nil {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43087.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 603,
+      "column": 24,
+      "originalLine": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+      "classification": "test_gap",
+      "reason": "RecoveryList参数100/256的合法精确边界未纳入当前recovery选择；API limit=100用例只用于API文件突变。",
+      "patches": [
+        {
+          "original": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+          "mutated": "\tif limit < 1 || limit >= 100 || len(cursor) > 256 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43248.json"
+        },
+        {
+          "original": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+          "mutated": "\tif limit < 1 || limit > 100 || len(cursor) >= 256 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43270.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 603,
+      "column": 45,
+      "originalLine": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+      "classification": "test_gap",
+      "reason": "RecoveryList参数100/256的合法精确边界未纳入当前recovery选择；API limit=100用例只用于API文件突变。",
+      "patches": [
+        {
+          "original": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+          "mutated": "\tif limit < 1 || limit >= 100 || len(cursor) > 256 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43248.json"
+        },
+        {
+          "original": "\tif limit < 1 || limit > 100 || len(cursor) > 256 {",
+          "mutated": "\tif limit < 1 || limit > 100 || len(cursor) >= 256 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43270.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 610,
+      "column": 100,
+      "originalLine": "\t\tif err != nil || DecodeStrict(b, &c) != nil || !ValidOperationID(c.OperationID) || c.CreatedAtMs < 0 {",
+      "classification": "test_gap",
+      "reason": "合法cursor.created_at_ms=0边界未覆盖，当前生成的回执时间均为正。",
+      "patches": [
+        {
+          "original": "\t\tif err != nil || DecodeStrict(b, &c) != nil || !ValidOperationID(c.OperationID) || c.CreatedAtMs < 0 {",
+          "mutated": "\t\tif err != nil || DecodeStrict(b, &c) != nil || !ValidOperationID(c.OperationID) || c.CreatedAtMs <= 0 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/43766.json"
+        }
+      ]
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 630,
+      "column": 23,
+      "originalLine": "\tif more && len(rows) > 0 {",
+      "classification": "equivalent_proven",
+      "reason": "more=true时先把rows截为rows[:limit]；输入limit已保证1..100，因此len(rows)=limit>=1。len(rows)>0改>=0在所有该分支可达状态都为true，输出cursor完全相同。",
+      "patches": [
+        {
+          "original": "\tif more && len(rows) > 0 {",
+          "mutated": "\tif more && len(rows) >= 0 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/44811.json"
+        }
+      ]
+    },
+    {
+      "profile": "storage",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/schema.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 125,
+      "column": 17,
+      "originalLine": "\t\t\t\t\tif col.Cid < 0 || col.Coll != \"BINARY\" {",
+      "classification": "equivalent_under_current_layout",
+      "reason": "当前GORM实体把id置于cid0，要求的唯一索引均用name/channel_id/group_id/model_id，cid均>0；<0改<=0在当前实体布局下无变化。未证明对任意自定义字段顺序的外部schema等价。",
+      "patches": [
+        {
+          "original": "\t\t\t\t\tif col.Cid < 0 || col.Coll != \"BINARY\" {",
+          "mutated": "\t\t\t\t\tif col.Cid <= 0 || col.Coll != \"BINARY\" {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/49725.json"
+        }
+      ]
+    },
+    {
+      "profile": "storage",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/snapshot.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 157,
+      "column": 26,
+      "originalLine": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+      "classification": "test_gap",
+      "reason": "connection_options原始JSON允许空白；上限2*MaxNameBytes+256的减法/除法变异在小型规范JSON下仍通过，缺大但合法的存储表示用例。",
+      "patches": [
+        {
+          "original": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+          "mutated": "\t\t\t\tmax = 2*MaxNameBytes - 256",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54340.json"
+        },
+        {
+          "original": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+          "mutated": "\t\t\t\tmax = 2/MaxNameBytes + 256",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54352.json"
+        }
+      ]
+    },
+    {
+      "profile": "storage",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/snapshot.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 157,
+      "column": 12,
+      "originalLine": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+      "classification": "test_gap",
+      "reason": "connection_options原始JSON允许空白；上限2*MaxNameBytes+256的减法/除法变异在小型规范JSON下仍通过，缺大但合法的存储表示用例。",
+      "patches": [
+        {
+          "original": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+          "mutated": "\t\t\t\tmax = 2*MaxNameBytes - 256",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54340.json"
+        },
+        {
+          "original": "\t\t\t\tmax = 2*MaxNameBytes + 256",
+          "mutated": "\t\t\t\tmax = 2/MaxNameBytes + 256",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54352.json"
+        }
+      ]
+    },
+    {
+      "profile": "storage",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/snapshot.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 180,
+      "column": 12,
+      "originalLine": "\t\tif total > MaxPlaintextBytes {",
+      "classification": "test_gap",
+      "reason": "源字段原始字节合计恰好32MiB边界未验证；不将后续序列化限制视为完全等价证明。",
+      "patches": [
+        {
+          "original": "\t\tif total > MaxPlaintextBytes {",
+          "mutated": "\t\tif total >= MaxPlaintextBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54711.json"
+        }
+      ]
+    },
+    {
+      "profile": "storage",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/snapshot.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 192,
+      "column": 12,
+      "originalLine": "\tif len(b) > MaxPlaintextBytes {",
+      "classification": "test_gap",
+      "reason": "Payload JSON恰好32MiB的合法序列化边界未覆盖；codec明文精确上限测试属于另一profile。",
+      "patches": [
+        {
+          "original": "\tif len(b) > MaxPlaintextBytes {",
+          "mutated": "\tif len(b) >= MaxPlaintextBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/54808.json"
+        }
+      ]
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 244,
+      "column": 51,
+      "originalLine": "\t_ = controller.SetReadDeadline(time.Now().Add(15 * time.Second))",
+      "classification": "test_fixture_limitation",
+      "reason": "httptest.ResponseRecorder不支持真实连接SetReadDeadline，因此15秒乘法改除法未被实际socket读取deadline断言发现。",
+      "patches": [
+        {
+          "original": "\t_ = controller.SetReadDeadline(time.Now().Add(15 * time.Second))",
+          "mutated": "\t_ = controller.SetReadDeadline(time.Now().Add(15 / time.Second))",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-35.374Z-api/test-runs/59393.json"
+        }
+      ]
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 287,
+      "column": 29,
+      "originalLine": "\tif c.Request.ContentLength > configtransfer.MaxMultipartBytes {",
+      "classification": "test_gap",
+      "reason": "完整multipart请求恰好MaxMultipartBytes（含合法epilogue）边界未覆盖；各part精确上限已覆盖。",
+      "patches": [
+        {
+          "original": "\tif c.Request.ContentLength > configtransfer.MaxMultipartBytes {",
+          "mutated": "\tif c.Request.ContentLength >= configtransfer.MaxMultipartBytes {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-35.374Z-api/test-runs/60562.json"
+        }
+      ]
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "LIVED",
+      "line": 291,
+      "column": 51,
+      "originalLine": "\t_ = controller.SetReadDeadline(time.Now().Add(15 * time.Second))",
+      "classification": "test_fixture_limitation",
+      "reason": "multipart读deadline同样未经过支持SetReadDeadline的真实连接fixture。",
+      "patches": [
+        {
+          "original": "\t_ = controller.SetReadDeadline(time.Now().Add(15 * time.Second))",
+          "mutated": "\t_ = controller.SetReadDeadline(time.Now().Add(15 / time.Second))",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-35.374Z-api/test-runs/61085.json"
+        }
+      ]
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "LIVED",
+      "line": 317,
+      "column": 72,
+      "originalLine": "\t\tif (name != \"password\" && name != \"file\") || seen[name] || len(seen) >= 2 {",
+      "classification": "equivalent_proven",
+      "reason": "part名称只允许password/file且seen[name]拒绝重复；一旦seen有2个名字，任何第三part要么未知要么重复，已被前两个条件拒绝。len(seen)>=2改>2不改变任何输入的接受/拒绝结果。",
+      "patches": [
+        {
+          "original": "\t\tif (name != \"password\" && name != \"file\") || seen[name] || len(seen) >= 2 {",
+          "mutated": "\t\tif (name != \"password\" && name != \"file\") || seen[name] || len(seen) > 2 {",
+          "testRun": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-35.374Z-api/test-runs/62395.json"
+        }
+      ]
+    }
+  ],
+  "uncovered": [
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 9,
+      "originalLine": "\tif err != nil || n+margin > MaxResultBytes {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_BOUNDARY",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 28,
+      "originalLine": "\tif err != nil || n+margin > MaxResultBytes {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 28,
+      "originalLine": "\tif err != nil || n+margin > MaxResultBytes {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/plan.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 20,
+      "originalLine": "\tif err != nil || n+margin > MaxResultBytes {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 14,
+      "column": 38,
+      "originalLine": "\tMaxPlaintextBytes       = 32 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 14,
+      "column": 31,
+      "originalLine": "\tMaxPlaintextBytes       = 32 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 15,
+      "column": 46,
+      "originalLine": "\tMaxFileBytes            = MaxPlaintextBytes + 64",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 16,
+      "column": 46,
+      "originalLine": "\tMaxMultipartBytes       = MaxPlaintextBytes + 16*1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 16,
+      "column": 50,
+      "originalLine": "\tMaxMultipartBytes       = MaxPlaintextBytes + 16*1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 17,
+      "column": 30,
+      "originalLine": "\tMaxSmallBodyBytes       = 8 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 23,
+      "column": 37,
+      "originalLine": "\tMaxPreviewBytes         = 8 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 23,
+      "column": 30,
+      "originalLine": "\tMaxPreviewBytes         = 8 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 24,
+      "column": 38,
+      "originalLine": "\tMaxResultBytes          = 12 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 24,
+      "column": 31,
+      "originalLine": "\tMaxResultBytes          = 12 * 1024 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 25,
+      "column": 31,
+      "originalLine": "\tMaxNameBytes            = 16 * 1024",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 27,
+      "column": 31,
+      "originalLine": "\tPreviewTTL              = 15 * time.Minute",
+      "reason": "工具覆盖率映射限制：const声明没有可执行覆盖率块，Gremlins据位置标为未覆盖；这些常量虽被边界测试使用，工具仍未实际运行相应突变。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 55,
+      "originalLine": "func (e *Error) Error() string { return e.Code + \": \" + e.Stage }",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/types.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 184,
+      "column": 48,
+      "originalLine": "func (e *Error) Error() string { return e.Code + \": \" + e.Stage }",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 22,
+      "column": 19,
+      "originalLine": "\t\tif r.FileSHA256 != request.FileSHA256 || r.PlanSHA256 != request.PlanSHA256 {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 22,
+      "column": 57,
+      "originalLine": "\t\tif r.FileSHA256 != request.FileSHA256 || r.PlanSHA256 != request.PlanSHA256 {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 19,
+      "column": 10,
+      "originalLine": "\t\tif err != nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 54,
+      "column": 24,
+      "originalLine": "\t\tif r.OwnerInstanceID != s.instanceID {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 57,
+      "column": 51,
+      "originalLine": "\t\tif err := s.fence(ctx, op, code, \"commit\"); err != nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/restore.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 114,
+      "column": 10,
+      "originalLine": "\t\tif err == nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 122,
+      "column": 52,
+      "originalLine": "\t\tcase <-time.After(time.Duration(attempt+1) * 100 * time.Millisecond):",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 122,
+      "column": 46,
+      "originalLine": "\t\tcase <-time.After(time.Duration(attempt+1) * 100 * time.Millisecond):",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 122,
+      "column": 42,
+      "originalLine": "\t\tcase <-time.After(time.Duration(attempt+1) * 100 * time.Millisecond):",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 196,
+      "column": 9,
+      "originalLine": "\tif err == nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 229,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 237,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 241,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 245,
+      "column": 15,
+      "originalLine": "\tif ctx.Err() != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 249,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 252,
+      "column": 15,
+      "originalLine": "\tif ctx.Err() != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 260,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 265,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 274,
+      "column": 15,
+      "originalLine": "\tif ctx.Err() != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 278,
+      "column": 47,
+      "originalLine": "\tif err := DecodeStrict(plain, &payload); err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 281,
+      "column": 36,
+      "originalLine": "\tif err := Validate(&payload); err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 284,
+      "column": 40,
+      "originalLine": "\tif err := checkBudgets(&payload); err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 289,
+      "column": 9,
+      "originalLine": "\tif err != nil {",
+      "reason": "recovery使用已验证payload边界的快速测试，未选择Export/Preview密码和取消分支；这些逻辑有完整基线/API正常测试，但此处突变尚未被这些跨profile测试执行。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 380,
+      "column": 25,
+      "originalLine": "\t\t\tif p.dto.OperationID == op {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 473,
+      "column": 14,
+      "originalLine": "\tif r.Status == \"prepared\" && s.isRunning(op) {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 510,
+      "column": 23,
+      "originalLine": "\t\tterminal = r.Status == \"committed\" || r.Status == \"aborted\"",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 510,
+      "column": 50,
+      "originalLine": "\t\tterminal = r.Status == \"committed\" || r.Status == \"aborted\"",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 111,
+      "column": 60,
+      "originalLine": "\t\tctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 114,
+      "column": 10,
+      "originalLine": "\t\tif err != nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "ARITHMETIC_BASE",
+      "status": "NOT COVERED",
+      "line": 154,
+      "column": 62,
+      "originalLine": "\t\tctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    },
+    {
+      "profile": "api",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/api/config_transfer.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "NOT COVERED",
+      "line": 157,
+      "column": 10,
+      "originalLine": "\t\tif err != nil {",
+      "reason": "所选profile未执行此分支；需针对实际错误/结果/预算路径补覆盖或用完整domain profile核对。"
+    }
+  ],
+  "timeouts": [
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "TIMED OUT",
+      "line": 180,
+      "column": 4,
+      "originalLine": "\t\ti++"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "TIMED OUT",
+      "line": 195,
+      "column": 5,
+      "originalLine": "\t\t\ti++"
+    },
+    {
+      "profile": "rules",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/json.go",
+      "type": "INCREMENT_DECREMENT",
+      "status": "TIMED OUT",
+      "line": 200,
+      "column": 6,
+      "originalLine": "\t\t\t\ti++"
+    },
+    {
+      "profile": "recovery",
+      "file": "/Users/lixiuxiu/development_tool/projects/portunus/backend/configtransfer/service.go",
+      "type": "CONDITIONALS_NEGATION",
+      "status": "TIMED OUT",
+      "line": 522,
+      "column": 18,
+      "originalLine": "\tif lost && live != nil {"
+    }
+  ],
+  "notViableExamples": [
+    {
+      "profile": "rules",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26672.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./json.go:135:17: invalid operation: operator - not defined on path + \".\" (value of type string)\n"
+    },
+    {
+      "profile": "rules",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-50-33.812Z-rules/test-runs/26683.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./json.go:135:17: invalid operation: operator - not defined on path (variable of type string)\n"
+    },
+    {
+      "profile": "recovery",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/36988.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./restore.go:205:24: invalid operation: operator - not defined on quoteIdentifier(key) (value of type string)\n"
+    },
+    {
+      "profile": "recovery",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-53-10.873Z-recovery/test-runs/37905.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./service.go:213: PreviewTTL * time.Second (constant 900000000000000000000 of int64 type \"time\".Duration) overflows int64\n"
+    },
+    {
+      "profile": "storage",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/48959.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./schema.go:103:48: invalid operation: operator - not defined on `\"` + strings.ReplaceAll(s, `\"`, `\"\"`) (value of type string)\n"
+    },
+    {
+      "profile": "storage",
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-54-36.844Z-storage/test-runs/48961.json",
+      "compilerOutput": "FAIL\tgithub.com/Lixiuxiu559/portunus/backend/configtransfer [build failed]\nFAIL\n# github.com/Lixiuxiu559/portunus/backend/configtransfer [github.com/Lixiuxiu559/portunus/backend/configtransfer.test]\n./schema.go:103:48: invalid operation: operator - not defined on `\"` (constant \"\\\"\" of type string)\n"
+    }
+  ],
+  "verification": {
+    "race": {
+      "command": "go test -race ./backend/configtransfer ./backend/api -count=1",
+      "log": "/private/tmp/portunus-mutation-go-race-final.log",
+      "exitCode": 0
+    },
+    "integrityAndOwnedProcessSmoke": "/private/tmp/portunus-mutation-go-integrity-process-smoke.json",
+    "setupFailureSmoke": "/private/tmp/portunus-mutation-go-setup-smoke.json",
+    "strictDryRun": {
+      "command": "node scripts/mutation-go.mjs codec --dry-run --strict",
+      "exitCode": 10,
+      "report": "/Users/lixiuxiu/development_tool/projects/portunus/tmp/mutation-go/reports/2026-11-10T02-55-43.814Z-codec-dry"
+    }
+  },
+  "limitations": [
+    "所有profile先执行完整普通包测试；每个突变仅执行配置中明确列出的所选测试，未对每个突变执行全领域或跨包集成套件。",
+    "57个NOT VIABLE有真实编译失败证据，主要为字符串使用-和duration常量溢出，不计作已杀死。",
+    "4个TIMED OUT保留为超时，不能把无限循环/死锁当作已杀死断言；当前结论不完整。",
+    "剩余存活逐项记录；仅标equivalent_proven者有逻辑证明，其余保留业务测试缺口/fixture限制，未新增排除项或减少突变器。",
+    "业务mutants结束后仅修复运行器报告与清理边界，未重跑这些有效业务mutants；独立真实Go/进程fixture验证最终runner。"
+  ],
+  "sources": [
+    "https://github.com/go-gremlins/gremlins/releases/tag/v0.6.0",
+    "https://github.com/go-gremlins/gremlins/blob/v0.6.0/docs/docs/usage/commands/unleash/index.md",
+    "https://github.com/go-gremlins/gremlins/blob/v0.6.0/internal/engine/executor.go",
+    "https://github.com/go-gremlins/gremlins/blob/v0.6.0/internal/report/report.go",
+    "https://github.com/zimmski/go-mutesting"
+  ]
+}

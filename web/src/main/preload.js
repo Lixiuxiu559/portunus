@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const { addressOf } = require('./server-address');
 const { UPDATE_CHANNEL_NAMES } = require('./update-channels');
+const CONFIG_TRANSFER_CHANNELS = require('./config-transfer-channels');
 
 const { preloadProfile } = require('./runtime-profile');
 const runtime = preloadProfile(process.argv);
@@ -47,6 +48,11 @@ contextBridge.exposeInMainWorld('api', {
     saveClaude: (text) => ipcRenderer.invoke('client-config:save-claude', text),
     rollbackClaude: () => ipcRenderer.invoke('client-config:rollback-claude'),
   },
+
+  // 专用固定方法，不接受 URL、文件路径、原始文件或任意 IPC channel。
+  configTransfer: Object.fromEntries(Object.entries(CONFIG_TRANSFER_CHANNELS).map(([method, channel]) => [
+    method, (...args) => ipcRenderer.invoke(channel, ...args),
+  ])),
 
   // 打开外部链接（默认浏览器）
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

@@ -1,0 +1,58 @@
+[
+  {
+    "kind": "add",
+    "exitCode": 1,
+    "workspaceUnchanged": false,
+    "completed": false,
+    "toolCompleted": false,
+    "runCompleted": false,
+    "resultComplete": false,
+    "allKilled": false,
+    "temporarySourceRemoved": true,
+    "actualGoStillAlive": false,
+    "runReportExists": true,
+    "stderr": "file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-Voz2n0/scripts/mutation-go.mjs:233\n  if (!integrityOK && !metadata.error) throw new Error(`源码指纹或临时目录清理检查失败；详见 ${report}/run.json`);\n                                             ^\n\nError: 源码指纹或临时目录清理检查失败；详见 /private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-Voz2n0/tmp/mutation-go/reports/2026-11-10T02-59-54.261Z-codec/run.json\n    at file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-Voz2n0/scripts/mutation-go.mjs:233:46\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.15.0\n"
+  },
+  {
+    "kind": "delete",
+    "exitCode": 1,
+    "workspaceUnchanged": false,
+    "completed": false,
+    "toolCompleted": false,
+    "runCompleted": false,
+    "resultComplete": false,
+    "allKilled": false,
+    "temporarySourceRemoved": true,
+    "actualGoStillAlive": false,
+    "runReportExists": true,
+    "stderr": "file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-vFkr3D/scripts/mutation-go.mjs:233\n  if (!integrityOK && !metadata.error) throw new Error(`源码指纹或临时目录清理检查失败；详见 ${report}/run.json`);\n                                             ^\n\nError: 源码指纹或临时目录清理检查失败；详见 /private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-vFkr3D/tmp/mutation-go/reports/2026-11-10T02-59-55.343Z-codec/run.json\n    at file:///private/var/folders/dt/sftmzdv97xj9gfg83s_t_41r0000gn/T/portunus-review-regression-vFkr3D/scripts/mutation-go.mjs:233:46\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.15.0\n"
+  },
+  {
+    "kind": "orphan",
+    "exitCode": 0,
+    "workspaceUnchanged": true,
+    "completed": true,
+    "toolCompleted": true,
+    "runCompleted": true,
+    "resultComplete": false,
+    "allKilled": false,
+    "temporarySourceRemoved": true,
+    "actualGoStillAlive": false,
+    "runReportExists": true,
+    "stderr": ""
+  },
+  {
+    "kind": "dry-strict",
+    "exitCode": 10,
+    "workspaceUnchanged": true,
+    "completed": true,
+    "toolCompleted": true,
+    "runCompleted": false,
+    "resultComplete": false,
+    "allKilled": false,
+    "temporarySourceRemoved": true,
+    "actualGoStillAlive": false,
+    "runReportExists": true,
+    "stderr": ""
+  }
+]

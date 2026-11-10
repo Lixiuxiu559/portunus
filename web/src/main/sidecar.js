@@ -253,6 +253,15 @@ function createBackend(deps) {
     get error() {
       return error;
     },
+    // 仅 Main 内部使用，不经 preload 暴露。外部轮询模式没有 owned child，
+    // 不能授予配置迁移能力；每次读取都返回不可修改的实例快照。
+    get access() {
+      return Object.freeze({
+        instanceId,
+        generation,
+        ready: state === 'ready' && Boolean(child) && child.exitCode == null && child.signalCode == null && !child.killed,
+      });
+    },
     ready,
     start,
     stop,
