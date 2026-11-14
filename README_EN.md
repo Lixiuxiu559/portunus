@@ -68,13 +68,13 @@ Call records capture the selected model, channel, group, protocol, latency, requ
 
 Record counts refer to log rows; retries or target switches can produce several records for one client request. Portunus does not configure model prices or calculate call costs. Refer to your upstream provider's invoice for actual charges.
 
-Filter by channel, group, or exact request ID; open a record to copy its request ID or error summary. The request association view groups persisted logs by request ID and shows ordinary retries, token-budget compatibility retries, and target switches. Historical logs without an ID stay separate. The latest persisted result is not proof of a final client outcome, and a continuous attempt sequence does not prove completeness. See the [call-record guide (Chinese)](docs/call-records.md).
+The current log page supports filtering by channel, group, model, API key, and success/failure status. Open a record to copy its request ID or error summary and inspect the collected upstream attempts and routing diagnostics for that request. The current UI has no request-ID filter or request-grouping view; the corresponding backend query APIs remain available. Log results and collected attempts do not prove that a complete client request succeeded. See the [call observability and logging architecture (Chinese)](docs/wiki/核心模块/调用观测与日志.md).
 
 ### Check upstream balances and quotas
 
 Add query sources from an upstream channel card. Built-in adapters cover DeepSeek, SiliconFlow China, OpenRouter, and NewAPI accounts; custom sources use GET/POST and JSON field mappings. Query credentials are configured separately from generation credentials, and accounts and currencies are displayed separately.
 
-Cards show the last queried balance, its timestamp, and a refresh action. Successful values remain visible as they age; failed updates and invalid credentials have separate states. Automatic refresh is off by default. These values do not affect routing, circuit breakers, or call-cost calculation. See the [balance and quota guide (Chinese)](docs/channel-quota.md). This describes the current source tree; packaged availability depends on the Release.
+Cards show the last queried balance, its timestamp, and a refresh action. Successful values remain visible as they age; failed updates and invalid credentials have separate states. Automatic refresh is off by default. These values do not affect routing, circuit breakers, or call-cost calculation. See the [balance and quota architecture (Chinese)](docs/wiki/核心模块/余额与额度.md). This describes the current source tree; packaged availability depends on the Release.
 
 ### Keep everyday maintenance on your desktop
 
@@ -98,7 +98,7 @@ If your system blocks the first launch, see [Installation help](#installation-he
 
 ### 2. Add a channel and create a group
 
-In Upstream Channels, choose a provider preset and protocol, enter the endpoint and API key, then fetch and select models or enter their names manually before saving. See the [upstream-channel guide (Chinese)](docs/upstream-channels.md). Then open Groups to select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order. The app opens on Channels by default, with navigation in this order: Channels, Models, Groups, Logs, Access, Settings.
+In Upstream Channels, choose a provider preset and protocol, enter the endpoint and API key, then fetch and select models or enter their names manually before saving. See the [channels, models, and groups architecture (Chinese)](docs/wiki/核心模块/渠道模型与分组.md). Then open Groups to select upstream models and choose a routing strategy. For automatic fallback, choose Failover and set the priority order. The app opens on Channels by default, with navigation in this order: Channels, Models, Groups, Logs, Access, Settings.
 
 ### 3. Connect clients and applications
 
