@@ -220,3 +220,5 @@ pnpm run build:win   # Windows EXE / ZIP（x64）
 ---
 
 [产品定义与阶段计划](./docs/product/PRODUCT.md) · [版本更新](https://github.com/Lixiuxiu559/portunus/releases) · [问题与建议](https://github.com/Lixiuxiu559/portunus/issues)
+
+> 本项目由社区维护，欢迎提交 Issue。
